@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сейсмостанция «Разлом-26» — монитор рынка</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%23EAEDEB"/><path d="M2 17h6l3-9 5 17 4-12 3 4h7" stroke="%23A63A2B" stroke-width="2.6" fill="none"/></svg>'>
+<style>
+  :root{
+    --paper:#EAEDEB;--card:#FBFCFA;--ink:#1B2321;--ink-soft:#5A6560;--line:#D3D8D4;
+    --calm:#1F7A63;--calm-bg:#E3F0EA;--tension:#B7791F;--tension-bg:#F5EBD9;
+    --fault:#A63A2B;--fault-bg:#F4E2DD;--neutral:#6B7570;--neutral-bg:#E7EAE8;
+    --mono:"SF Mono","Cascadia Mono","JetBrains Mono",Consolas,"Liberation Mono",monospace;
+    --serif:"Iowan Old Style",Georgia,"Times New Roman",serif;
+    --sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg,transparent,transparent 27px,rgba(27,35,33,.04) 27px,rgba(27,35,33,.04) 28px),
+      repeating-linear-gradient(90deg,transparent,transparent 27px,rgba(27,35,33,.04) 27px,rgba(27,35,33,.04) 28px);
+    line-height:1.45;font-size:15px}
+  .wrap{max-width:1280px;margin:0 auto;padding:18px 22px 60px}
+  a{color:inherit}button{font-family:inherit;cursor:pointer}
+
+  /* ---------- шапка ---------- */
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 22px;padding-bottom:10px;position:relative}
+  .station{font-family:var(--serif);font-size:25px;letter-spacing:.4px}
+  .station .num{font-family:var(--mono);font-size:13px;color:var(--ink-soft);margin-left:8px}
+  .srcline{margin-left:auto;display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .srcdots{display:flex;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--line);border:1px solid var(--ink-soft)}
+  .dot.ok{background:var(--calm);border-color:var(--calm)}
+  .dot.fail{background:var(--fault);border-color:var(--fault)}
+  .dot.proxy{background:var(--tension);border-color:var(--tension)}
+  .btn{border:1.5px solid var(--ink);background:var(--card);padding:7px 16px;font-family:var(--mono);font-size:13px;border-radius:3px}
+  .btn:hover{background:var(--ink);color:var(--card)}
+  .btn[disabled]{opacity:.55;cursor:wait}
+  .btn:focus-visible,details summary:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--calm);outline-offset:2px}
+  .progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--line)}
+  .progress i{display:block;height:100%;width:0;background:var(--calm);transition:width .3s}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--ink)}
+
+  /* ---------- вердикт ---------- */
+  .verdict{margin-top:20px;border:2px solid var(--ink);border-radius:5px;background:var(--card);overflow:hidden;box-shadow:0 1px 0 rgba(27,35,33,.15)}
+  .v-tape{position:relative;height:98px;border-bottom:1.5px solid var(--line);background:
+      repeating-linear-gradient(90deg,transparent,transparent 26px,rgba(27,35,33,.06) 26px,rgba(27,35,33,.06) 27px)}
+  #tape{position:absolute;inset:0;width:100%;height:100%}
+  .v-word{position:absolute;left:26px;top:50%;transform:translateY(-50%);font-family:var(--serif);font-weight:700;font-size:42px;letter-spacing:.8px;text-shadow:0 0 16px var(--card),0 0 8px var(--card)}
+  .v-stamp{position:absolute;right:20px;top:12px;font-family:var(--mono);font-size:11px;color:var(--ink-soft);border:1px dashed var(--ink-soft);padding:4px 8px;border-radius:2px;transform:rotate(1.2deg);background:rgba(251,252,250,.9)}
+  .v-body{display:grid;grid-template-columns:minmax(300px,1.1fr) 1fr}
+  .v-scale{padding:18px 24px;border-right:1.5px solid var(--line)}
+  .scale-bar{position:relative;height:14px;border:1.5px solid var(--ink);border-radius:8px;background:linear-gradient(90deg,var(--fault) 0 32%,var(--tension) 32% 46%,#9aa8a2 46% 54%,#7fae94 54% 68%,var(--calm) 68% 100%)}
+  .scale-needle{position:absolute;top:-7px;width:2.5px;height:28px;background:var(--ink);left:50%;transition:left .8s cubic-bezier(.2,.8,.2,1)}
+  .scale-needle::after{content:"";position:absolute;top:-6px;left:-4.5px;border:6px solid transparent;border-top-color:var(--ink)}
+  .scale-lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:8px}
+  .v-nums{display:flex;gap:28px;margin-top:16px;flex-wrap:wrap}
+  .vn b{display:block;font-family:var(--mono);font-size:27px}
+  .vn span{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.6px}
+  .v-why{padding:18px 24px}
+  .v-why h4{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--ink-soft);margin-bottom:9px}
+  .why-row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:4px 0;border-bottom:1px dotted var(--line)}
+  .why-row .val{font-family:var(--mono);white-space:nowrap}
+  .phase{margin-top:12px;font-size:13px;color:var(--ink-soft);line-height:1.5}
+  .phase b{color:var(--ink)}
+  .override-banner{display:none;background:var(--fault);color:#fff;font-family:var(--mono);font-size:13px;padding:8px 24px;letter-spacing:.4px}
+  .override-banner.show{display:block}
+  .ai-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 24px;border-top:1.5px solid var(--line);background:rgba(31,122,99,.05)}
+  .ai-sel,.ai-inp{font-family:var(--mono);font-size:12.5px;padding:7px 9px;border:1.5px solid var(--line);border-radius:3px;background:#fff}
+  .ai-inp{min-width:150px}
+  .ai-inp.wide{min-width:240px;flex:1;max-width:330px}
+  .ai-strip .note{font-size:12px;color:var(--ink-soft)}
+  .ai-out{padding:14px 24px 18px;border-top:1px dashed var(--line);font-size:14px;line-height:1.62;max-width:920px}
+  .ai-out p{margin:0 0 10px}
+  .ai-out b{color:var(--ink)}
+
+  /* ---------- панели ---------- */
+  details.panel{margin-top:16px;border:1.5px solid var(--line);border-radius:4px;background:var(--card)}
+  details.panel>summary{list-style:none;cursor:pointer;padding:10px 18px;font-family:var(--serif);font-size:15.5px;display:flex;align-items:center;gap:10px;color:var(--ink-soft)}
+  details.panel>summary::before{content:"▸";font-family:var(--mono);transition:transform .2s}
+  details.panel[open]>summary::before{transform:rotate(90deg)}
+  .panel-body{padding:6px 18px 18px;border-top:1px solid var(--line)}
+  .keys{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-top:8px}
+  .keyfield label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-soft);margin-bottom:4px}
+  .keyfield input{font-family:var(--mono);font-size:13px;padding:8px 10px;border:1.5px solid var(--line);border-radius:3px;background:#fff;min-width:290px}
+  .hint{font-size:12.5px;color:var(--ink-soft);margin-top:10px;max-width:880px;line-height:1.5}
+
+  /* ---------- блоки и карточки ---------- */
+  section.block{margin-top:30px}
+  .block-head{display:flex;align-items:baseline;gap:14px;border-bottom:1.5px solid var(--ink);padding-bottom:6px;margin-bottom:14px}
+  .block-head h2{font-family:var(--serif);font-size:19px;font-weight:700}
+  .block-head .bw{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+  .bscore{margin-left:auto;font-family:var(--mono);font-size:12px;padding:3px 10px;border-radius:11px;border:1.5px solid var(--line);background:var(--neutral-bg);color:var(--ink)}
+  .bscore.pos{background:var(--calm-bg);border-color:var(--calm);color:var(--calm)}
+  .bscore.neg{background:var(--fault-bg);border-color:var(--fault);color:var(--fault)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:13px}
+  .card{background:var(--card);border:1.5px solid var(--line);border-radius:5px;padding:13px 15px 11px;display:flex;flex-direction:column;gap:7px;min-height:172px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--neutral)}
+  .card.s-calm::before{background:var(--calm)}
+  .card.s-tension::before{background:var(--tension)}
+  .card.s-fault::before{background:var(--fault)}
+  .card.s-na::before{background:var(--line)}
+  .card.s-na{opacity:.88}
+  .card.loading .c-val{color:var(--line);animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  .c-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .c-name{font-size:13px;font-weight:600;line-height:1.3;padding-left:6px}
+  .c-score{font-family:var(--mono);font-size:11px;padding:2.5px 8px;border-radius:10px;white-space:nowrap;border:1px solid transparent}
+  .sc-calm{color:var(--calm);background:var(--calm-bg)}
+  .sc-tension{color:#8a5c14;background:var(--tension-bg)}
+  .sc-fault{color:var(--fault);background:var(--fault-bg)}
+  .sc-neutral{color:var(--neutral);background:var(--neutral-bg)}
+  .c-val{font-family:var(--mono);font-size:24px;letter-spacing:-.3px;padding-left:6px}
+  .c-val.txt{font-size:17px;padding-top:3px}
+  .c-val small{font-size:13px;color:var(--ink-soft);margin-left:4px}
+  .c-delta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);padding-left:6px}
+  .c-note{font-size:12px;color:var(--ink-soft);line-height:1.4;padding-left:6px}
+  .c-note a.retry{color:var(--fault);font-family:var(--mono);font-size:11.5px;border-bottom:1px dotted var(--fault);text-decoration:none}
+  .c-spark{height:34px;margin-top:auto;padding-left:6px}
+  .c-spark canvas{width:100%;height:34px;display:block}
+  .zones{display:flex;gap:3px;padding-left:6px;flex-wrap:wrap}
+  .zone{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:9px;background:var(--neutral-bg);color:var(--ink-soft);border:1px solid transparent}
+  .zone.act{color:#fff;font-weight:600}
+  .zone.act.z2,.zone.act.z1{background:var(--calm)}
+  .zone.act.z0{background:var(--neutral)}
+  .zone.act.z-1{background:var(--tension)}
+  .zone.act.z-2{background:var(--fault)}
+  .c-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);border-top:1px dotted var(--line);padding-top:6px;padding-left:6px}
+  .c-meta a{text-decoration:none;border-bottom:1px dotted var(--ink-soft)}
+  .stale{color:var(--tension)}
+
+  /* ---------- детекторы ---------- */
+  .det-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:13px}
+  .det{background:var(--card);border:1.5px solid var(--line);border-radius:5px;padding:13px 15px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:7px}
+  .det::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--neutral)}
+  .det.st-fired::before{background:var(--fault)}
+  .det.st-watch::before{background:var(--tension)}
+  .det.st-good::before{background:var(--calm)}
+  .det-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .det-name{font-size:13px;font-weight:600;line-height:1.3;padding-left:6px}
+  .det-name .triad{color:var(--fault);font-size:11px;font-family:var(--mono)}
+  .det-state{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:10px;white-space:nowrap}
+  .st-fired .det-state{background:var(--fault);color:#fff}
+  .st-watch .det-state{background:var(--tension);color:#fff}
+  .st-calm .det-state{background:var(--neutral-bg);color:var(--neutral)}
+  .st-good .det-state{background:var(--calm);color:#fff}
+  .det-inputs{font-family:var(--mono);font-size:12px;padding-left:6px;color:var(--ink)}
+  .det-logic{font-size:11.5px;color:var(--ink-soft);line-height:1.45;padding-left:6px}
+  .det-pts{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+
+  .newsbox{margin-top:16px;font-size:12.5px}
+  .newsbox h4{font-family:var(--serif);font-size:14.5px;margin:12px 0 4px}
+  .newsbox .tagline{font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+  .news-item{padding:4px 0 4px 6px;border-bottom:1px dotted var(--line)}
+  .news-item .src{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft)}
+  .news-item a{text-decoration:none;border-bottom:1px dotted var(--ink-soft)}
+
+  .method{font-size:13.5px;max-width:980px}
+  .method h3{font-family:var(--serif);font-size:16px;margin:16px 0 6px}
+  .method p{margin:6px 0;color:var(--ink-soft);line-height:1.55}
+  .method p b{color:var(--ink)}
+  table.contrib{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;margin-top:10px}
+  table.contrib th,table.contrib td{border:1px solid var(--line);padding:5px 8px;text-align:left}
+  table.contrib th{background:rgba(27,35,33,.06);font-weight:600}
+  td.num{text-align:right}
+  footer{margin-top:36px;border-top:2px solid var(--ink);padding-top:12px;font-size:12px;color:var(--ink-soft);max-width:980px;line-height:1.55}
+  .updated{font-family:var(--mono)}
+  @media (max-width:760px){
+    .v-body{grid-template-columns:1fr}
+    .v-scale{border-right:none;border-bottom:1.5px solid var(--line)}
+    .v-word{font-size:28px}.station{font-size:20px}
+  }
+  @media (prefers-reduced-motion:reduce){.scale-needle{transition:none}.card.loading .c-val{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="station"><b>СЕЙСМОСТАНЦИЯ «РАЗЛОМ-26»</b><span class="num">v4.6 · сайт (серверный снимок) · бюллетень наблюдений за линиями разлома рынка</span></div>
+  <div class="srcline">
+    <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
+    <span id="updated" class="updated">—</span>
+    <button class="btn" id="refreshBtn">Обновить</button>
+  </div>
+  <div class="progress"><i id="pbar"></i></div>
+</header>
+
+<div class="verdict" id="verdictBox">
+  <div class="override-banner" id="overrideBanner"></div>
+  <div class="v-tape">
+    <canvas id="tape"></canvas>
+    <div class="v-word" id="vWord">ЗАГРУЗКА…</div>
+    <div class="v-stamp" id="vStamp">станция активна</div>
+  </div>
+  <div class="v-body">
+    <div class="v-scale">
+      <div class="scale-bar"><div class="scale-needle" id="needle"></div></div>
+      <div class="scale-lab"><span>−100 · защита</span><span>0</span><span>+100 · риск-он</span></div>
+      <div class="v-nums">
+        <div class="vn"><b id="vScore">—</b><span>композитный балл</span></div>
+        <div class="vn"><b id="vCover">—</b><span>покрытие данных</span></div>
+        <div class="vn"><b id="vDet">0</b><span>детекторы событий</span></div>
+        <div class="vn"><b id="vLead">—</b><span>опережающие</span></div>
+        <div class="vn"><b id="vCoin">—</b><span>подтверждающие</span></div>
+      </div>
+      <div class="phase" id="vPhase"></div>
+    </div>
+    <div class="v-why">
+      <h4>Что тянет вердикт (топ-факторы)</h4>
+      <div id="whyList"></div>
+    </div>
+  </div>
+  <div class="ai-strip">
+    <select id="aiProvider" class="ai-sel" title="Провайдер ИИ"></select>
+    <input id="aiModel" class="ai-inp" placeholder="модель" title="ID модели у провайдера">
+    <input id="aiKey" class="ai-inp wide" type="password" placeholder="API-ключ провайдера" title="Хранится в памяти вкладки; постоянно — в CONFIG.AI">
+    <input id="aiBase" class="ai-inp wide" placeholder="base URL (напр. http://localhost:1234/v1)" style="display:none">
+    <select id="aiDepth" class="ai-sel" title="Формат разбора">
+      <option value="deep" selected>эссе · глубокий</option>
+      <option value="brief">сводка · краткая</option>
+    </select>
+    <button class="btn" id="aiBtn">Спросить ИИ</button>
+    <span id="aiStatus" class="updated"></span>
+    <span class="note">снимок уходит НАПРЯМУЮ выбранному провайдеру — ключи ИИ никогда не проходят через CORS-шлюзы</span>
+  </div>
+  <div class="ai-out" id="aiOut" hidden></div>
+</div>
+
+<details class="panel">
+  <summary>Источники и ключи (уже настроено — открывать не обязательно)</summary>
+  <div class="panel-body">
+    <div class="keys">
+      <div class="keyfield"><label for="fredKey">FRED API key</label><input id="fredKey" type="password" autocomplete="off"></div>
+      <div class="keyfield"><label for="finnhubKey">Finnhub key</label><input id="finnhubKey" type="password" autocomplete="off"></div>
+      <button class="btn" id="applyKeys">Применить и обновить</button>
+    </div>
+    <p class="hint">FRED не отдаёт CORS-заголовки браузеру — это свойство самого API, поэтому его серии всегда идут через шлюзы: страница обходит их по одному, начиная с самого надёжного за сессию (сбой — штраф рейтинга шлюза, 429 — пауза); янтарная точка в шапке — норма, а не ошибка. Надёжнее и приватнее всего — собственный шлюз в <code>CONFIG.OWN_PROXY</code> (готовый код Cloudflare Worker — в комментарии рядом с конфигом): встроенный ключ FRED через публичные шлюзы виден их операторам, а ключ Finnhub через них не отправляется вовсе — при недоступности прямого пути его карточки честно помечаются сбоем. Серии кэшируются: при обновлении старые значения остаются на экране и заменяются по мере прихода свежих. NY Fed, Treasury, CoinGecko, Frankfurter и Finnhub обычно работают напрямую. Блок «Спросить ИИ» под вердиктом устойчив к смене моделей и провайдеров — три пути: <b>OpenRouter</b> (агрегатор: почти любая модель мира одним ключом; ключ — openrouter.ai/keys, каталог id — openrouter.ai/models), <b>Meta · Muse Spark</b> (напрямую через Meta Model API, поскольку в OpenRouter её нет: ключ — developer.meta.com/ai, модель muse-spark-1.1, цена $1,25/$4,25 за Мток — один разбор ≈ цента, новым аккаунтам $20 кредитов; превью изначально только для США — при блокировке браузерного запроса обход через локальный LiteLLM-прокси в «своём endpoint») и <b>свой endpoint</b> — любой OpenAI-совместимый сервер: локальные Ollama (http://localhost:11434/v1) и LM Studio (http://localhost:1234/v1) — бесплатно и приватно, vLLM, LiteLLM, либо прямой API любого провайдера по его base URL. Провайдер, модель и ключ — в полосе кнопки; постоянные значения — в <code>CONFIG.AI</code>. Снимок показателей уходит <b>напрямую</b> провайдеру, ключи ИИ через CORS-шлюзы не ходят. Этот же настроенный провайдер используется для LLM-верификации новостных триггеров детекторов. У кнопки два формата: <b>эссе</b> — развёрнутое объяснение смысла комбинации (причинные цепочки, три сценария с сигналами-порогами, фальсификаторы; рассчитано на мощные модели уровня Claude Opus 4.8 / Fable 5 / GPT-5.6 / DeepSeek V4 Pro; 700–1100 слов, 20–60 сек., на Opus ≈ 8–12 центов за разбор) и <b>сводка</b> — короткая выжимка, посильная слабым и локальным моделям.</p>
+  </div>
+</details>
+
+<div id="blocks"></div>
+
+<section class="block">
+  <div class="block-head"><h2>VI · Автодетекторы событий</h2><span class="bw">считаются только по данным и новостям · ручного ввода нет</span><span class="bscore" id="bs_det"></span></div>
+  <div class="det-grid" id="detGrid"></div>
+  <div class="newsbox" id="newsbox"></div>
+</section>
+
+<details class="panel" style="margin-top:26px">
+  <summary>Как считается вердикт: методология и таблица вкладов</summary>
+  <div class="panel-body method">
+    <p><b>Что это.</b> Панель — ежедневный монитор режима, формализующий одну ставку рынка: «денежные потоки от ИИ придут по расписанию, а короткое долларовое фондирование останется дешёвым и бесперебойным». Пять блоков — водопровод ликвидности, кредит, рынок, макро-цикл, режим-детекторы — рассматриваются как производные этой ставки; задача панели — заметить, когда она начинает трещать. Вердикт означает «какой режим подтверждают данные», а не «дёшево/дорого» и не «купить сегодня»: это позиционный барометр (какую долю риска положено нести в этом режиме), а не тайминг-триггер.</p>
+    <p><b>Скоринг.</b> Каждый индикатор попадает в одну из зон с баллом −2…+2 (зонная шкала на карточке, активная зона подсвечена; у HY/IG/VIX в строке динамики дан P₂ᵧ — перцентиль за два года, контекст к абсолютным порогам). Родственные индикаторы объединены в «семьи» (уровень + импульс HY; тренд + импульс S&amp;P; четыре количественных меры ликвидности; цена фондирования: SOFR−IORB, SRF, вола ставок): семья голосует в блоке один раз — одна серия данных не считается дважды. Балл блока = среднее семейств × 50; композит = взвешенное по блокам (25/25/20/15/15), −100…+100, плюс поправки автодетекторов. Вердикты: ≥+30 «покупать» · +10…+30 «держать, докупать выборочно» · −10…+10 «держать» · −30…−10 «сокращать/хеджировать» · &lt;−30 «защитный режим»; при покрытии &lt;60% вердикт не ставится.</p>
+    <p><b>Два измерения и гейт.</b> Индикаторы разделены на <b>подтверждающие</b> (условия сейчас: уровни спредов, тренд, вола, резервы — по своей природе зелёные до самой вершины цикла) и <b>опережающие</b> (куда клонится: импульсы кредита и волы ставок, канарейки ликвидности, кривая после инверсии, TGA, SLOOS, заявки, доллар и юань). Обе шкалы считаются по тем же семьям и показаны в шапке. Гейт: «ПОКУПАТЬ» требует опережающих ≥ +10, полная «ЗАЩИТА» по баллам — опережающих ≤ −10; иначе вердикт сдвигается на ступень с пояснением. Расхождение шкал — главный сигнал стадии: «подтверждающие сильны, опережающие остыли» = поздняя Фаза 0.</p>
+    <p><b>Автодетекторы и триада.</b> Шесть детекторов с двумя уровнями (НАБЛЮДЕНИЕ — ранние признаки, малая поправка; СРАБОТАЛ — полная). Фондинговый стресс: SRF устойчиво &gt;$25 млрд (≥2 дня из трёх либо вне окна квартального конца — разовый квартальный всплеск является косметикой дилерских балансов и срабатыванием не считается) или SOFR−IORB &gt;15 б.п. Капекс/амортизация гиперскейлеров и стресс BDC: сканер заголовков за 14 дней с фильтром отрицаний и LLM-подтверждением факта (при заданном ИИ-ключе); срабатывание — по ≥2 разным тикерам, совпадения публикуются под детекторами. Нефтяной шок — по цене и скорости WTI. Инфляционный узел — базовый CPI × динамика зарплат. Разворот ФРС даёт плюс только при упорядоченном смягчении (HY &lt;400, спокойная вола ставок); 2-летка −50 б.п. при HY ≥450 или воле &gt;10 — паническое смягчение, плюса нет. <b>Рубильник триады</b>: (фондинговый + капекс или BDC) ИЛИ (капекс + BDC при ≥1 жёстком рыночном подтверждении) ИЛИ (фондинговый + ≥2 подтверждения) → «ЗАЩИТНЫЙ РЕЖИМ» независимо от суммы баллов — в «проверке кэшем» корреляции уходят к единице, и обычный скоринг структурно запаздывает.</p>
+    <p><b>Фазы (нелинейны).</b> 0 (рост) → 0-поздняя → 1 «проверка кэшем» (падает почти всё, включая будущих победителей — в маржин-волну не ловят даже золото и дюрацию) → 2 «ответ политики» (первое снижение ставки исторически — сигнал продажи; вход — только по триаде разворота: спреды перестали расширяться + ревизии прибыли стабилизировались + доллар развернулся) → 3 (дебейсмент: слабый доллар, золото лидирует). Стагфляционный узел (растущие брейк-ивены на падающем рынке) приоритетнее Фазы 2: у политики связаны руки, защита — реальные активы и короткий кэш, а не длинная дюрация.</p>
+    <p><b>Ключевые калибровки.</b> Пустой RRP — нейтраль: структурный факт цикла, последствия ловят SOFR−IORB и SRF. Экстремальный штиль не награждается ни по VIX (&lt;13), ни по воле ставок (&lt;2,5 б.п./день — набранное плечо базис-трейда). Растяжение S&amp;P &gt;12% над 200-дневной срезает трендовый балл до +1 — встроенный валюационный противовес. Просадка биткоина 10–25% при VIX&lt;20 — дивергенция ликвидности (−1). Обвал нефти &gt;20%/30дн при устойчивом рынке — дезинфляционный плюс, при падающем — без плюса. Выход кривой из инверсии различается по 2-летке: бычье раскручивание −2 (острый рецессионный таймер), медвежье −1 (его дюрационный пресс уже считает TIPS-карточка). Резервы нормированы на ВВП: стресс-2019 случился при ~7%, современная комфортная зона ~10–11%. Sahm занижен падением участия — рядом пейроллы (порог безубыточности ~40–60 тыс./мес).</p>
+    <p><b>Ритм использования.</b> Почти все ряды T+1, балансы ФРС — еженедельно: смотреть чаще раза в день бессмысленно. Спокойная фаза: один взгляд вечером (по Москве — когда вышли вчерашние данные США и дневные операции ФРС), 2–3 минуты — вердикт, две шкалы, колонка «тянут вниз», состояния детекторов; чуть внимательнее в четверг–пятницу (H.4.1, заявки, NFCI) и по календарю: первая пятница месяца (пейроллы), середина месяца (CPI), февраль/май/август/ноябрь (SLOOS), дни FOMC. Повышенное внимание — любой детектор в НАБЛЮДЕНИИ, опережающие ниже нуля или HY-импульс &gt;+25: дважды в день. Событие — детектор СРАБОТАЛ или рынок падает: панель отвечает на главный вопрос дня — трёхдневная встряска или смена режима.</p>
+    <p><b>Горизонты опережения.</b> Быстрый слой (дни): иена, SRF, SOFR−IORB, термструктура VIX — это сигналы «уже происходит». Средний (2 недели — 2 месяца): вола ставок (исторически ломается за 2–3 недели до кредита), HY-импульс (2007: спреды поехали за 3–4 месяца до пика акций; 2020: за дни), биткоин-канарейка, чистая ликвидность и TGA. Медленный (1–2 квартала): SLOOS, бычье раскручивание кривой. Sahm и пейроллы — подтверждение уже идущей рецессии: калибровка фазы, не прогноз.</p>
+    <p><b>Честные пределы.</b> Панель почти никогда не сигналит до первого движения цены; её работа — после первых процентов падения отличить шум от смены режима, до основной части тренда. Медленный кредитный топпинг (2000/2007) она опережает: гейт снимает «покупать» за недели-месяцы. Быстрый экзогенный шок (иена-2024, февраль-2020) первые −5–10% встретит зелёной — это неустранимо для дневных данных; ценность смещается на день 1–3 (триада и фаза). Дно панель пропускает по построению: первое снижение ставки — сигнал продажи, вход — по триаде разворота; это осознанная асимметрия — заплатить первыми процентами отскока, чтобы не сидеть с полной аллокацией внутри −30–40%. Действовать по панели — ступенчато, раз в дни-недели, а не рывком по одному сигналу.</p>
+    <p><b>Смена цикла — как пересадить панель на новую ставку, не ломая двигатель.</b> Панель двухэтажна: <b>шасси</b> (водопровод ликвидности, кредит-против-акций, кривая, труд, доллар, семьи, гейт опережающих, триада-как-жанр, фазовая модель) — это макро-физика, работавшая в 1998, 2007, 2019, 2020 и 2024 годах и не привязанная к ИИ; <b>картридж</b> (блок CYCLE в начале скрипта) — всё, что привязано к текущей ставке: её формулировка, тикеры двух узких радаров, справочные секции ленты. Когда эта ставка отыграет, чек-лист пересадки: 1) сформулируйте новую ставку одним предложением (что должно оставаться правдой, чтобы риск был оправдан) и впишите в CYCLE.bet — она автоматически попадёт в эссе-контракт ИИ; 2) замените capexTickers на 4–6 эмитентов, чьи расходы несут новую ставку, и bdcTickers — на публичные канарейки её самого непрозрачного канала финансирования (в 2007 это были бы ABX/монолайны, сейчас — BDC); 3) обновите гео/тарифные регэкспы и заголовки секций под новый внешний риск; 4) пройдите чек-лист калибровки ниже; 5) убедитесь, что триада всё ещё осмыслена: «фондинговый стресс» вечен, а два новостных детектора должны смотреть на каналы новой ставки. Ничего за пределами CYCLE и порогов не трогать.</p>
+<p><b>Годовой ритуал обслуживания</b> (напоминание — в подвале страницы): обновить константу ВВП (CONFIG.GDP_FALLBACK_BN, одна цифра); взглянуть на пороги, помеченные как режимо-зависимые — порог безубыточности пейроллов (иммиграционная политика), абсолютные уровни иены (дифференциал ставок), «$95» нефти (уровень общей инфляции); свериться с P₂ᵧ-перцентилями на HY/IG/VIX — если «спокойные» абсолютные зоны системно сидят в хвостах двухлетнего распределения, режим сместился и зоны пора двигать; проверить, живы ли первоисточники (сбои каскадов видны сами — по подписям «резерв» на карточках).</p>
+<p><b>Данные и что за бортом.</b> Лаги: WTI до ~5 дней (EIA), золото через PAXG≈споту, SLOOS квартальный, пейроллы/Sahm сильно ревизуются BLS задним числом. Машинно не измеряется (нет бесплатных источников): позиционирование (COT/AAII), полноценный MOVE и CDX-базис, мультипликаторы прибыли, внутридневная ширина — эти слои смотрите руками; BIZD и дневная ширина показаны справочно и в балл не входят. Панель — монитор одной поименованной ставки, не универсальный кризис-радар: чужой кризис (CRE, Европа, сырьё) она увидит через общие ноги — фондирование, кредит, доллар — позже узкоспециализированного радара, но не пропустит. У критичных карточек — каскады источников: валюты ECB→FRED H.10 · RRP NY Fed→FRED · SRF NY Fed→FRED RPONTSYD · TGA Минфин→FRED · крипто и золото CoinGecko→Binance · Sahm→расчёт из UNRATE · ВВП→встроенная оценка; активный резерв подписан на карточке. Кросс-индикаторы (биткоин×VIX, золото×TIPS, нефть и стагфляция×S&amp;P) считаются второй волной — строго после своих источников; если источник всё же недоступен, карточка помечается и пересчитывается автодолечиванием. Перцентильный скоринг и PCA отклонены осознанно ради полной трассируемости каждого балла (таблица ниже); ручная проверка событий BDC — полнотекстовый поиск EDGAR.</p>
+    <h3>Вклад каждого индикатора в текущий балл</h3>
+    <div id="contribWrap"><p>Появится после загрузки данных.</p></div>
+  </div>
+</details>
+
+<footer>
+  <p><b>Дисклеймер.</b> Страница — исследовательский инструмент, механически переводящий открытые данные в сводный индикатор по заранее описанным правилам. Это не инвестиционная рекомендация; автор логики — языковая модель без лицензии финансового консультанта. Данные приходят с задержками и могут содержать ошибки источников — критичные значения проверяйте по первоисточникам (ссылки на карточках). Решения о сделках — с учётом вашего горизонта и риска, при необходимости с лицензированным консультантом.</p>
+  <p style="margin-top:6px">Автообновление каждые 15 минут: <span class="updated" id="countdown">—</span></p>
+  <p style="margin-top:6px">Калибровка циклических порогов (иена, заявки, резервы/ВВП, GDP-резерв): <span class="updated" id="calib">—</span></p>
+</footer>
+</div>
+
+<script>
+/* ═════════ v4.6 · аудит-редакция (12.07.2026) ═════════
+   Логика скоринга, пороги, веса и вердикты НЕ менялись. Изменения:
+   · безопасность: экранирование новостных заголовков и ссылок (устранён XSS);
+     ключ Finnhub больше не ходит через публичные CORS-шлюзы — только напрямую
+     или через собственный OWN_PROXY;
+   · данные: явные единицы FRED-серий вместо эвристики величины (паспорта серий:
+     WALCL и WTREGEN — $млн; RRPONTSYD/RPONTSYD — $млрд; WRESBAL публиковался
+     в обеих единицах — оставлена величинная развилка с пустой зоной риска);
+     sanity-диапазоны против битых ответов шлюзов; NOCORS-память шлюзов
+     сбрасывается на каждом обновлении; NEG-фильтр новостей — по клаузе
+     триггера, а не по всему заголовку (реальные события со словами
+     despite/unchanged больше не теряются); degraded-флаг у кривой без DGS2;
+     Binance-резерв подписывается на карточке;
+   · сервис: CONFIG.DEBUG (журнал сбоев в консоль), CONFIG.OWN_PROXY (+готовый
+     Worker в комментарии), перерисовка спарклайнов при resize, aria-подписи
+     точек источников, favicon, строка калибровки порогов в футере,
+     поля ключей скрыты (type=password).
+   ═ Синтез (финал): восстановлены метки/сортировка/лимит ленты триггеров и
+     расширенный снимок для ИИ ([метка] тикер дата) — поверх экранирования;
+     WTREGEN — величинная развилка (паспорт FRED менялся: млрд↔млн; порог 2500
+     разделяет режимы без зоны неоднозначности), sanity-низ расширен до
+     долговых-потолочных минимумов TGA; контракт «Спросить ИИ» переписан с
+     пересказа на интерпретацию; финал: ДВА контракта на выбор в полосе кнопки —
+     эссе-мандат для мощных моделей (причинная механика, три сценария с
+     порогами-сигналами из зон панели, фальсификаторы; 700–1100 слов, бюджет
+     вывода 3400 токенов) и краткая сводка для слабых/локальных (150–250 слов,
+     1200 токенов); в снимок добавлены баллы блоков; вечная вкладка не копит
+     память (история композита ограничена 500 точками).
+   ═ Долговечность: цикло-специфика (ставка, тикеры радаров, гео/тарифные
+     регэкспы и заголовки секций) вынесена в единый КАРТРИДЖ CONFIG.CYCLE;
+     тексты логики детекторов и ставка в эссе-контракте генерируются из него;
+     в методологии — чек-лист «Смена цикла» и годовой ритуал обслуживания.
+   ═ Хостинг: режим серверного снимка (CONFIG.SNAPSHOT_URL) — страница читает
+     готовый snapshot.json, собранный расписанием; один хук snapKey в fetchJSON
+     покрывает все 12 источников; ключи из опубликованной страницы удаляются. */
+/* ============ КОНФИГ ============ */
+const CONFIG={
+  /* ⚠ Ключи ниже встроены, чтобы страница работала «из коробки». Помните:
+     FRED-ключ уходит в URL через публичные шлюзы (их операторы его видят) —
+     для бесплатного личного ключа риск невелик, но при публикации файла
+     замените на свой; Finnhub-ключ ходит ТОЛЬКО напрямую или через OWN_PROXY. */
+  FRED_KEY:"",
+  FINNHUB_KEY:"",
+  DEBUG:false,            /* true → журнал сетевых сбоев и деградаций в консоль */
+  CALIBRATED:"2026-07",   /* месяц ревизии циклических порогов; футер напомнит через ~год */
+  OWN_PROXY:"",           /* свой CORS-шлюз: URL-префикс, к которому дописывается
+                             encodeURIComponent(целевой URL), напр.
+                             "https://razlom.<you>.workers.dev/?url=".
+                             Встаёт первым в очередь шлюзов и единственный
+                             допущен к Finnhub. Готовый Cloudflare Worker:
+                             export default{async fetch(req){
+                               const u=new URL(req.url).searchParams.get("url");
+                               if(!u||!/^https:\/\/(api\.stlouisfed\.org|markets\.newyorkfed\.org|api\.fiscaldata\.treasury\.gov|api\.coingecko\.com|api\.frankfurter\.(dev|app)|finnhub\.io|api\.binance\.com)\//.test(u))
+                                 return new Response("bad url",{status:400});
+                               const r=await fetch(u);const h=new Headers(r.headers);
+                               h.set("Access-Control-Allow-Origin","*");
+                               return new Response(r.body,{status:r.status,headers:h});
+                             }}  */
+  GDP_FALLBACK_BN:30800,
+  /* Хостинг-режим: URL серверного снимка данных (пусто = обычный клиентский режим).
+     На сайте: "./snapshot.json" — страница мгновенно читает готовые данные,
+     собранные расписанием GitHub Actions; ключи FRED/Finnhub тогда НЕ нужны в файле. */
+  SNAPSHOT_URL:"./snapshot.json",
+  /* ═════ КАРТРИДЖ ЦИКЛА ═════
+     Всё, что привязано к ТЕКУЩЕЙ ставке рынка, собрано здесь. Когда цикл
+     сменится (ставка отыграет вверх или вниз) — перепишите ТОЛЬКО этот блок
+     под новую ставку по чек-листу «Смена цикла» в методологии. Двигатель
+     вердикта (семьи, гейт, триада-как-жанр, фазы) — цикло-агностичен,
+     его не трогать. */
+  CYCLE:{
+    bet:"денежные потоки от ИИ придут по расписанию, а короткое фондирование останется дешёвым",
+    capexTickers:["MSFT","GOOGL","AMZN","META","ORCL"],        /* узкий радар №1: чей капекс несёт ставку */
+    bdcTickers:["ARCC","OBDC","FSK","BXSL","GBDC","MFIC"],     /* узкий радар №2: непрозрачный канал финансирования */
+    geoTitle:"Иран / Ормуз",                                    /* справочная гео-секция ленты */
+    geoRx:"(hormuz|strait of hormuz|iran)[^.]{0,90}(strike|attack|clos\\w*|block\\w*|escalat\\w*|tanker|missile|cease-?fire|truce|deal|agreement|talks)|(cease-?fire|peace|deal|agreement)[^.]{0,50}iran",
+    tariffTitle:"Тарифы",
+    tariffRx:"tariff|section 122|ieepa|duty refund|trade court"
+  },  /* номинальный ВВП США, $млрд — резерв нормировки резервов; обновляйте изредка */
+  /* ===== «Спросить ИИ»: три пути, устойчивые к смене моделей =====
+     openrouter — агрегатор: почти любая модель мира одним ключом (каталог: openrouter.ai/models)
+     musespark  — Meta Model API напрямую (Muse Spark нет в OpenRouter): api.meta.ai, $1.25/$4.25 за Мток, $20 стартовых кредитов
+     custom     — любой OpenAI-совместимый сервер: локальные Ollama/LM Studio/vLLM, LiteLLM-прокси, либо прямой API любого провайдера */
+  AI:{
+    provider:"openrouter",
+    openrouter:{key:"",model:"anthropic/claude-sonnet-4.6"},
+    musespark:{key:"",model:"muse-spark-1.1"},
+    custom:{key:"",model:"",base:""}
+  }
+};
+
+/* ============ УТИЛИТЫ ============ */
+const $=id=>document.getElementById(id);
+const fmt=(v,d=2)=>(v==null||isNaN(v))?"—":v.toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d});
+const sign=v=>v>0?"+":"";
+const today=()=>new Date();
+const daysBetween=(a,b)=>Math.round((b-a)/864e5);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const iso=d=>d.toISOString().slice(0,10);
+const fredK=()=>($("fredKey").value.trim()||CONFIG.FRED_KEY);
+const finnK=()=>($("finnhubKey").value.trim()||CONFIG.FINNHUB_KEY);
+/* v4.6: экранирование внешних строк перед innerHTML и фильтр протокола ссылок */
+const esc=t=>String(t??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"#";
+const dbg=(...a)=>{if(CONFIG.DEBUG)console.warn("[разлом]",...a);};
+
+async function fetchWithTimeout(url,ms){
+  const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+  try{return await fetch(url,{signal:c.signal});}finally{clearTimeout(t);}
+}
+/* пул параллельных задач */
+async function pool(items,n,fn){
+  const q=[...items];
+  await Promise.all(Array.from({length:Math.min(n,q.length)},async()=>{
+    while(q.length){const it=q.shift();try{await fn(it);}catch(e){}}
+  }));
+}
+
+/* ============ СЕТЬ: прямой запрос + шлюзы с памятью «здоровья» ============ */
+/* Гонка из трёх прокси на каждый запрос создавала шторм и ловила 429 —
+   идём по одному, начиная с самого надёжного за сессию.
+   v4.6: NOCORS-память сбрасывается на каждом обновлении (один таймаут больше не
+   переводит источник в прокси-режим до конца сессии); хосты с ключом в URL
+   (Finnhub) через публичные шлюзы не ходят — только напрямую или через свой. */
+const GATES=[
+  {n:"corsproxy",score:0,f:u=>"https://corsproxy.io/?url="+encodeURIComponent(u)},
+  {n:"allorigins",score:0,f:u=>"https://api.allorigins.win/raw?url="+encodeURIComponent(u)},
+  {n:"codetabs",score:0,f:u=>"https://api.codetabs.com/v1/proxy?quest="+encodeURIComponent(u)},
+  {n:"corsproxy-legacy",score:-1,f:u=>"https://corsproxy.io/?"+encodeURIComponent(u)}
+];
+if(CONFIG.OWN_PROXY) GATES.unshift({n:"own",score:10,trusted:true,f:u=>CONFIG.OWN_PROXY+encodeURIComponent(u)});
+const NOCORS_BASE=["api.stlouisfed.org"];      /* FRED заведомо без CORS — сразу в шлюзы */
+let NOCORS=new Set(NOCORS_BASE);               /* v4.6: сбрасывается в начале каждого loadAll */
+const NOPROXY=new Set(["finnhub.io"]);         /* ключ в URL — публичным шлюзам не показываем */
+const SECRETCOOL={};                           /* кулдаун прямых попыток для NOPROXY-хостов */
+const SOURCES={fred:"idle",nyfed:"idle",treasury:"idle",coingecko:"idle",frankfurter:"idle",finnhub:"idle"};
+let SNAP=null; /* серверный снимок {generated_at,responses} */
+const snapHas=k=>!!(SNAP&&SNAP.responses&&SNAP.responses[k]!==undefined);
+function snapKey(url){
+  try{
+    const u=new URL(url), h=u.host, q=u.searchParams;
+    if(h.includes("stlouisfed"))   return "fred:"+q.get("series_id");
+    if(h.includes("newyorkfed"))   return u.pathname.includes("reverserepo")?"nyfed:rrp"
+                                        : u.pathname.includes("/rp/repo")   ?"nyfed:srf"
+                                        : u.pathname.includes("sofr")       ?"nyfed:sofr":null;
+    if(h.includes("fiscaldata"))   return "fiscal:tga";
+    if(h.includes("coingecko"))    {const m=u.pathname.match(/coins\/([a-z-]+)\//);return m?"cg:"+m[1]:null;}
+    if(h.includes("binance"))      return "bin:"+(q.get("symbol")||"");
+    if(h.includes("frankfurter"))  {const c=(q.get("symbols")||q.get("to")||"");return c?"fx:"+c:null;}
+    if(h.includes("finnhub"))      return u.pathname.includes("company-news")?"fh:news:"+q.get("symbol")
+                                        : u.pathname.includes("/quote")      ?"fh:quote:"+q.get("symbol")
+                                        : "fh:general";
+  }catch(e){}
+  return null;
+}
+async function fetchJSON(url,src){
+  if(SNAP&&SNAP.responses){                       /* режим сайта: данные уже собраны сервером */
+    const k=snapKey(url);
+    if(k&&SNAP.responses[k]!==undefined){ if(src)SOURCES[src]="ok"; return SNAP.responses[k]; }
+  }
+  const host=(()=>{try{return new URL(url).host;}catch(e){return "";}})();
+  const secret=NOPROXY.has(host);
+  if(secret&&SECRETCOOL[host]&&Date.now()<SECRETCOOL[host]){   /* недавний сбой — не мучаем повторами */
+    if(src&&SOURCES[src]!=="ok")SOURCES[src]="fail";
+    throw new Error("fetch failed: "+host);
+  }
+  if(!NOCORS.has(host)){
+    for(const ms of (secret?[6000,10000]:[6000])){             /* секретным хостам — вторая прямая попытка */
+      try{
+        const r=await fetchWithTimeout(url,ms);
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        const j=JSON.parse(await r.text());if(src)SOURCES[src]="ok";return j;
+      }catch(e){dbg("прямой запрос",host,String(e&&e.message||e));}
+    }
+    if(!secret) NOCORS.add(host);                              /* лишь до ближайшего loadAll */
+  }
+  const gates=GATES.filter(g=>!secret||g.trusted);             /* хосты с ключом — только через свой шлюз */
+  if(!gates.length){
+    SECRETCOOL[host]=Date.now()+60000;
+    if(src&&SOURCES[src]!=="ok")SOURCES[src]="fail";
+    throw new Error("fetch failed: "+host);
+  }
+  for(let round=0;round<2;round++){
+    const order=[...gates].sort((a,b)=>(b.score-a.score)||(Math.random()-0.5));
+    for(const g of order){
+      if(g.cool&&Date.now()<g.cool) continue;      /* шлюз в кулдауне после 429 */
+      try{
+        const r=await fetchWithTimeout(g.f(url),round?12000:9000);
+        if(r.status===429){g.cool=Date.now()+20000;g.score=Math.max(g.score-2,-4);throw new Error("HTTP 429");}
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        const j=JSON.parse(await r.text());
+        g.score=Math.min(g.score+1,4);
+        if(src&&SOURCES[src]!=="ok")SOURCES[src]="proxy";
+        return j;
+      }catch(e){g.score=Math.max(g.score-1,-4);dbg("шлюз",g.n,host,String(e&&e.message||e));}
+    }
+    await sleep(400+Math.random()*400);
+  }
+  if(src&&SOURCES[src]!=="ok"&&SOURCES[src]!=="proxy")SOURCES[src]="fail";
+  throw new Error("fetch failed: "+host);
+}
+function drawSources(){
+  const names={fred:"FRED",nyfed:"NY Fed",treasury:"Treasury",coingecko:"CoinGecko",frankfurter:"Frankfurter",finnhub:"Finnhub"};
+  const box=$("srcdots");box.innerHTML="";
+  for(const k in SOURCES){
+    const d=document.createElement("span");
+    d.className="dot "+(SOURCES[k]==="ok"?"ok":SOURCES[k]==="proxy"?"proxy":SOURCES[k]==="fail"?"fail":"");
+    const stTxt=({ok:"прямое подключение",proxy:"через CORS-шлюз (норма)",fail:"недоступен",idle:"не запрошен"})[SOURCES[k]];
+    d.title=names[k]+": "+stTxt;
+    d.setAttribute("role","img");d.setAttribute("aria-label",names[k]+": "+stTxt);
+    box.appendChild(d);
+  }
+}
+
+/* ============ FRED: кэш между обновлениями + нормализация единиц ============ */
+const SERIES_LIMITS={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,RRPONTSYD:300,WRESBAL:90,
+  BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
+  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:20,CES0500000003:20,
+  PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
+  DEXJPUS:70,DEXCHUS:70,UNRATE:30,RPONTSYD:20};    /* ленивые резервы: не предзагружаются */
+const FREDCACHE={};                      /* series → {obs,ts}; живёт между обновлениями */
+const FREDINFLIGHT={};
+/* v4.6: единицы H.4.1-серий заданы ЯВНО по паспортам FRED, а не угадываются по
+   величине. WALCL и WTREGEN — «Millions of U.S. Dollars»: старая эвристика
+   raw>100000 ломалась на TGA < $100 млрд (99 000 млн прочлись бы как 99 000 млрд).
+   WRESBAL публиковался FRED и в $млрд, и в $млн — для него величинная развилка
+   сохранена, но её зона неоднозначности пуста: резервы США не бывают <$100 млрд. */
+const FRED_MN=new Set(["WALCL"]);                    /* паспорт серии: всегда $млн */
+/* WTREGEN: FRED публиковал ряд И в $млрд (снимок 2025), И в $млн (текущий паспорт) —
+   развилка по величине; зона неоднозначности пуста: TGA исторически $3–1792 млрд,
+   т.е. в млн это ≥3000, в млрд ≤1792 — порог 2500 разделяет режимы начисто.
+   WRESBAL: та же история, но резервы не бывают <$100 млрд — порог 100000. */
+const bnOf=(series,raw)=> FRED_MN.has(series)? raw/1000
+  : series==="WTREGEN"? (raw>2500? raw/1000: raw)
+  : series==="WRESBAL"? (raw>100000? raw/1000: raw)
+  : raw;                                             /* → $млрд */
+/* Диапазоны здравого смысла (в «сырых» единицах серии): страховка от повреждённых
+   ответов публичных шлюзов — мусорные точки отбрасываются; если их больше половины,
+   ответ считается битым (сработают stale-кэш и повтор автодозагрузки). */
+const SANITY={SOFR:[0,15],IORB:[0,15],WALCL:[2e6,2.5e7],WTREGEN:[2,2.5e6],
+  WRESBAL:[500,1e7],RRPONTSYD:[0,3500],RPONTSYD:[0,1500],
+  BAMLH0A0HYM2:[1.5,25],BAMLC0A0CM:[0.4,8],SP500:[1000,30000],VIXCLS:[5,150],
+  VXVCLS:[5,120],SAHMREALTIME:[-1,10],CCSA:[5e5,3e7],T10Y3M:[-5,8],DFII10:[-4,9],
+  T10YIE:[-1,8],DCOILWTICO:[-60,300],DGS2:[-1,16],DGS10:[-1,16],CPILFESL:[100,600],
+  CES0500000003:[10,90],PAYEMS:[1.1e5,2.3e5],DTWEXBGS:[70,200],NFCI:[-3,12],
+  DRTSCILM:[-100,100],GDP:[15000,80000],DEXJPUS:[60,400],DEXCHUS:[4,12],UNRATE:[1,30]};
+async function fredFetch(series){
+  if(FREDINFLIGHT[series]) return FREDINFLIGHT[series];
+  const p=(async()=>{
+    const key=fredK();
+    if(!key&&!snapHas("fred:"+series)) throw new Error("NOKEY"); /* в режиме снимка ключ не нужен */
+    const url=`https://api.stlouisfed.org/fred/series/observations?series_id=${series}&api_key=${key||"snapshot"}&file_type=json&sort_order=desc&limit=${SERIES_LIMITS[series]||140}`;
+    const j=await fetchJSON(url,"fred");
+    let obs=(j.observations||[]).filter(o=>o.value!==".").map(o=>({d:new Date(o.date+"T00:00:00Z"),v:+o.value})).reverse();
+    const rg=SANITY[series];
+    if(rg){const n0=obs.length;obs=obs.filter(o=>o.v>=rg[0]&&o.v<=rg[1]);
+      if(n0&&obs.length<n0*0.5){dbg("sanity: битый ответ",series,(n0-obs.length)+"/"+n0);throw new Error("SANITY");}}
+    if(!obs.length) throw new Error("EMPTY");
+    FREDCACHE[series]={obs,ts:Date.now()};
+    return obs;
+  })().finally(()=>{delete FREDINFLIGHT[series];});
+  FREDINFLIGHT[series]=p;
+  return p;
+}
+async function fred(series){
+  const c=FREDCACHE[series];
+  if(c&&Date.now()-c.ts<5*60*1000) return c.obs;   /* свежий кэш */
+  try{ return await fredFetch(series); }
+  catch(e){ if(c) return c.obs; throw e; }          /* сеть упала — отдаём прошлое значение */
+}
+const fredCached=s=>FREDCACHE[s]?FREDCACHE[s].obs:null; /* синхронный доступ для детекторов */
+/* перцентиль текущего значения в 2-летнем окне — контекст к абсолютным порогам */
+const pctOf=(s,v)=>{const w=s.slice(-520).map(p=>p.v);if(w.length<120)return null;
+  return Math.round(w.filter(x=>x<v).length/w.length*100);};
+/* --- общие данные (мемоизация + stale-fallback), чтобы карточки не дублировали запросы --- */
+const SHARED={},SHAREDIN={};
+async function getShared(key,loader){
+  const c=SHARED[key];
+  if(c&&Date.now()-c.ts<5*60*1000) return c.v;
+  if(!SHAREDIN[key]) SHAREDIN[key]=loader().then(v=>{SHARED[key]={v,ts:Date.now()};return v;}).finally(()=>{delete SHAREDIN[key];});
+  try{ return await SHAREDIN[key]; }
+  catch(e){ if(c) return c.v; throw e; }
+}
+/* TGA: первоисточник — дневной отчёт Минфина (FiscalData, CORS есть); резерв — FRED WTREGEN */
+async function loadTGAseries(){
+  try{
+    const u="https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?sort=-record_date&page[size]=260";
+    const j=await fetchJSON(u,"treasury");
+    const rows=(j.data||[]).filter(r=>/Treasury General Account/i.test(r.account_type||""));
+    const pick=r=>+(r.open_today_bal??r.close_today_bal??r.opening_balance_today??NaN);
+    const s=rows.map(r=>({d:new Date(r.record_date),v:pick(r)/1000})).filter(x=>isFinite(x.v)&&x.v>0&&x.v<3000).reverse();
+    if(!s.length) throw 0;
+    return {rows:s,src:"Минфин (дневная)"};
+  }catch(e){
+    const s=await fred("WTREGEN");
+    return {rows:s.map(p=>({d:p.d,v:bnOf("WTREGEN",p.v)})),src:"FRED WTREGEN (недельная, резерв)"};
+  }
+}
+/* RRP: первоисточник — операции NY Fed (тот же API, что уже работает у SRF); резерв — FRED */
+async function loadRRPseries(){
+  try{
+    const j=await fetchJSON("https://markets.newyorkfed.org/api/rp/reverserepo/all/results/last/320.json","nyfed");
+    const ops=(j.repo&&j.repo.operations)||j.operations||[];
+    const byDate={};
+    ops.forEach(o=>{
+      const d=o.operationDate||o.effectiveDate;
+      const amt=+(o.totalAmtAccepted??o.totalAmountAccepted??0)/1e9;   /* $ → $млрд */
+      if(d) byDate[d]=(byDate[d]||0)+amt;
+    });
+    const rows=Object.keys(byDate).sort().map(d=>({d:new Date(d),v:byDate[d]})).filter(p=>p.v>=0&&p.v<3500);
+    if(!rows.length) throw 0;
+    return {rows,src:"NY Fed"};
+  }catch(e){
+    const s=await fred("RRPONTSYD");
+    return {rows:s.map(p=>({d:p.d,v:p.v})),src:"FRED (резерв)"};
+  }
+}
+const last=s=>s[s.length-1];
+const back=(s,n)=>s[Math.max(0,s.length-1-n)];
+function agoDays(s,days){
+  const t=last(s).d.getTime()-days*864e5;
+  if(s[0].d.getTime()>t) dbg("agoDays: серия короче окна",days,"дн. — дельта по доступному");
+  let best=s[0];
+  for(const p of s){if(p.d.getTime()<=t)best=p;else break;}
+  return best;
+}
+
+/* ============ РЕЕСТР ИНДИКАТОРОВ ============ */
+const IND=[];
+const state={data:{},history:[],news:{capex:[],bdcHard:[],bdcSoft:[],geo:[],tariff:[]},newsAt:null,detPts:0};
+function addInd(o){IND.push(o);}
+/* zones: [{l:подпись, s:балл}]; load() возвращает zi — индекс активной зоны */
+
+/* ---------- I · ВОДОПРОВОД (25) ---------- */
+addInd({id:"sofr_iorb",block:"plumb",family:"price",name:"SOFR − IORB (дефицит резервов)",unit:"б.п.",
+ zones:[{l:"<0",s:2},{l:"0–5",s:1},{l:"5–10",s:0},{l:"10–15",s:-1},{l:">15",s:-2}],
+ link:"https://www.newyorkfed.org/markets/reference-rates",
+ async load(){
+   let sofr;
+   try{sofr=await fred("SOFR");}catch(e){
+     const j=await fetchJSON("https://markets.newyorkfed.org/api/rates/secured/sofr/last/10.json","nyfed");
+     sofr=(j.refRates||[]).map(r=>({d:new Date(r.effectiveDate),v:+r.percentRate})).reverse();
+     if(!sofr.length) throw new Error("EMPTY");
+   }
+   const iorb=await fred("IORB");
+   const iMap=new Map(iorb.map(p=>[+p.d,p.v]));
+   const spOf=p=>{let iv=iMap.get(+p.d);if(iv==null){const pr=iorb.filter(q=>q.d<=p.d);iv=pr.length?pr[pr.length-1].v:last(iorb).v;}return (p.v-iv)*100;};
+   const sp=spOf(last(sofr));
+   const sp3=sofr.slice(-3).reduce((a,p)=>a+spOf(p),0)/Math.min(3,sofr.length);
+   state.sofrSpread=sp; state.sofrSpread3=sp3;
+   const zi= sp<0?0: sp<5?1: sp<10?2: sp<15?3:4;
+   return {value:fmt(sp,1),delta:"SOFR "+fmt(last(sofr).v)+"% / IORB "+fmt(last(iorb).v)+"%",
+     note:"Устойчивый плюс = резервы дороги, водопровод под давлением.",zi,date:last(sofr).d,
+     series:sofr.slice(-30).map(p=>({d:p.d,v:spOf(p)}))};
+ }});
+
+addInd({id:"netliq",block:"plumb",family:"qty",lead:true,staleDays:12,name:"Чистая ликвидность ФРС (баланс − TGA − RRP), Δ13 нед.",unit:"",
+ zones:[{l:">+1,5%",s:2},{l:"0…+1,5",s:1},{l:"−1,5…0",s:0},{l:"−4…−1,5",s:-1},{l:"<−4",s:-2}],
+ link:"https://fred.stlouisfed.org/series/WALCL",
+ async load(){
+   const w=await fred("WALCL");
+   const t=(await getShared("tga",loadTGAseries)).rows;   /* $млрд */
+   const r=(await getShared("rrp",loadRRPseries)).rows;   /* $млрд */
+   const rows=[];
+   for(const p of w){
+     const tg=[...t].reverse().find(x=>x.d<=p.d), rp=[...r].reverse().find(x=>x.d<=p.d);
+     if(!tg||!rp) continue;                        /* считаем только там, где есть все три компоненты */
+     rows.push({d:p.d,v:(bnOf("WALCL",p.v)-tg.v-rp.v)/1000}); /* $трлн */
+   }
+   if(rows.length<5) throw new Error("EMPTY");
+   const l=last(rows),prev=agoDays(rows,91),chg=(l.v/prev.v-1)*100;
+   const zi= chg>1.5?0: chg>0?1: chg>-1.5?2: chg>-4?3:4;
+   return {value:fmt(l.v,2)+" трлн $",delta:sign(chg)+fmt(chg,1)+"% за ~13 нед.",
+     note:"Растущая касса Минфина при пустом RRP выкачивает резервы напрямую.",zi,date:l.d,series:rows.slice(-50)};
+ }});
+
+addInd({id:"reserves",block:"plumb",family:"qty",staleDays:12,name:"Банковские резервы, % ВВП",unit:"%",
+ zones:[{l:">11 комфорт",s:2},{l:"10–11 достаточно",s:1},{l:"9–10 тонко",s:-1},{l:"<9 дефицит",s:-2}],
+ link:"https://fred.stlouisfed.org/series/WRESBAL",
+ async load(){
+   const s=await fred("WRESBAL"); const bn=bnOf("WRESBAL",last(s).v); /* $млрд */
+   let gdp=null,degraded=false;
+   try{const g=await fred("GDP"); gdp=last(g).v;}catch(e){}
+   if(!gdp){gdp=CONFIG.GDP_FALLBACK_BN;degraded=true;} /* ВВП квартальный и медленный: встроенная оценка держит нормировку */
+   const v=bn/gdp*100;
+   const zi= v>11?0: v>10?1: v>9?2:3;
+   return {value:fmt(v,1),degraded,
+     delta:fmt(bn/1000,2)+" трлн $ · ВВП "+fmt(gdp/1000,1)+" трлн"+(degraded?" (встроенная оценка)":""),
+     note:"Нормировка на ВВП вместо статичных долларов. Репо-стресс 2019-го случился при ~7% ВВП, но потребность в резервах с тех пор выросла (SRB-нормативы, базис-трейд, дилерские балансы) — современные оценки сдвигают комфортную зону к ~10–11%; ниже 9% — территория 2019-го с поправкой на рост системы.",
+     zi,date:last(s).d,series:s.slice(-60).map(p=>({d:p.d,v:bnOf("WRESBAL",p.v)/1000}))};
+ }});
+
+addInd({id:"tga",block:"plumb",family:"qty",lead:true,name:"Касса Минфина (TGA), дневная",unit:"$ млрд",
+ zones:[{l:"слив >75",s:2},{l:"слив 0–75",s:1},{l:"набор 0–75",s:-1},{l:"набор >75",s:-2}],
+ link:"https://fiscaldata.treasury.gov/datasets/daily-treasury-statement/",
+ async load(){
+   const sh=await getShared("tga",loadTGAseries), series=sh.rows;
+   const l=last(series),prev=agoDays(series,28),chg=l.v-prev.v;
+   const zi= chg<-75?0: chg<0?1: chg<75?2:3;
+   return {value:fmt(l.v,0),delta:sign(chg)+fmt(chg,0)+" за 4 нед. · "+sh.src,
+     note:"Расход TGA = скрытый впрыск ликвидности, набор кассы — дренаж.",zi,date:l.d,series:series.slice(-60)};
+ }});
+
+addInd({id:"rrp",block:"plumb",family:"qty",name:"Обратное репо (RRP): остаток буфера",unit:"$ млрд",
+ zones:[{l:">300 буфер",s:1},{l:"50–300",s:0},{l:"<50 нет буфера",s:0}],
+ link:"https://www.newyorkfed.org/markets/desk-operations/reverse-repo",
+ async load(){
+   const sh=await getShared("rrp",loadRRPseries), s=sh.rows; const v=last(s).v; /* $млрд */
+   const zi= v>300?0: v>50?1:2;
+   return {value:fmt(v,0),delta:last(s).d.toISOString().slice(0,10)+" · "+sh.src,
+     note:"Пустой буфер — структурный факт этого цикла (нейтраль): его ПОСЛЕДСТВИЯ ловят SOFR−IORB и SRF. Буфер >$300 млрд — плюс к запасу прочности.",
+     zi,date:last(s).d,series:s.slice(-90)};
+ }});
+
+addInd({id:"nfci",block:"plumb",staleDays:14,name:"Финансовые условия (NFCI, ФРБ Чикаго)",unit:"",
+ zones:[{l:"<−0,3 мягко",s:1},{l:"−0,3…0",s:0},{l:"0…0,5 жёстко",s:-1},{l:">0,5 стресс",s:-2}],
+ link:"https://www.chicagofed.org/research/data/nfci/current-data",
+ async load(){
+   const s=await fred("NFCI"); const v=last(s).v, chg=v-agoDays(s,60).v;
+   const zi= v<-0.3?0: v<0?1: v<0.5?2:3;
+   return {value:fmt(v,2),delta:sign(chg)+fmt(chg,2)+" за ~2 мес.",
+     note:"Композит из 105 рядов (кредит, леверидж, риск): ноль = историческая норма, выше нуля — условия жёстче нормы. Агрегатный кросс-чек всего блока.",
+     zi,date:last(s).d,series:s.slice(-100)};
+ }});
+
+addInd({id:"srf",block:"plumb",family:"price",name:"Обращения к SRF (репо-окно ФРС)",unit:"$ млрд",
+ zones:[{l:"≈0",s:1},{l:"1–25",s:0},{l:">25 кв.-конец",s:-1},{l:">25 устойчиво",s:-2}],
+ link:"https://www.newyorkfed.org/markets/desk-operations/repo",
+ async load(){
+   let byDate={},srcTag="";
+   try{
+     const j=await fetchJSON("https://markets.newyorkfed.org/api/rp/repo/all/results/last/6.json","nyfed");
+     const ops=(j.repo&&j.repo.operations)||j.operations||[];
+     ops.forEach(o=>{const d=o.operationDate||o.effectiveDate;const amt=+(o.totalAmtAccepted??o.totalAmountAccepted??0)/1e9;byDate[d]=(byDate[d]||0)+amt;});
+     if(!Object.keys(byDate).length) throw 0;
+   }catch(e){
+     const f=await fred("RPONTSYD");                 /* резерв: FRED, репо-операции ФРС, $млрд */
+     f.slice(-6).forEach(pnt=>{byDate[pnt.d.toISOString().slice(0,10)]=pnt.v;});
+     srcTag=" · FRED (резерв)";
+   }
+   const dates=Object.keys(byDate).sort();
+   if(!dates.length) throw new Error("EMPTY");
+   const l=byDate[dates[dates.length-1]];
+   state.srfLast=l; state.srfMax3=Math.max(...dates.slice(-3).map(d=>byDate[d]));
+   state.srfDays25=dates.slice(-3).filter(d=>byDate[d]>25).length;
+   const qd=new Date(dates[dates.length-1]), m=qd.getUTCMonth(), dd=qd.getUTCDate();
+   state.srfQtrEnd=((m===2||m===5||m===8||m===11)&&dd>=26)||((m===0||m===3||m===6||m===9)&&dd<=3);
+   const zi= l<1?0: l<25?1: (state.srfQtrEnd&&state.srfDays25<2)?2:3;
+   return {value:fmt(l,1),delta:dates[dates.length-1]+(state.srfQtrEnd?" · окно кв.-конца":"")+srcTag,
+     note:zi===2?"Всплеск на границе квартала — обычно косметика дилерских балансов, а не системный стресс: штраф смягчён; устойчивость проверит следующий день.":"Банки берут экстренное репо, только когда рынок фондирования жмёт.",
+     zi,date:new Date(dates[dates.length-1]),series:dates.map(d=>({d:new Date(d),v:byDate[d]}))};
+ }});
+
+addInd({id:"ratevol",block:"plumb",family:"price",lead:true,name:"Волатильность ставок: реализованная 10л (MOVE-прокси)",unit:"б.п./дн.",
+ zones:[{l:"<2,5 штиль-экстрим",s:0},{l:"2,5–4 штиль",s:1},{l:"4–7 норма",s:0},{l:"7–10 напряжение",s:-1},{l:">10 стресс",s:-2}],
+ link:"https://fred.stlouisfed.org/series/DGS10",
+ async load(){
+   const s=await fred("DGS10");
+   if(s.length<30) throw new Error("EMPTY");
+   const diffs=[]; for(let i=1;i<s.length;i++) diffs.push((s[i].v-s[i-1].v)*100);
+   const w=diffs.slice(-20), m=w.reduce((a,x)=>a+x,0)/w.length;
+   const sd=Math.sqrt(w.reduce((a,x)=>a+(x-m)*(x-m),0)/w.length);
+   state.rateVol=sd;
+   const zi= sd<2.5?0: sd<4?1: sd<7?2: sd<10?3:4;
+   const hist=[]; for(let i=20;i<diffs.length;i++){const ww=diffs.slice(i-20,i);const mm=ww.reduce((a,x)=>a+x,0)/20;hist.push({d:s[i+1].d,v:Math.sqrt(ww.reduce((a,x)=>a+(x-mm)*(x-mm),0)/20)});}
+   return {value:fmt(sd,1),delta:"σ дневных изменений DGS10 за 20 дн.",
+     note:(sd<2.5?"Экстремальный штиль ставок = максимальное плечо базис-трейда уже набрано, пружина сжата — плюса не даём. ":"")+"Прокси MOVE из бесплатных данных: рычаг базис-трейда ($1,8 трлн репо) чувствителен именно к воле ставок — она обычно ломается за 2–3 недели до кредитных спредов.",
+     zi,date:last(s).d,series:hist.slice(-100)};
+ }});
+
+/* ---------- II · КРЕДИТ (25) ---------- */
+addInd({id:"hy",block:"credit",family:"hy",name:"HY-спред (ICE BofA OAS)",unit:"б.п.",
+ zones:[{l:"<300",s:2},{l:"300–350",s:1},{l:"350–450",s:-1},{l:">450",s:-2}],
+ link:"https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+ async load(){
+   const s=await fred("BAMLH0A0HYM2"); const v=last(s).v*100, chg=v-agoDays(s,30).v*100;
+   state.hyLevel=v; state.hyChg=chg;
+   const zi= v<300?0: v<350?1: v<450?2:3;
+   const pc=pctOf(s.map(p=>({v:p.v})),last(s).v);
+   return {value:fmt(v,0),delta:sign(chg)+fmt(chg,0)+" б.п. за 30 дн."+(pc!=null?" · P₂ᵧ "+pc+"%":""),
+     note:"Кредит ведёт акции: расширение при спокойном S&P — ранний сигнал.",zi,date:last(s).d,
+     series:s.slice(-120).map(p=>({d:p.d,v:p.v*100}))};
+ }});
+
+addInd({id:"hy_mom",block:"credit",family:"hy",lead:true,name:"Импульс HY-спреда (Δ30 дней)",unit:"б.п.",
+ zones:[{l:"≤−25",s:2},{l:"−25…0",s:1},{l:"0…+25",s:0},{l:"+25…+75",s:-1},{l:">+75",s:-2}],
+ link:"https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+ async load(){
+   const s=await fred("BAMLH0A0HYM2"); const chg=(last(s).v-agoDays(s,30).v)*100;
+   const zi= chg<=-25?0: chg<0?1: chg<25?2: chg<75?3:4;
+   return {value:sign(chg)+fmt(chg,0),delta:"",note:"Скорость важнее уровня: +75 б.п./мес = каскад близко.",zi,date:last(s).d};
+ }});
+
+addInd({id:"ig",block:"credit",name:"IG-спред (инвестгрейд OAS)",unit:"б.п.",
+ zones:[{l:"<100",s:2},{l:"100–130",s:1},{l:"130–160",s:-1},{l:">160",s:-2}],
+ link:"https://fred.stlouisfed.org/series/BAMLC0A0CM",
+ async load(){
+   const s=await fred("BAMLC0A0CM"); const v=last(s).v*100, chg=(last(s).v-agoDays(s,30).v)*100;
+   const zi= v<100?0: v<130?1: v<160?2:3;
+   const pc=pctOf(s.map(p=>({v:p.v})),last(s).v);
+   return {value:fmt(v,0),delta:sign(chg)+fmt(chg,0)+" за 30 дн."+(pc!=null?" · P₂ᵧ "+pc+"%":""),
+     note:"Через IG идёт долговое финансирование ИИ-капекса ($1,5 трлн навеса эмиссии).",zi,date:last(s).d,
+     series:s.slice(-120).map(p=>({d:p.d,v:p.v*100}))};
+ }});
+
+addInd({id:"sloos",block:"credit",lead:true,staleDays:135,name:"Кредитные стандарты банков (SLOOS, C&I)",unit:"% нетто",
+ zones:[{l:"<0 смягчение",s:1},{l:"0–20",s:0},{l:"20–40 ужесточение",s:-1},{l:">40 сжатие",s:-2}],
+ link:"https://www.federalreserve.gov/data/sloos.htm",
+ async load(){
+   const s=await fred("DRTSCILM"); const v=last(s).v, prev=back(s,1).v;
+   const zi= v<0?0: v<20?1: v<40?2:3;
+   return {value:fmt(v,1),delta:"кварталом ранее: "+fmt(prev,1),
+     note:"Доля банков, ужесточающих стандарты по кредитам крупному бизнесу. Квартальный и с лагом — медленный, но исторически надёжный предвестник рецессии прибыли (>20–30% нетто).",
+     zi,date:last(s).d,series:s.slice(-40)};
+ }});
+
+addInd({id:"bizd",block:"credit",name:"BIZD — «живой ABX» частного кредита",unit:"$",optional:true,info:true,
+ zones:[{l:"день ≥−1%",s:0},{l:"−1…−2,5",s:-1},{l:"обвал <−2,5",s:-2}],
+ link:"https://www.vaneck.com/us/en/investments/bdc-income-etf-bizd/",
+ async load(){
+   const key=finnK();
+   if(!key&&!snapHas("fh:quote:SPY")&&!snapHas("fh:quote:BIZD")) throw new Error("NOKEY_OPT");
+   const q=await fetchJSON(`https://finnhub.io/api/v1/quote?symbol=BIZD&token=${key}`,"finnhub");
+   if(!q||!q.c) throw new Error("EMPTY");
+   const dd=(q.c/q.pc-1)*100;
+   const zi= dd>=-1?0: dd>-2.5?1:2;
+   return {value:fmt(q.c,2),delta:sign(dd)+fmt(dd,2)+"% за день",
+     note:"Справочно (дневной шум в балл не идёт): следите за трендом цены против NAV. Резкий обвал −2,5%+ за день — событийный красный флаг марок частного кредита; детали (дисконт к NAV, PIK) — в 10-Q на EDGAR.",
+     zi,date:new Date()};
+ }});
+
+/* ---------- III · РЫНОК (20) ---------- */
+addInd({id:"spx",block:"market",family:"spx",name:"S&P 500 против 200-дневной",unit:"",
+ zones:[{l:">+12% растяжение",s:1},{l:"0…+12, растёт",s:2},{l:">200д, плоская",s:1},{l:"до −5% ниже",s:-1},{l:"<−5% ниже",s:-2}],
+ link:"https://fred.stlouisfed.org/series/SP500",
+ async load(){
+   const s=await fred("SP500"); const v=last(s).v;
+   const sma=n=>s.slice(-n).reduce((a,p)=>a+p.v,0)/Math.min(n,s.length);
+   const win=s.slice(-210,-10);
+   const s200=sma(200), s200p=win.reduce((a,p)=>a+p.v,0)/Math.max(win.length,1);
+   const dist=(v/s200-1)*100, rising=s200>s200p;
+   state.spx20=(v/agoDays(s,28).v-1)*100;
+   const zi= dist>12?0: dist>0?(rising?1:2): dist>-5?3:4;
+   return {value:fmt(v,0),delta:sign(dist)+fmt(dist,1)+"% к 200д ("+(rising?"растёт":"плоская")+")",
+     note:dist>12?"Растяжение >12% над 200-дневной исторически даёт слабые форвардные доходности — тренд цел, но платить за вход дорого.":"Тренд-фильтр: не спорить с наклоном 200-дневной.",
+     zi,date:last(s).d,series:s.slice(-120)};
+ }});
+
+addInd({id:"spx_mom",block:"market",family:"spx",name:"Импульс S&P 500 (Δ~20 торг. дней)",unit:"%",
+ zones:[{l:">+3",s:1},{l:"±3",s:0},{l:"−7…−3",s:-1},{l:"<−7",s:-2}],
+ link:"https://fred.stlouisfed.org/series/SP500",
+ async load(){
+   const s=await fred("SP500"); const chg=(last(s).v/agoDays(s,28).v-1)*100;
+   const zi= chg>3?0: chg>-3?1: chg>-7?2:3;
+   return {value:sign(chg)+fmt(chg,1),delta:"",note:"Быстрые −7% в этом цикле = гамма-ускорение вниз, а не «скидка».",zi,date:last(s).d};
+ }});
+
+addInd({id:"vix",block:"market",name:"VIX",unit:"",
+ zones:[{l:"<13 штиль-экстрим",s:0},{l:"13–20",s:1},{l:"20–26",s:0},{l:"26–35",s:-1},{l:">35",s:-2}],
+ link:"https://fred.stlouisfed.org/series/VIXCLS",
+ async load(){
+   const s=await fred("VIXCLS"); const v=last(s).v;
+   state.vix=v;
+   const zi= v<13?0: v<20?1: v<26?2: v<35?3:4;
+   const pc=pctOf(s,v);
+   return {value:fmt(v,1),delta:sign(v-agoDays(s,30).v)+fmt(v-agoDays(s,30).v,1)+" за 30 дн."+(pc!=null?" · P₂ᵧ "+pc+"%":""),
+     note:v<13?"Экстремально низкая вола = переполненный шорт-вол и дорогая самоуспокоенность — плюса не даём.":"Термструктуру смотрите на vixcentral.com: бэквордация >2–3 дней = событие.",
+     zi,date:last(s).d,series:s.slice(-120)};
+ }});
+
+addInd({id:"vixterm",block:"market",lead:true,name:"Термструктура VIX (VIX / VIX3M)",unit:"",
+ zones:[{l:"<0,85 крутое контанго",s:0},{l:"0,85–1,0 норма",s:1},{l:"1,0–1,05 бэквордация",s:-1},{l:">1,05 событие",s:-2}],
+ link:"https://fred.stlouisfed.org/series/VXVCLS",
+ async load(){
+   const v1=await fred("VIXCLS"), v3=await fred("VXVCLS");
+   const map=new Map(v3.map(p=>[+p.d,p.v]));
+   const rows=v1.map(p=>{const b=map.get(+p.d);return b?{d:p.d,v:p.v/b}:null;}).filter(Boolean);
+   if(rows.length<10) throw new Error("EMPTY");
+   const r=last(rows).v;
+   const zi= r<0.85?0: r<1?1: r<1.05?2:3;
+   return {value:fmt(r,2),delta:"VIX "+fmt(last(v1).v,1)+" / VIX3M "+fmt(last(v3).v,1),
+     note:r>=1?"Бэквордация: страх «сейчас» дороже страха «потом» — рынок в событии. Дольше 2–3 дней = смена режима.":"Контанго: ближняя вола дешевле дальней — обычный режим; слишком крутое контанго (<0,85) — самоуспокоенность, плюса не даём.",
+     zi,date:last(rows).d,series:rows.slice(-120)};
+ }});
+
+addInd({id:"breadth",block:"market",name:"Ширина: SMH/SPY и RSP/SPY (день)",unit:"",optional:true,info:true,txt:true,
+ zones:[{l:"оба > SPY",s:0},{l:"смешанно",s:0},{l:"оба < SPY",s:0}],
+ link:"https://stockcharts.com/freecharts/",
+ async load(){
+   const key=finnK();
+   if(!key&&!snapHas("fh:quote:SPY")&&!snapHas("fh:quote:BIZD")) throw new Error("NOKEY_OPT");
+   const q=sym=>fetchJSON(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${key}`,"finnhub");
+   const [smh,spy,rsp]=await Promise.all([q("SMH"),q("SPY"),q("RSP")]);
+   if(!smh.c||!spy.c||!rsp.c) throw new Error("EMPTY");
+   const a=(smh.c/smh.pc-1)-(spy.c/spy.pc-1), b=(rsp.c/rsp.pc-1)-(spy.c/spy.pc-1);
+   const zi=(a>0&&b>0)?0:(a<0&&b<0)?2:1;
+   return {value:(a>0?"чипы сильнее":"чипы слабее"),delta:"равновзвеш. "+(b>0?"сильнее":"слабее")+" SPY (день)",
+     note:"Дневной прокси; полноценно — $SPXA200R на stockcharts.",zi,date:new Date()};
+ }});
+
+/* ---------- IV · МАКРО (15) ---------- */
+addInd({id:"payrolls",block:"macro",staleDays:45,name:"Пейроллы: средний прирост за 3 мес.",unit:"тыс.",
+ zones:[{l:">120",s:1},{l:"40–120",s:0},{l:"0–40 стагнация",s:-1},{l:"<0 сокращение",s:-2}],
+ link:"https://fred.stlouisfed.org/series/PAYEMS",
+ async load(){
+   const s=await fred("PAYEMS");
+   if(s.length<5) throw new Error("EMPTY");
+   const d1=last(s).v-back(s,1).v, d2=back(s,1).v-back(s,2).v, d3=back(s,2).v-back(s,3).v;
+   const avg=(d1+d2+d3)/3;
+   const zi= avg>120?0: avg>40?1: avg>0?2:3;
+   return {value:sign(avg)+fmt(avg,0),delta:"последний месяц: "+sign(d1)+fmt(d1,0),
+     note:"Сторона найма (безработица может «улучшаться» из-за падения участия). Порог безубыточности снижен иммиграционной политикой до ~40–60 тыс./мес.",
+     zi,date:last(s).d,series:s.slice(-16).map((p,i,arr)=>i?{d:p.d,v:p.v-arr[i-1].v}:null).filter(Boolean)};
+ }});
+
+addInd({id:"sahm",block:"macro",staleDays:45,name:"Правило Сам (реальное время)",unit:"п.п.",
+ zones:[{l:"<0,20",s:2},{l:"0,20–0,34",s:1},{l:"0,35–0,49",s:-1},{l:"≥0,50",s:-2}],
+ link:"https://fred.stlouisfed.org/series/SAHMREALTIME",
+ async load(){
+   let v,dte,ser,srcNote="";
+   try{
+     const s=await fred("SAHMREALTIME"); v=last(s).v; dte=last(s).d; ser=s.slice(-24);
+   }catch(e){
+     /* резерв: Sahm по определению из UNRATE = 3-мес. средняя U3 минус её минимум за предыдущие 12 мес. */
+     const u=await fred("UNRATE");
+     if(u.length<16) throw new Error("EMPTY");
+     const m3=[]; for(let i=2;i<u.length;i++) m3.push({d:u[i].d,v:(u[i].v+u[i-1].v+u[i-2].v)/3});
+     const lastM=m3[m3.length-1];
+     const prior=m3.slice(-13,-1);
+     v=+(lastM.v-Math.min(...prior.map(x=>x.v))).toFixed(2);
+     dte=lastM.d; ser=m3.slice(-24).map(x=>({d:x.d,v:+(x.v-Math.min(...m3.slice(Math.max(0,m3.indexOf(x)-12),m3.indexOf(x)).map(y=>y.v))).toFixed(2)}));
+     srcNote=" Рассчитано из UNRATE (первоисточник SAHMREALTIME недоступен) — формула идентична; данные текущей ревизии, расхождение с real-time версией — сотые п.п.";
+   }
+   state.sahm=v;
+   const zi= v<0.2?0: v<0.35?1: v<0.5?2:3;
+   return {value:fmt(v,2),delta:srcNote?"резерв: расчёт из UNRATE":"",
+     note:"Безработица нелинейна: 0,5 исторически = рецессия уже идёт. Оговорка цикла: U-3 занижена падением участия — сверяйте с пейроллами и длящимися заявками."+srcNote,
+     zi,date:dte,series:ser};
+ }});
+
+addInd({id:"claims",block:"macro",lead:true,staleDays:16,name:"Длящиеся заявки на пособие (CCSA)",unit:"млн",
+ zones:[{l:"< среднего",s:1},{l:"выше ≤5%",s:-1},{l:">5% / >2,05М",s:-2}],
+ link:"https://fred.stlouisfed.org/series/CCSA",
+ async load(){
+   const s=await fred("CCSA"); const v=last(s).v/1e6;
+   const avg=s.slice(-26).reduce((a,p)=>a+p.v,0)/Math.min(26,s.length)/1e6;
+   const devi=(v/avg-1)*100;
+   const zi=(v>2.05||devi>5)?2: devi>0?1:0;
+   return {value:fmt(v,3),delta:sign(devi)+fmt(devi,1)+"% к 26-нед. среднему",
+     note:"В режиме «не нанимают — не увольняют» перелом покажут именно длящиеся.",
+     zi,date:last(s).d,series:s.slice(-60).map(p=>({d:p.d,v:p.v/1e6}))};
+ }});
+
+addInd({id:"curve",block:"macro",lead:true,name:"Кривая 10 лет − 3 мес (T10Y3M)",unit:"б.п.",
+ zones:[{l:"без инверсии",s:1},{l:"инверсия",s:-1},{l:"выход из инверсии",s:-1},{l:"ре-крутизна бычья",s:-2},{l:"ре-крутизна медвежья",s:-1}],
+ link:"https://fred.stlouisfed.org/series/T10Y3M",
+ async load(){
+   const s=await fred("T10Y3M"); const v=last(s).v*100;
+   const minYr=Math.min(...s.slice(-260).map(p=>p.v))*100;
+   const sixmo=agoDays(s,182).v*100;
+   let zi,note;
+   let g6=null,dgCurve=false;
+   const g=fredCached("DGS2");
+   if(g&&g.length>10) g6=(g[g.length-1].v-agoDays(g,182).v)*100;
+   if(v<0){zi=1;note="Инверсия: ограничение впереди.";}
+   else if(minYr<0&&v-sixmo>80){
+     const bull=(g6!=null&&g6<-40);
+     dgCurve=(g6==null);                   /* v4.6: без DGS2 тип раскручивания не определён */
+     zi=bull?3:4;
+     note= bull
+       ?"Бычье раскручивание: короткий конец рушится — ФРС смягчает в слабость. Исторически самый острый предрецессионный таймер."
+       :"Медвежье раскручивание: растёт длинный конец (срочная премия) — пресс на мультипликаторы (его дюрационную часть уже считает карточка TIPS), таймер менее срочный."+(dgCurve?" (DGS2 недоступен — тип принят мягким, уточнится автодозагрузкой.)":"");
+   }
+   else if(minYr<0){zi=2;note="Кривая вышла из инверсии — часы уже идут.";}
+   else{zi=0;note="Инверсии за год не было — циклический фон спокойнее.";}
+   return {value:fmt(v,0),delta:sign(v-sixmo)+fmt(v-sixmo,0)+" за 6 мес.",note,zi,degraded:dgCurve,date:last(s).d,
+     series:s.slice(-160).map(p=>({d:p.d,v:p.v*100}))};
+ }});
+
+addInd({id:"real10",block:"macro",name:"Реальная доходность 10 лет (TIPS)",unit:"%",
+ zones:[{l:"Δ60 <−40",s:1},{l:"±40",s:0},{l:"Δ60 >+40",s:-1}],
+ link:"https://fred.stlouisfed.org/series/DFII10",
+ async load(){
+   const s=await fred("DFII10"); const v=last(s).v, chg=(v-agoDays(s,60).v)*100;
+   state.real10chg30=(v-agoDays(s,30).v)*100;
+   const zi= chg<-40?0: chg>40?2:1;
+   return {value:fmt(v,2),delta:sign(chg)+fmt(chg,0)+" б.п. за 60 дн.",
+     note:"Дисконт-ставка длинной дюрации: рост бьёт по growth-мультипликаторам.",
+     zi,date:last(s).d,series:s.slice(-120)};
+ }});
+
+/* валютный каскад: новый хост Frankfurter → легаси → резерв ФРС (H.10, лаг до ~недели) */
+async function fxRange(cur,days=100){
+  const rng=cur==="JPY"?[60,400]:[4,12];    /* v4.6: отсев мусора шлюзов */
+  const end=iso(new Date()),start=iso(new Date(Date.now()-days*864e5));
+  const hosts=[
+    "https://api.frankfurter.dev/v1/"+start+".."+end+"?base=USD&symbols="+cur,
+    "https://api.frankfurter.app/"+start+".."+end+"?from=USD&to="+cur
+  ];
+  for(const u of hosts){
+    try{
+      const j=await fetchJSON(u,"frankfurter");
+      const rows=Object.entries(j.rates||{}).map(([d,o])=>({d:new Date(d),v:o[cur]})).filter(p=>p.v>=rng[0]&&p.v<=rng[1]).sort((a,b)=>a.d-b.d);
+      if(rows.length>10) return {rows,src:"ECB"};
+    }catch(e){}
+  }
+  const s=await fred(cur==="JPY"?"DEXJPUS":"DEXCHUS");
+  return {rows:s.map(p=>({d:p.d,v:p.v})),src:"FRED H.10 (лаг до ~нед.)"};
+}
+
+/* ---------- V · РЕЖИМЫ (15) ---------- */
+addInd({id:"jpy",block:"regime",lead:true,name:"USD/JPY — детонатор кэрри",unit:"¥",
+ zones:[{l:"цело",s:0},{l:"срыв: −4¥/30дн или <158",s:-1},{l:"анвайнд: −8¥/30дн или <152",s:-2}],
+ link:"https://frankfurter.dev/",
+ async load(){
+   const {rows,src}=await fxRange("JPY");
+   const v=last(rows).v, chg30=v-agoDays(rows,30).v;
+   state.jpyUnwind=(chg30<-8||v<152);
+   const zi= state.jpyUnwind?2: (chg30<-4||v<158)?1:0;
+   return {value:fmt(v,1),delta:sign(chg30)+fmt(chg30,1)+" за 30 дн. · "+src,
+     note:"Парадокс цикла: резкое УКРЕПЛЕНИЕ иены = принудительный делеверидж лонгов. Первична скорость (Δ30дн), абсолютные уровни — вторичный ориентир, зависящий от дифференциала ставок.",
+     zi,date:last(rows).d,series:rows};
+ }});
+
+/* CoinGecko → Binance-резерв: те же активы (PAXG≈споту золота, BTCUSDT).
+   v4.6: возвращает {rows,src} — резерв подписывается на карточке; rng отсеивает
+   мусор шлюзов. Учтите: Binance гео-блокирует запросы из США, так что для
+   американского клиента резерва фактически нет — работает первичный CoinGecko. */
+async function cryptoDaily(cgId,binSym,days,rng){
+  const clean=rows=>rng?rows.filter(p=>p.v>=rng[0]&&p.v<=rng[1]):rows;
+  try{
+    const j=await fetchJSON("https://api.coingecko.com/api/v3/coins/"+cgId+"/market_chart?vs_currency=usd&days="+days+"&interval=daily","coingecko");
+    const rows=clean((j.prices||[]).map(pnt=>({d:new Date(pnt[0]),v:pnt[1]})));
+    if(rows.length>5) return {rows,src:""};
+    throw 0;
+  }catch(e){
+    const k=await fetchJSON("https://api.binance.com/api/v3/klines?symbol="+binSym+"&interval=1d&limit="+(days+1),"coingecko");
+    if(!Array.isArray(k)||k.length<5) throw new Error("EMPTY");
+    const rows=clean(k.map(row=>({d:new Date(row[0]),v:+row[4]})));
+    if(rows.length<5) throw new Error("EMPTY");
+    return {rows,src:" · Binance (резерв)"};
+  }
+}
+
+addInd({id:"goldreal",block:"regime",deps:true,lead:true,name:"Золото × реальные ставки (детектор дебейсмента)",unit:"$",
+ zones:[{l:"норма ↑",s:1},{l:"спокойно",s:0},{l:"дебейсмент",s:-1},{l:"маржин-волна",s:-1}],
+ link:"https://www.coingecko.com/en/coins/pax-gold",
+ async load(){
+   const {rows,src:cSrc}=await cryptoDaily("pax-gold","PAXGUSDT",31,[500,2e4]); /* v4.6: окно ≈ подписи «30 дн.» */
+   const v=last(rows).v, chg=(v/rows[0].v-1)*100;
+   const dg=(state.real10chg30==null)||(state.spx20==null);
+   const realUp=(state.real10chg30??0)>10;
+   let zi,note;
+   if(chg<-6&&(state.spx20??0)<-3){zi=3;note="Золото валится вместе с рынком — почерк принудительного делевериджа (в маржин-колл продают то, что можно продать). Маркер фазы 1.";}
+   else if(chg>2&&realUp){zi=2;note="Золото растёт ВМЕСТЕ с реальной ставкой: рынок голосует за дебейсмент — «золото > акции».";}
+   else if(chg>2){zi=0;note="Золото растёт на падающей реальной ставке — обычный режим смягчения.";}
+   else{zi=1;note="Металл спокоен.";}
+   return {value:fmt(v,0),degraded:dg,delta:sign(chg)+fmt(chg,1)+"% за 30 дн. (PAXG≈споту)"+cSrc,note,zi,date:last(rows).d,series:rows};
+ }});
+
+addInd({id:"btc",block:"regime",deps:true,lead:true,name:"Биткоин — канарейка долларовой ликвидности",unit:"$",
+ zones:[{l:"<10%",s:1},{l:"10–25% при VIX<20 · диверг.",s:-1},{l:"10–25%",s:0},{l:"25–40%",s:-1},{l:">40%",s:-2}],
+ link:"https://www.coingecko.com/en/coins/bitcoin",
+ async load(){
+   const {rows,src:cSrc}=await cryptoDaily("bitcoin","BTCUSDT",90,[1000,1e7]);
+   const v=last(rows).v, mx=Math.max(...rows.map(p=>p.v)), dd=(v/mx-1)*100;
+   const vv=state.vix, calmVix=(vv??99)<20;
+   const zi= dd>-10?0: dd>-25?(calmVix?1:2): dd>-40?3:4;
+   return {value:fmt(v,0),degraded:(vv==null),
+     delta:fmt(dd,1)+"% от 90-дн. максимума"+(calmVix&&dd<=-10&&dd>-25?" · VIX спокоен":(vv==null?" · VIX неизвестен":""))+cSrc,
+     note:(zi===1)?"Дивергенция: крипта сливается при спокойном VIX — долларовая ликвидность утекает раньше акций. Это и есть сигнал канарейки.":"Падение BTC при спокойном VIX = ликвидность утекает раньше акций.",
+     zi,date:last(rows).d,series:rows};
+ }});
+
+addInd({id:"stagf",block:"regime",deps:true,lead:true,name:"Стагфляционный флаг (брейк-ивены × S&P)",unit:"б.п.",
+ zones:[{l:"спокойно",s:0},{l:"флаг",s:-1}],
+ link:"https://fred.stlouisfed.org/series/T10YIE",
+ async load(){
+   const s=await fred("T10YIE"); const chg=(last(s).v-agoDays(s,30).v)*100;
+   const bad= chg>15&&(state.spx20??0)<0;
+   state.stagfOn=bad;
+   const dg=(state.spx20==null);
+   return {value:sign(chg)+fmt(chg,0),delta:"S&P 20дн: "+sign(state.spx20??0)+fmt(state.spx20??0,1)+"%",
+     note:bad?"Инфляционные ожидания растут на падающем рынке — руки ФРС связаны.":"Комбинация спокойна.",
+     zi:bad?1:0,degraded:dg,date:last(s).d};
+ }});
+
+addInd({id:"oil",block:"regime",deps:true,lead:true,staleDays:12,name:"Нефть WTI (энергошок / Ормуз)",unit:"$",
+ zones:[{l:"обвал >20% дезинфл.",s:1},{l:"<80",s:0},{l:"80–95",s:-1},{l:">95 / +25%",s:-2}],
+ link:"https://fred.stlouisfed.org/series/DCOILWTICO",
+ async load(){
+   const s=await fred("DCOILWTICO"); const v=last(s).v, chg30=(v/agoDays(s,30).v-1)*100;
+   state.wti=v; state.wtiChg30=chg30;
+   const shock=(v>95||chg30>25);
+   const crash=(chg30<-20);
+   let zi,note;
+   if(shock){zi=3;note="Энергошок: канал «нефть → CPI → ФРС» давит на мультипликаторы; при пустых хранилищах реакция выпуклая.";}
+   else if(crash&&(state.spx20??0)>-3){zi=0;note="Обвал нефти при устойчивом рынке — снятие военной премии: дезинфляционный импульс и поддержка реальных доходов.";}
+   else if(crash){zi=1;note="Обвал нефти на падающем рынке — возможен сигнал спроса, плюса не даём.";}
+   else if(v>80){zi=2;note="При пустых хранилищах (Кушинг) реакция цены на инциденты выпуклая.";}
+   else{zi=1;note="При пустых хранилищах (Кушинг) реакция цены на инциденты выпуклая.";}
+   return {value:fmt(v,1),degraded:(state.spx20==null&&crash),delta:sign(chg30)+fmt(chg30,1)+"% за 30 дн.",note,
+     zi,date:last(s).d,series:s.slice(-120)};
+ }});
+
+addInd({id:"cny",block:"regime",lead:true,name:"Юань (USD/CNY), Δ60 дн. — китайская нога",unit:"%",
+ zones:[{l:"CNY крепнет >1,5 — рефляция",s:1},{l:"±",s:0},{l:"слабеет 2–3,5",s:-1},{l:">3,5 девальв. шок",s:-2}],
+ link:"https://frankfurter.dev/",
+ async load(){
+   const {rows,src}=await fxRange("CNY");
+   const v=last(rows).v, chg=(v/agoDays(rows,60).v-1)*100; /* + = юань слабеет */
+   state.cnySrc=src;
+   const zi= chg<-1.5?0: chg<2?1: chg<3.5?2:3;
+   return {value:sign(chg)+fmt(chg,1),delta:"USD/CNY "+fmt(v,2),
+     note:"Частичный ответ на американоцентричность: укрепление юаня = мягкие глобальные долларовые условия и рефляционный ветер из Китая; быстрая девальвация = экспорт дефляции и стресс (август-2015).",
+     zi,date:last(rows).d,series:rows.slice(-90)};
+ }});
+
+addInd({id:"dxy",block:"regime",lead:true,staleDays:12,name:"Доллар (широкий индекс), Δ60 дн.",unit:"%",
+ zones:[{l:"<−3 рефляция",s:1},{l:"±3",s:0},{l:"+3…+5 ужесточение",s:-1},{l:">+5 спираль",s:-2}],
+ link:"https://fred.stlouisfed.org/series/DTWEXBGS",
+ async load(){
+   const s=await fred("DTWEXBGS"); const v=last(s).v, chg=(v/agoDays(s,60).v-1)*100;
+   const zi= chg<-3?0: chg<3?1: chg<5?2:3;
+   return {value:sign(chg)+fmt(chg,1),delta:"индекс "+fmt(v,1),
+     note:"Доллар — цена глобальной долларовой ликвидности: резкое укрепление ужесточает условия для всего мира (и наоборот, слабый доллар — рефляционный попутный ветер). Спираль >+5%/60дн — почерк стресс-делевериджа.",
+     zi,date:last(s).d,series:s.slice(-120)};
+ }});
+
+const BLOCKS={
+  plumb:{title:"I · Водопровод ликвидности",w:25,desc:"резервы, TGA, RRP, фондинг, NFCI"},
+  credit:{title:"II · Кредит: публичные цены против марок",w:25,desc:"HY/IG, SLOOS, BDC"},
+  market:{title:"III · Рынок и внутренности",w:20,desc:"тренд, импульс, вола, ширина"},
+  macro:{title:"IV · Макро-цикл",w:15,desc:"найм и увольнения, кривая, реальные ставки"},
+  regime:{title:"V · Режим-детекторы",w:15,desc:"кэрри, доллар, дебейсмент, канарейки"}
+};
+
+/* ============ НОВОСТНОЙ СКАНЕР (Finnhub, 14 дней) ============ */
+const RX={
+  capexHard:/(capex|capital expenditure)s?\b[^.]{0,80}\b(cut|cuts|trim|lower|reduc\w*|slash\w*|pull(ing)? back|scal\w* back|paus\w*|delay\w*)|\b(cut|cuts|trim|lower|reduc\w*|slash\w*|paus\w*|delay\w*)\b[^.]{0,60}(capex|capital expenditure|data ?cent(er|re) (spend|build|plan))|useful li(fe|ves)|shorten\w*[^.]{0,40}depreciat|depreciat\w*[^.]{0,40}(shorten|accelerat)|impairment|write-?down/i,
+  bdcHard:/gat(e|ing)\b|suspend\w*[^.]{0,40}(redemption|withdrawal)|(redemption|withdrawal)s?[^.]{0,40}(suspend|halt|limit|gate)|dividend[^.]{0,40}(cut|reduc\w*|lower|slash|suspend)|(cut|cuts|reduc\w*|slash\w*|suspend\w*)[^.]{0,30}dividend/i,
+  bdcSoft:/non-?accrual|nav[^.]{0,30}(markdown|write-?down|decline)|default rate|pik income/i,
+  geo:new RegExp(CONFIG.CYCLE.geoRx,"i"),
+  tariff:new RegExp(CONFIG.CYCLE.tariffRx,"i")
+};
+/* Отрицания: "will NOT cut capex", "denies dividend cut".
+   v4.6: NEG проверяется в КЛАУЗЕ триггера (35 симв. до + сам матч), а не по всему
+   заголовку — «cuts capex despite strong demand» больше не гибнет как отрицание;
+   контекстные despite/unchanged/intact/keep убраны из списка: они описывают
+   обстоятельства ПОСЛЕ события, а не отменяют его. Настоящие отрицания
+   (not/denies/won't/rules out…) стоят перед глаголом и ловятся окном. */
+const NEG=/\b(not|no|never|deni\w*|won'?t|will not|rule[sd]? out|maintain\w*|reiterat\w*|refus\w*|dismiss\w*)\b/i;
+const trigNoNeg=(h,rx)=>{
+  const m=rx.exec(h); if(!m) return false;
+  return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));
+};
+async function scanNews(){
+  const key=finnK();
+  if(!key&&!snapHas("fh:general")) return;   /* в режиме снимка ключ не нужен */
+  const from=iso(new Date(Date.now()-14*864e5)),to=iso(new Date());
+  const news={capex:[],bdcHard:[],bdcSoft:[],geo:[],tariff:[]};
+  const pull=async sym=>{
+    try{
+      const j=await fetchJSON(`https://finnhub.io/api/v1/company-news?symbol=${sym}&from=${from}&to=${to}&token=${key}`,"finnhub");
+      return Array.isArray(j)?j.slice(0,60):[];
+    }catch(e){return [];}
+  };
+  await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
+    (await pull(sym)).forEach(n=>{const h=n.headline||"";
+      if(trigNoNeg(h,RX.capexHard)) news.capex.push({sym,h,u:n.url,t:n.datetime});});
+  });
+  await pool(CONFIG.CYCLE.bdcTickers,3,async sym=>{
+    (await pull(sym)).forEach(n=>{
+      const h=n.headline||"";
+      if(trigNoNeg(h,RX.bdcHard)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
+      else if(RX.bdcHard.test(h)||RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime});
+    });
+  });
+  try{
+    const g=await fetchJSON(`https://finnhub.io/api/v1/news?category=general&token=${key}`,"finnhub");
+    (Array.isArray(g)?g.slice(0,120):[]).forEach(n=>{
+      const h=n.headline||"";
+      if(RX.geo.test(h))news.geo.push({sym:"GEO",h,u:n.url,t:n.datetime});
+      if(RX.tariff.test(h))news.tariff.push({sym:"TAR",h,u:n.url,t:n.datetime});
+    });
+  }catch(e){}
+  for(const k in news){const seen=new Set();news[k]=news[k].filter(x=>!seen.has(x.h)&&seen.add(x.h)).slice(0,8);}
+  state.news=news;state.newsAt=new Date();
+  await llmVerifyNews(); /* подтверждение фактов текущим ИИ-провайдером, если задан ключ */
+}
+const distinct=(arr,f)=>new Set(arr.map(f)).size;
+
+/* ============ АВТОДЕТЕКТОРЫ СОБЫТИЙ ============ */
+/* Каждый: eval() → {st:"calm"|"watch"|"fired"|"good", pts, inputs, note} */
+const DETECTORS=[
+ {id:"d_fund",triad:true,name:"Фондинговый стресс",
+  logic:"СРАБОТАЛ: SRF >$25 млрд устойчиво (≥2 дня из 3, либо вне окна квартального конца) ИЛИ SOFR−IORB >15 б.п. ИЛИ средний спред за 3 дня >10. Квартальный разовый всплеск SRF — косметика балансов, не срабатывание. НАБЛЮДЕНИЕ: SRF >$5 млрд или спред >5 б.п. Поправка: −10 / −3.",
+  eval(){
+    const srf=state.srfMax3??state.srfLast??0, sp=state.sofrSpread??-99, sp3=state.sofrSpread3??-99;
+    const srfStress=(state.srfDays25??0)>=2 || ((state.srfLast??0)>25&&!state.srfQtrEnd);
+    const fired= srfStress||sp>15||sp3>10;
+    const watch= srf>5||sp>5;
+    return {st:fired?"fired":watch?"watch":"calm",pts:fired?-10:watch?-3:0,
+      inputs:"SRF₃ "+fmt(srf,1)+" млрд ("+(state.srfDays25??0)+" дн. >25"+(state.srfQtrEnd?", кв.-конец":"")+") · спред "+fmt(sp,1)+" б.п. (ср₃ "+fmt(sp3,1)+")"};
+  }},
+ {id:"d_capex",triad:true,name:"Капекс / амортизация гиперскейлеров",
+  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера, не по всему заголовку); при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
+  eval(){
+    const n=state.news.capex.length, syms=distinct(state.news.capex,x=>x.sym);
+    const st= syms>=2?"fired": n>=1?"watch":"calm";
+    const llm= state.newsLLM==="ok"?" · LLM-фильтр пройден": state.newsLLM==="fail"?" · LLM-сбой (regex+NEG)": state.newsLLM==="off"?" · без LLM (нет ключа)":"";
+    return {st,pts:st==="fired"?-15:st==="watch"?-5:0,
+      inputs:state.newsAt?("триггеров: "+n+" по "+syms+" тикерам"+llm):"сканер: ожидание"};
+  }},
+ {id:"d_bdc",triad:true,name:"Стресс BDC (гейты · дивиденды)",
+  logic:"Сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней. Жёсткие триггеры: гейт/приостановка выкупа, срезка дивиденда. Мягкие: non-accrual, NAV-markdown; сюда же считаются опровержения жёстких триггеров («нет дыма без огня»). СРАБОТАЛ: жёсткие по ≥2 тикерам. НАБЛЮДЕНИЕ: 1 жёсткий или ≥2 мягких. Поправка: −15 / −4.",
+  eval(){
+    const hardT=distinct(state.news.bdcHard,x=>x.sym), soft=state.news.bdcSoft.length;
+    const st= hardT>=2?"fired": (hardT>=1||soft>=2)?"watch":"calm";
+    const llm= state.newsLLM==="ok"?" · LLM-фильтр пройден": state.newsLLM==="fail"?" · LLM-сбой": state.newsLLM==="off"?" · без LLM":"";
+    return {st,pts:st==="fired"?-15:st==="watch"?-4:0,
+      inputs:state.newsAt?("жёстких: "+state.news.bdcHard.length+" ("+hardT+" тик.) · мягких: "+soft+llm):"сканер: ожидание"};
+  }},
+ {id:"d_oil",triad:false,name:"Нефтяной шок / Ормуз",
+  logic:"По цене WTI (EIA/FRED, T+3…5): СРАБОТАЛ — >$95 или +25% за 30 дней. НАБЛЮДЕНИЕ — >$85 или +15%. Поправка: −10 / −4. Новости по Ирану даются ниже справочно и на балл не влияют.",
+  eval(){
+    const v=state.wti, c=state.wtiChg30;
+    if(v==null) return {st:"calm",pts:0,inputs:"ожидание данных WTI"};
+    const fired= v>95||c>25, watch= v>85||c>15;
+    return {st:fired?"fired":watch?"watch":"calm",pts:fired?-10:watch?-4:0,
+      inputs:"WTI "+fmt(v,1)+" $ · Δ30 "+sign(c)+fmt(c,1)+"%"};
+  }},
+ {id:"d_infl",triad:false,name:"Инфляционный узел",
+  logic:"По FRED: базовый CPI (CPILFESL) и почасовые заработки (CES0500000003). СРАБОТАЛ: CPI >3,5% г/г при неубывающей динамике зарплат г/г. НАБЛЮДЕНИЕ: CPI >3,2% и растёт. Поправка: −8 / −3.",
+  eval(){
+    const cpi=fredCached("CPILFESL"), w=fredCached("CES0500000003");
+    if(!cpi||cpi.length<14) return {st:"calm",pts:0,inputs:"ожидание данных CPI"};
+    const yoy=a=>(last(a).v/a[a.length-13].v-1)*100;
+    const yoyAt=(a,k)=>(a[a.length-1-k].v/a[a.length-13-k].v-1)*100;
+    const c=yoy(cpi), cPrev=(cpi.length>=17)?yoyAt(cpi,3):c;
+    state.coreCPI=c;
+    let wUp=true;
+    if(w&&w.length>=17){wUp= yoy(w)>=yoyAt(w,3)-0.05;}
+    const fired= c>3.5&&wUp, watch= c>3.2&&c>=cPrev;
+    return {st:fired?"fired":watch?"watch":"calm",pts:fired?-8:watch?-3:0,
+      inputs:"CPI base "+fmt(c,1)+"% г/г"+(w&&w.length>=17?(" · зарплаты "+fmt(yoy(w),1)+"% г/г"):"")};
+  }},
+ {id:"d_pivot",triad:false,name:"Разворот ФРС при спокойном кредите",
+  logic:"По FRED: 2-летка (DGS2), HY-спред, VIX. АКТИВЕН (+10): DGS2 −50 б.п. за 60 дней при HY <400 и VIX <30 — упорядоченное смягчение. НАБЛЮДЕНИЕ (+4): DGS2 −30 б.п. при HY <420. Если смягчение идёт при HY ≥450 — это паническое смягчение: поправки нет.",
+  eval(){
+    const s=fredCached("DGS2");
+    if(!s||s.length<40) return {st:"calm",pts:0,inputs:"ожидание данных DGS2"};
+    const chg=(last(s).v-agoDays(s,60).v)*100;
+    state.dgs2chg=chg;
+    const hy=state.hyLevel??999, vix=state.vix??99;
+    if(chg<=-50&&(hy>=450||(state.rateVol??0)>10)) return {st:"watch",pts:0,inputs:"2-летка "+sign(chg)+fmt(chg,0)+" б.п. · HY "+fmt(hy,0)+" · вола ставок "+fmt(state.rateVol??0,1)+" — паническое смягчение, плюса нет"};
+    const good= chg<=-50&&hy<400&&vix<30, watch= chg<=-30&&hy<420;
+    return {st:good?"good":watch?"watch":"calm",pts:good?10:watch?4:0,
+      inputs:"2-летка "+sign(chg)+fmt(chg,0)+" б.п./60дн · HY "+fmt(hy,0)+" · VIX "+fmt(vix,1)};
+  }}
+];
+const STATE_LABEL={calm:"СПОКОЙНО",watch:"НАБЛЮДЕНИЕ",fired:"СРАБОТАЛ",good:"АКТИВЕН"};
+
+function renderDetectors(){
+  const g=$("detGrid");g.innerHTML="";
+  DETECTORS.forEach(d=>{
+    const el=document.createElement("article");
+    el.className="det st-calm";el.id="det_"+d.id;
+    el.innerHTML=`<div class="det-top"><div class="det-name">${d.name}${d.triad?' <span class="triad">·триада·</span>':""}</div>
+      <span class="det-state">—</span></div>
+      <div class="det-inputs">…</div>
+      <div class="det-logic">${d.logic}</div>
+      <div class="det-top" style="margin-top:auto"><span class="det-pts"></span></div>`;
+    g.appendChild(el);
+  });
+}
+function evalDetectors(){
+  let pts=0,firedTriad=0,linesShown=[];
+  state.detFired={};
+  DETECTORS.forEach(d=>{
+    let r;
+    try{ r=d.eval(); }catch(e){ r={st:"calm",pts:0,inputs:"ошибка данных — ожидание"}; }
+    d.last=r; pts+=r.pts;
+    if(r.st==="fired") state.detFired[d.id.replace("d_","")]=true;
+    if(d.triad&&r.st==="fired") firedTriad++;
+    const el=$("det_"+d.id);
+    el.className="det st-"+r.st;
+    el.querySelector(".det-state").textContent=STATE_LABEL[r.st];
+    el.querySelector(".det-inputs").textContent=r.inputs;
+    el.querySelector(".det-pts").textContent= r.pts?("поправка к баллу: "+(r.pts>0?"+":"")+r.pts):"поправки нет";
+    if(r.pts) linesShown.push({name:"Детектор: "+d.name,val:STATE_LABEL[r.st],score:r.pts>0?1:-1,w:Math.abs(r.pts)});
+  });
+  state.detPts=pts; state.triadFired=firedTriad;
+  const b=$("bs_det");
+  b.textContent="поправка: "+(pts>0?"+":"")+pts;
+  b.className="bscore "+(pts>0?"pos":pts<0?"neg":"");
+  return linesShown;
+}
+function taggedTriggers(){
+  const mk=(arr,tag)=>arr.map(n=>({...n,tag}));
+  return [...mk(state.news.capex,"КАПЕКС"),...mk(state.news.bdcHard,"BDC-жёсткий"),...mk(state.news.bdcSoft,"BDC-мягкий")]
+    .sort((a,b)=>(b.t||0)-(a.t||0));
+}
+function renderNews(){
+  const nb=$("newsbox");
+  /* заголовки и ссылки — внешние данные (иногда через шлюзы): экранируем, в href — только http(s) */
+  const item=n=>`<div class="news-item"><a href="${esc(safeUrl(n.u))}" target="_blank" rel="noopener">${esc(n.h)}</a> <span class="src">· ${n.tag?esc(n.tag)+" · ":""}${esc(n.sym)}${n.t?" · "+new Date(n.t*1000).toISOString().slice(0,10):""}</span></div>`;
+  const sec=(t,arr,tag)=>arr.length?`<h4>${t} <span class="tagline">${tag}</span></h4>`+arr.map(item).join(""):"";
+  const trigAll=taggedTriggers(), trig=trigAll.slice(0,10);
+  const more=trigAll.length>10?`<div class="news-item"><span class="src">…и ещё ${trigAll.length-10}</span></div>`:"";
+  nb.innerHTML=(state.newsAt?`<p class="tagline">новостной сканер Finnhub · ${state.newsAt.toLocaleTimeString("ru-RU")} · эвристика по ключевым словам — проверяйте первоисточники</p>`:"")
+    +sec("Совпадения детекторов (капекс · BDC)",trig,"влияют на балл")+(trig.length?more:"")
+    +sec(CONFIG.CYCLE.geoTitle,state.news.geo,"справочно, на балл не влияет — шок ловится ценой WTI")
+    +sec(CONFIG.CYCLE.tariffTitle,state.news.tariff,"справочно, на балл не влияет");
+}
+
+/* ============ РЕНДЕР КАРТОЧЕК ============ */
+const scoreOf=(ind,res)=> res==null?null: ind.zones[res.zi].s;
+function statusClass(sc){return sc==null?"s-na": sc>=1?"s-calm": sc<=-1?"s-fault":"s-tension";}
+function scoreBadge(sc,info){
+  if(info) return '<span class="c-score sc-neutral">справочно</span>';
+  if(sc==null) return '<span class="c-score sc-neutral">нет данных</span>';
+  const cls= sc>=1?"sc-calm": sc<=-1?"sc-fault":"sc-tension";
+  return `<span class="c-score ${cls}">балл ${sc>0?"+":""}${sc}</span>`;
+}
+function zonesHTML(ind,zi){
+  return `<div class="zones">${ind.zones.map((z,i)=>`<span class="zone${i===zi?" act z"+z.s:""}">${z.l}</span>`).join("")}</div>`;
+}
+function renderBlocks(){
+  const root=$("blocks");root.innerHTML="";
+  for(const bid in BLOCKS){
+    const b=BLOCKS[bid];
+    const sec=document.createElement("section");sec.className="block";
+    sec.innerHTML=`<div class="block-head"><h2>${b.title}</h2><span class="bw">${b.desc} · вес ${b.w}%</span><span class="bscore" id="bs_${bid}">—</span></div><div class="grid" id="grid_${bid}"></div>`;
+    root.appendChild(sec);
+    IND.filter(i=>i.block===bid).forEach(ind=>{
+      const c=document.createElement("article");c.className="card s-na loading";c.id="card_"+ind.id;
+      c.innerHTML=`<div class="c-top"><div class="c-name">${ind.name}</div>${scoreBadge(null,ind.info)}</div>
+        <div class="c-val">···</div><div class="c-delta"></div><div class="c-note">в очереди…</div>
+        <div class="c-spark"><canvas></canvas></div>
+        ${zonesHTML(ind,-1)}
+        <div class="c-meta"><span class="obs">—</span><a href="${ind.link}" target="_blank" rel="noopener">источник ↗</a></div>`;
+      $("grid_"+bid).appendChild(c);
+    });
+  }
+}
+async function loadOne(ind){
+  try{
+    const res=await ind.load();
+    state.data[ind.id]=res;paintCard(ind,res,null);
+  }catch(e){
+    state.data[ind.id]=null;paintCard(ind,null,e.message||"ошибка");
+  }
+}
+function paintCard(ind,res,err){
+  const c=$("card_"+ind.id);if(!c)return;
+  const sc=err?null:scoreOf(ind,res);
+  c.className="card "+statusClass(sc);
+  c.querySelector(".c-top").innerHTML=`<div class="c-name">${ind.name}</div>${scoreBadge(sc,ind.info)}`;
+  const zwrap=c.querySelector(".zones"); if(zwrap) zwrap.outerHTML=zonesHTML(ind,err?-1:res.zi);
+  if(err){
+    c.querySelector(".c-val").textContent="—";
+    c.querySelector(".c-delta").textContent="";
+    const mFail=/fetch failed: (.+)$/.exec(err||"");
+    c.querySelector(".c-note").innerHTML= err==="NOKEY"?"Нужен ключ FRED (панель «Источники»).":
+      err==="NOKEY_OPT"?"Опционально: нужен ключ Finnhub.":
+      'Источник не ответил'+(mFail?' ('+esc(mFail[1])+')':'')+'. <a class="retry" data-id="'+ind.id+'">повторить</a>';
+    c.querySelector(".obs").textContent="";
+    const r=c.querySelector("a.retry");
+    if(r)r.addEventListener("click",async ev=>{ev.preventDefault();
+      c.querySelector(".c-note").textContent="повтор…";
+      await loadOne(ind);compute();});
+    return;
+  }
+  const val=c.querySelector(".c-val");
+  val.innerHTML=res.value+(ind.unit?`<small>${ind.unit}</small>`:"");
+  val.classList.toggle("txt",!!ind.txt);
+  c.querySelector(".c-delta").textContent=res.delta||"";
+  c.querySelector(".c-note").textContent=res.note||"";
+  const stale=res.date?daysBetween(res.date,today())>(ind.staleDays||9):false;
+  c.querySelector(".obs").innerHTML=res.date?("набл.: "+res.date.toISOString().slice(0,10)+(stale?' <span class="stale">задержка</span>':"")):"";
+  if(res.series&&res.series.length>3)spark(c.querySelector("canvas"),res.series,sc,ind.id);
+}
+const SPARKREG={};                        /* v4.6: серии спарклайнов — для перерисовки при resize */
+function spark(cv,series,score,id){
+  if(id)SPARKREG[id]={series,score};
+  const dpr=window.devicePixelRatio||1,w=cv.clientWidth||240,h=34;
+  cv.width=w*dpr;cv.height=h*dpr;
+  const x=cv.getContext("2d");x.scale(dpr,dpr);x.clearRect(0,0,w,h);
+  const vs=series.map(p=>p.v),mn=Math.min(...vs),mx=Math.max(...vs),rg=(mx-mn)||1;
+  x.beginPath();
+  series.forEach((p,i)=>{const px=i/(series.length-1)*(w-2)+1,py=h-3-((p.v-mn)/rg)*(h-6);i?x.lineTo(px,py):x.moveTo(px,py);});
+  x.strokeStyle= score>=1?"#1F7A63": score<=-1?"#A63A2B":"#6B7570";
+  x.lineWidth=1.5;x.stroke();
+}
+
+/* ============ СКОРИНГ И ВЕРДИКТ ============ */
+function compute(){
+  const detLines=evalDetectors();
+  const contrib=[];let totalW=0,acc=0;
+  for(const bid in BLOCKS){
+    const inds=IND.filter(i=>i.block===bid);
+    const scored=inds.map(i=>({i,r:state.data[i.id]})).filter(x=>x.r&&x.r.zi!=null&&!x.i.info);
+    const be=$("bs_"+bid);
+    if(!scored.length){be.textContent="нет данных";be.className="bscore";continue;}
+    /* семейная агрегация: индикаторы одной серии/латентной переменной усредняются внутри семьи,
+       блок = среднее семейств → одна переменная не считается дважды */
+    const fams={};
+    scored.forEach(x=>{const f=x.i.family||x.i.id;(fams[f]=fams[f]||[]).push(x);});
+    const famKeys=Object.keys(fams);
+    const famMean=k=>fams[k].reduce((a,x)=>a+scoreOf(x.i,x.r),0)/fams[k].length;
+    const avg=famKeys.reduce((a,k)=>a+famMean(k),0)/famKeys.length;
+    const bScore=avg/2*100;
+    acc+=bScore*BLOCKS[bid].w;totalW+=BLOCKS[bid].w;
+    be.textContent=(bScore>0?"+":"")+Math.round(bScore);
+    be.className="bscore "+(bScore>10?"pos":bScore<-10?"neg":"");
+    famKeys.forEach(k=>fams[k].forEach(x=>contrib.push({name:x.i.name,val:x.r.value+(x.i.unit?" "+x.i.unit:""),
+      score:scoreOf(x.i,x.r),w:+(BLOCKS[bid].w/famKeys.length/fams[k].length).toFixed(1)})));
+  }
+  let score= totalW? acc/totalW:0;
+  score=Math.max(-100,Math.min(100,score+state.detPts));
+
+  /* два измерения: опережающие (куда клонится) и подтверждающие (условия сейчас).
+     Считаются тоже по семьям (семья делится на lead/coin-половины) — иначе
+     родственные индикаторы (netliq и TGA) голосовали бы дважды именно в гейте. */
+  const gf={};
+  IND.forEach(i=>{const r=state.data[i.id];if(!r||r.zi==null||i.info)return;
+    const k=(i.family||i.id)+"|"+(i.lead?"L":"C");
+    (gf[k]=gf[k]||{lead:!!i.lead,arr:[]}).arr.push(scoreOf(i,r));});
+  let lS=0,lN=0,cS=0,cN=0;
+  Object.values(gf).forEach(g=>{
+    const m=g.arr.reduce((a,v)=>a+v,0)/g.arr.length;
+    if(g.lead){lS+=m;lN++;}else{cS+=m;cN++;}});
+  const leadScore=lN?lS/lN/2*100:0, coinScore=cN?cS/cN/2*100:0;
+  state.leadScore=leadScore;state.coinScore=coinScore;
+
+  const hardMarket=(((state.hyLevel??0)>450&&(state.hyChg??0)>75)?1:0)+((state.jpyUnwind)?1:0)+(((state.vix??0)>35)?1:0)+(((state.rateVol??0)>10)?1:0);
+  const F=state.detFired||{};
+  /* фондинговый стресс — необходимое или почти необходимое условие «проверки кэшем»:
+     новостная пара (капекс+BDC) без единого рыночного подтверждения рубильник не жмёт */
+  const override= (F.fund&&(F.capex||F.bdc))
+               || (F.capex&&F.bdc&&hardMarket>=1)
+               || (F.fund&&hardMarket>=2);
+
+  const total=IND.filter(i=>!i.optional&&!i.info).length;
+  const got=IND.filter(i=>!i.optional&&!i.info&&state.data[i.id]&&state.data[i.id].zi!=null).length;
+  const coverage=got/total;
+
+  let word,color;
+  if(override){word="ЗАЩИТНЫЙ РЕЖИМ · ПРОДАВАТЬ РИСК";color="var(--fault)";}
+  else if(coverage<0.6){word="НЕДОСТАТОЧНО ДАННЫХ";color="var(--neutral)";}
+  else if(score>=30){word="ПОКУПАТЬ · РАСШИРЯТЬ РИСК";color="var(--calm)";}
+  else if(score>=10){word="ДЕРЖАТЬ · ДОКУПАТЬ ВЫБОРОЧНО";color="var(--calm)";}
+  else if(score>-10){word="ДЕРЖАТЬ";color="var(--neutral)";}
+  else if(score>-30){word="СОКРАЩАТЬ · ХЕДЖИРОВАТЬ";color="var(--tension)";}
+  else{word="ЗАЩИТНЫЙ РЕЖИМ · ПРОДАВАТЬ РИСК";color="var(--fault)";}
+
+  /* гейт опережающих: покупка требует их подтверждения; полная защита — их слабости */
+  let gateNote="";
+  if(!override&&coverage>=0.6){
+    if(score>=30&&leadScore<10){
+      word="ДЕРЖАТЬ · ДОКУПАТЬ ВЫБОРОЧНО";color="var(--calm)";
+      gateNote="Гейт опережающих: подтверждающие сильны (+"+Math.round(coinScore)+"), но опережающие лишь "+(leadScore>0?"+":"")+Math.round(leadScore)+" — покупка не подтверждена, вердикт понижен на ступень.";
+    }else if(score<=-30&&leadScore>-10){
+      word="СОКРАЩАТЬ · ХЕДЖИРОВАТЬ";color="var(--tension)";
+      gateNote="Гейт опережающих: балл низкий, но опережающие ("+(leadScore>0?"+":"")+Math.round(leadScore)+") не подтверждают полную защиту — вердикт смягчён на ступень.";
+    }
+  }
+
+  $("vWord").textContent=word;$("vWord").style.color=color;
+  $("vScore").textContent=(score>0?"+":"")+Math.round(score);
+  $("vCover").textContent=got+"/"+total;
+  $("vDet").textContent=(state.detPts>0?"+":"")+state.detPts;
+  $("vLead").textContent=(leadScore>0?"+":"")+Math.round(leadScore);
+  $("vLead").style.color= leadScore>=10?"var(--calm)":leadScore<=-10?"var(--fault)":"var(--ink)";
+  $("vCoin").textContent=(coinScore>0?"+":"")+Math.round(coinScore);
+  $("vCoin").style.color= coinScore>=10?"var(--calm)":coinScore<=-10?"var(--fault)":"var(--ink)";
+  $("needle").style.left=((score+100)/200*100)+"%";
+  $("vStamp").textContent="бюллетень · "+new Date().toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+  const ob=$("overrideBanner");
+  if(override){ob.classList.add("show");ob.textContent="⚠ ТРИАДА: совпадение жёстких сигналов «проверки кэшем» — скоринг переопределён, режим защиты независимо от суммы баллов.";}
+  else ob.classList.remove("show");
+
+  let phase;
+  if(override||((state.vix??0)>35&&(state.hyChg??0)>75)) phase="<b>Фаза 1: «проверка кэшем».</b> Корреляции → 1: падает почти всё, включая будущих победителей; не ловить золото и дюрацию в первые дни маржин-волны.";
+  else if(state.stagfOn&&score<=-10) phase="<b>Стагфляционный узел (приоритетнее «Фазы 2»).</b> Инфляционные ожидания растут при слабом рынке — у ответа политики связаны руки: сценарий «смягчение → дно» может не сработать; защита здесь — реальные активы и короткий кэш, а не длинная дюрация.";
+  else if(score<=-30&&(state.sahm??0)>=0.5) phase="<b>Фаза 2: ответ политики впереди.</b> Первое снижение ставки исторически — сигнал продажи; ждать триаду разворота: спреды перестали расширяться + ревизии прибыли стабилизировались + доллар развернулся.";
+  else if(score<0&&(state.hyChg??0)<-40) phase="<b>Возможен вход в Фазу 3.</b> Кредит сужается при слабом рынке — проверяйте разворот доллара и ревизий EPS перед разворотом сухого пороха.";
+  else if(coinScore>=35&&leadScore<=5) phase="<b>Фаза 0-поздняя: рост подтверждён, опережающие остыли.</b> Классика вершинной зоны: тренд не шортят, но плечо не наращивают; хеджи дёшевы, работает секторная карта, а не индексная бета.";
+  else if(score>=30) phase="<b>Фаза 0 / рост.</b> Риск-он подтверждён кредитом и водопроводом; следите за шириной и кэрри как ранними трещинами.";
+  else phase="<b>Фаза 0: вершинная зона / болтанка.</b> Хеджи дёшевы, пока индекс у максимумов; работает секторная карта, а не индексная бета.";
+  $("vPhase").innerHTML=phase+(gateNote?('<br><span style="color:var(--tension)">'+gateNote+'</span>'):"");
+
+  const rankSrc=[...contrib,...detLines];
+  const row=r=>`<div class="why-row"><span>${r.name}</span><span class="val" style="color:${r.score>0?"var(--calm)":r.score<0?"var(--fault)":"var(--neutral)"}">${r.val} · ${r.score>0?"+":""}${r.score}</span></div>`;
+  const pos=rankSrc.filter(r=>r.score>0).sort((a,b)=>b.score*b.w-a.score*a.w).slice(0,3);
+  const neg=rankSrc.filter(r=>r.score<0).sort((a,b)=>a.score*a.w-b.score*b.w).slice(0,3);
+  $("whyList").innerHTML=
+    '<div style="font-size:10.5px;letter-spacing:.7px;color:var(--calm);text-transform:uppercase;margin:2px 0 2px">Тянут вверх</div>'
+    +(pos.map(row).join("")||"<div class='why-row'><span>—</span></div>")
+    +'<div style="font-size:10.5px;letter-spacing:.7px;color:var(--fault);text-transform:uppercase;margin:8px 0 2px">Тянут вниз</div>'
+    +(neg.map(row).join("")||"<div class='why-row'><span>значимых негативов нет</span></div>");
+
+  $("contribWrap").innerHTML=contrib.length?`<table class="contrib"><tr><th>Индикатор</th><th>Значение</th><th class="num">Балл (−2…+2)</th><th class="num">Вес, %</th></tr>${
+    contrib.map(r=>`<tr><td>${r.name}</td><td>${r.val}</td><td class="num">${r.score>0?"+":""}${r.score}</td><td class="num">${r.w}</td></tr>`).join("")
+  }</table><p style="margin-top:8px">Композит = Σ(балл/2 × 100 × вес) / Σвесов присутствующих блоков${state.detPts?(" · детекторы событий: "+(state.detPts>0?"+":"")+state.detPts):""}. Итог: <b>${(score>0?"+":"")+Math.round(score)}</b>.</p>`:"<p>Нет данных.</p>";
+
+  const hl=state.history[state.history.length-1];   /* v4.6: без дублей одинаковых точек */
+  if(!hl||hl.s!==score||Date.now()-hl.t>60000) state.history.push({t:Date.now(),s:score});
+  if(state.history.length>500) state.history=state.history.slice(-400);  /* вкладка может жить неделями — массив ограничен */
+  drawTape();drawSources();renderNews();
+}
+
+function drawTape(){
+  const cv=$("tape"),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  cv.width=w*dpr;cv.height=h*dpr;
+  const x=cv.getContext("2d");x.scale(dpr,dpr);x.clearRect(0,0,w,h);
+  x.strokeStyle="rgba(27,35,33,.25)";x.setLineDash([3,4]);
+  x.beginPath();x.moveTo(0,h/2);x.lineTo(w,h/2);x.stroke();x.setLineDash([]);
+  const pts=state.history.slice(-160);
+  if(!pts.length)return;
+  const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  x.beginPath();
+  const n=Math.max(pts.length,40);
+  for(let i=0;i<n;i++){
+    const p=pts[Math.min(i,pts.length-1)];
+    const jitter=reduced?0:Math.sin(i*1.7)*1.2;
+    const px=i/(n-1)*w, py=h/2-(p.s/100)*(h*0.36)+jitter;
+    i?x.lineTo(px,py):x.moveTo(px,py);
+  }
+  const s=pts[pts.length-1].s;
+  x.strokeStyle= s>=10?"#1F7A63": s<=-10?"#A63A2B":"#6B7570";
+  x.lineWidth=1.8;x.stroke();
+}
+
+/* ============ ЗАГРУЗКА ============ */
+let countLeft=900,loading=false;
+function setProgress(done,total){$("pbar").style.width=Math.round(done/total*100)+"%";}
+async function loadAll(){
+  if(loading)return;loading=true;
+  const btn=$("refreshBtn");btn.disabled=true;btn.textContent="Загрузка…";
+  for(const k in SOURCES)SOURCES[k]="idle";drawSources();
+  NOCORS=new Set(NOCORS_BASE);
+  SNAP=null; state.snapInfo="";
+  if(CONFIG.SNAPSHOT_URL){
+    try{
+      const r=await fetchWithTimeout(CONFIG.SNAPSHOT_URL+(CONFIG.SNAPSHOT_URL.includes("?")?"&":"?")+"t="+Date.now(),9000);
+      if(r.ok){const js=await r.json();
+        if(js&&js.responses&&js.generated_at){SNAP=js;
+          const age=Math.max(0,Math.round((Date.now()-new Date(js.generated_at).getTime())/60000));
+          state.snapInfo="снимок сервера · "+new Date(js.generated_at).toLocaleString("ru-RU",{hour:"2-digit",minute:"2-digit"})
+            +(age>90?" · УСТАРЕЛ ("+age+" мин) — проверьте Actions":" · "+age+" мин назад");
+        }}
+    }catch(e){dbg("snapshot",String(e));}
+    if(!SNAP) state.snapInfo="снимок недоступен — запустите workflow «Обновление снимка» во вкладке Actions (шаг 4 README)";
+  }            /* v4.6: сбой сессии — не приговор источнику навсегда */
+  const LAZY=new Set(["RRPONTSYD","DEXJPUS","DEXCHUS","UNRATE","RPONTSYD"]);
+  const seriesList=Object.keys(SERIES_LIMITS).filter(s=>!LAZY.has(s)); /* резервы тянутся только при нужде */
+  const totalSteps=seriesList.length+IND.length+1;let done=0;
+  /* фаза 1: FRED-серии, пул 3 с джиттером — без штормов на бесплатные шлюзы */
+  await pool(seriesList,3,async s=>{
+    try{await fredFetch(s);}catch(e){}
+    await sleep(60+Math.random()*120);
+    setProgress(++done,totalSteps);drawSources();
+  });
+  /* фаза 2а: независимые индикаторы (пул 5) — карточки заполняются по мере готовности */
+  await pool(IND.filter(i=>!i.deps),5,async ind=>{
+    await loadOne(ind);
+    setProgress(++done,totalSteps);drawSources();
+  });
+  /* фаза 2б: кросс-индикаторы (BTC×VIX, золото×TIPS, нефть/стагфляция×S&P) —
+     строго после своих источников, чтобы исключить гонку состояний */
+  await pool(IND.filter(i=>i.deps),4,async ind=>{
+    await loadOne(ind);
+    setProgress(++done,totalSteps);drawSources();
+  });
+  /* фаза 2.5: серии детекторов (с ретраем) — их не запрашивает ни одна карточка */
+  await pool(["DGS2","CPILFESL","CES0500000003","NFCI","GDP"],2,async se=>{try{await fred(se);}catch(e){}});
+  compute();
+  /* фаза 3: новостной сканер */
+  try{await scanNews();}catch(e){}
+  setProgress(++done,totalSteps);
+  compute();
+  /* фаза 4: автодолечивание — то, что раньше требовало ручных обновлений */
+  await autoHeal();
+  $("updated").textContent= state.snapInfo || ("обновлено "+new Date().toLocaleTimeString("ru-RU"));
+  btn.disabled=false;btn.textContent="Обновить";
+  setTimeout(()=>{$("pbar").style.width="0";},800);
+  countLeft=900;loading=false;
+}
+async function autoHeal(){
+  const detSeries=["DGS2","CPILFESL","CES0500000003","NFCI","GDP"];
+  for(let round=1;round<=3;round++){
+    const failed=IND.filter(i=>{
+      const r=state.data[i.id];
+      if(r&&!r.degraded) return false;
+      if(i.optional&&!finnK()&&!snapHas("fh:quote:SPY")) return false; /* нет ни ключа, ни снимка — не сбой */
+      return true;                              /* нет данных ИЛИ деградированный резерв */
+    });
+    const missSeries=detSeries.filter(se=>!FREDCACHE[se]);
+    if(!failed.length&&!missSeries.length) return;
+    $("updated").textContent="автодозагрузка "+round+"/3: осталось "+(failed.length+missSeries.length)+"…";
+    await sleep([0,2500,7000,16000][round]);
+    if(missSeries.length) await pool(missSeries,2,async se=>{try{await fred(se);}catch(e){}});
+    if(failed.length) await pool(failed,3,async ind=>{await loadOne(ind);drawSources();});
+    compute();
+  }
+}
+/* ============ «СПРОСИТЬ ИИ»: мультипровайдерная интерпретация ============ */
+const AI_PROVIDERS={
+  openrouter:{label:"OpenRouter · любая модель",kind:"oai",base:"https://openrouter.ai/api/v1",
+    keyUrl:"openrouter.ai/keys",hint:"напр. anthropic/claude-sonnet-4.6 · каталог: openrouter.ai/models"},
+  musespark:{label:"Meta · Muse Spark",kind:"oai",base:"https://api.meta.ai/v1",
+    keyUrl:"developer.meta.com/ai (Meta Model API)",hint:"muse-spark-1.1"},
+  custom:{label:"Свой endpoint (OpenAI-совм.)",kind:"oai",base:"",
+    keyUrl:"—",hint:"id модели вашего сервера (напр. llama3.3)"}
+};
+const aiCfg=id=>{CONFIG.AI[id]=CONFIG.AI[id]||{key:"",model:""};return CONFIG.AI[id];};
+function syncAIFields(){
+  const id=$("aiProvider").value,c=aiCfg(id),meta=AI_PROVIDERS[id]||{};
+  $("aiModel").value=c.model||"";
+  $("aiModel").placeholder=meta.hint||"модель";
+  $("aiKey").value=c.key||"";
+  $("aiKey").placeholder= id==="custom"?"ключ (для локальных серверов не нужен)":"API-ключ · "+(meta.keyUrl||"");
+  $("aiBase").style.display= id==="custom"?"":"none";
+  if(id==="custom") $("aiBase").value=c.base||"";
+}
+function aiInitUI(){
+  const sel=$("aiProvider");
+  sel.innerHTML=Object.entries(AI_PROVIDERS).map(([id,pr])=>`<option value="${id}">${pr.label}</option>`).join("");
+  sel.value=CONFIG.AI.provider||"openrouter";
+  syncAIFields();
+  sel.addEventListener("change",()=>{CONFIG.AI.provider=sel.value;syncAIFields();});
+  $("aiModel").addEventListener("input",()=>{aiCfg(sel.value).model=$("aiModel").value.trim();});
+  $("aiKey").addEventListener("input",()=>{aiCfg(sel.value).key=$("aiKey").value.trim();});
+  $("aiBase").addEventListener("input",()=>{aiCfg("custom").base=$("aiBase").value.trim();});
+}
+
+/* --- снимок панели: самодокументированная схема для любой модели --- */
+function buildSnapshot(){
+  const indicators=IND.map(i=>{
+    const r=state.data[i.id]; if(!r||r.zi==null) return null;
+    return {block:BLOCKS[i.block].title, name:i.name,
+      value:r.value+(i.unit?" "+i.unit:""), change:r.delta||"",
+      active_zone:i.zones[r.zi].l, score:i.info?"справочно (в композит не входит)":i.zones[r.zi].s,
+      type:i.info?"info":(i.lead?"опережающий":"подтверждающий"),
+      all_zones:i.zones.map(z=>z.l+" → "+(z.s>0?"+":"")+z.s).join(" · "),
+      obs_date:r.date?r.date.toISOString().slice(0,10):"",
+      stale:r.date?daysBetween(r.date,today())>(i.staleDays||9):false};
+  }).filter(Boolean);
+  const detectors=DETECTORS.map(d=>({name:d.name,state:STATE_LABEL[(d.last||{}).st||"calm"],
+    live_inputs:(d.last||{}).inputs||"",adjustment:(d.last||{}).pts||0,triad_member:!!d.triad,logic:d.logic}));
+  const dts=n=>n.t?new Date(n.t*1000).toISOString().slice(0,10):"";
+  const news={
+    detector_triggers:taggedTriggers().slice(0,8).map(n=>"["+n.tag+"] "+n.sym+" "+dts(n)+": "+n.h),
+    iran_context:state.news.geo.slice(0,5).map(n=>dts(n)+": "+n.h),
+    tariff_context:state.news.tariff.slice(0,3).map(n=>dts(n)+": "+n.h)};
+  const blockScores={}; for(const bid in BLOCKS) blockScores[BLOCKS[bid].title]=$("bs_"+bid).textContent;
+  return {snapshot_time:new Date().toString(),
+    verdict:$("vWord").textContent, composite_score:$("vScore").textContent, block_scores:blockScores,
+    leading_score:$("vLead").textContent, confirming_score:$("vCoin").textContent,
+    detectors_adjustment:$("vDet").textContent, data_coverage:$("vCover").textContent,
+    phase_and_gate:$("vPhase").textContent.replace(/\s+/g," "),
+    llm_news_filter:state.newsLLM||"idle",
+    block_weights:"водопровод 25% · кредит 25% · рынок 20% · макро 15% · режимы 15%",
+    indicators, detectors, news};
+}
+
+/* --- системный контекст: полное описание логики панели для ЛЮБОЙ модели --- */
+const AI_SYS_DEEP=`Ты — макро-стратег с 25-летним стажем (кредитные рынки, ставки, водопровод долларовой ликвидности). Тебе передан JSON-снимок панели «Разлом-26». Твоя задача — НЕ пересказать панель, а ОБЪЯСНИТЬ её: почему показатели сложились именно в такую комбинацию, какой режим она описывает, какие причинные цепочки сейчас работают, куда они ведут и что могло бы это прочтение опровергнуть. Пиши для умного человека без финансового образования: просто, живо, по-русски; каждый термин — с расшифровкой в скобках при первом употреблении.
+
+ДИСЦИПЛИНА ФАКТОВ — двухслойная. Слой данных: все числа, зоны и состояния панели бери ТОЛЬКО из снимка, показаний не выдумывай; при stale=true оговори свежесть. Слой смысла: причинные механизмы, передаточные цепочки, исторические аналогии и рассуждение «что обычно следует за такой конфигурацией» — ОБЯЗАТЕЛЬНЫ, это и есть твоя ценность; аналогии помечай как фон («почерк сентября-2019», «как в августе-2024»), не выдавая за данные. Не хватает данных для вывода — скажи прямо.
+
+ГЛАВНОЕ ПРАВИЛО: пересказ значений без объяснения — провал задачи. Литмус: если абзац можно собрать конкатенацией полей снимка — перепиши его. Число появляется только как улика в аргументе (не «резервы 10,2% ВВП, балл +1», а «резервы 10,2% ВВП — это ещё подушка: до территории репо-стресса ~9% остаётся запас порядка полутриллиона, поэтому текущий дренаж кассы Минфина пока не опасен»).
+
+РАМКА ПАНЕЛИ (для корректного чтения полей): ставка панели — «${CONFIG.CYCLE.bet}»; пять блоков — производные этой ставки. Подтверждающие индикаторы описывают условия сейчас (зелёные до самой вершины по построению), опережающие — куда клонится; их расхождение = стадия цикла; гейт не даёт «покупать» без опережающих ≥+10 и полную «защиту» без ≤−10. Триада (фондинг · капекс гиперскейлеров · BDC) при рыночном подтверждении принудительно включает защиту. Фазы: 0 → 0-поздняя → 1 «проверка кэшем» → 2 «ответ политики» (первое снижение ставки — исторически сигнал продажи) → 3 дебейсмент; стагфляционный узел блокирует «Фазу 2». Спец-пометки live_inputs: «кв.-конец» у SRF = квартальная косметика, не стресс; «паническое смягчение» у разворота = плюса нет; P₂ᵧ в change = перцентиль за 2 года (контекст, не балл); llm_news_filter — верифицированы ли новостные триггеры.
+
+ОБЯЗАТЕЛЬНЫЕ ЭЛЕМЕНТЫ ЭССЕ — вплетай в связный рассказ, НЕ нумеруя и не превращая в анкету; 700–1100 слов, обычные абзацы, без markdown и списков:
+· Диагноз режима развёрнутым тезисом в первом же абзаце: в каком мире живёт рынок и из чего это видно (не «панель показывает X», а «рынок сейчас — Y, и вот почему»).
+· Причинная механика: собери показания в 2–3 работающие цепочки (пример логики: изобилие резервов → дешёвое репо → спокойный кредит → поддержка мультипликаторов; дренаж TGA → давление на резервы → чувствительность спреда SOFR), покажи, где в цепочках напряжение и где подушки; обязательно объясни, что расхождение опережающих и подтверждающих говорит о СТАДИИ цикла.
+· Противоречия в данных, если есть: не сглаживай — объясни, какая трактовка вероятнее и почему.
+· Куда это ведёт: три сценария (базовый · рисковый · восстановительный) с качественной оценкой правдоподобия словами, без ложных процентов; у КАЖДОГО — 2–3 ранних сигнала с порогами строго из all_zones/logic панели («первым дёрнется импульс HY выше +25 б.п./мес», «SRF два дня подряд выше $25 млрд», «иена крепче чем −4¥ за месяц»).
+· Фальсификаторы: что должно случиться, чтобы текущее прочтение оказалось НЕВЕРНЫМ.
+· Практический смысл в терминах режима и доли риска (по фазовой модели панели), без персональных сделок, тикеров и размеров позиций; в финале — когда разумно заглянуть в панель в следующий раз (календарь: пейроллы — первая пятница, CPI — середина месяца, H.4.1 и заявки — четверг, SLOOS — фев/май/авг/ноя, FOMC) и одна строка: это машинная интерпретация мониторинга по открытым данным, не инвестиционная рекомендация.
+
+ЗАПРЕЩЕНО: советы по конкретным сделкам/тикерам/размерам позиций; markdown-заголовки и маркированные списки; выдумывание показаний панели; алармизм и убаюкивание; вода ради объёма.`;
+
+const AI_SYS_BRIEF=`Ты — аналитик панели «Разлом-26». Дай СВОДКУ по JSON-снимку: 150–250 слов, обычные абзацы без markdown. Строго: 1) вердикт своими словами (что значит и чего НЕ значит: режим, не «дёшево»); 2) три главных факта с числами из снимка (включая расхождение опережающих/подтверждающих, если есть) и всё в состоянии НАБЛЮДЕНИЕ/СРАБОТАЛ; 3) 2–3 порога из all_zones/logic, за которыми следить; 4) строка-дисклеймер. Числа — только из снимка.`;
+const AI_SYS=AI_SYS_DEEP; /* совместимость: верификация новостей задаёт свой sys */
+
+
+/* --- вызовы провайдеров (всегда напрямую, без CORS-шлюзов) --- */
+async function callOAI(base,cfg,userMsg,sys,maxTok){
+  const mk=tokField=>({model:cfg.model,messages:[{role:"system",content:sys||AI_SYS},{role:"user",content:userMsg}],[tokField]:maxTok||2600});
+  const headers={"Content-Type":"application/json","Authorization":"Bearer "+cfg.key,"X-Title":"Razlom-26 monitor"};
+  let r=await fetch(base+"/chat/completions",{method:"POST",headers,body:JSON.stringify(mk("max_tokens"))});
+  if(r.status===400){
+    const t=await r.text();
+    if(/max_completion_tokens/.test(t)) r=await fetch(base+"/chat/completions",{method:"POST",headers,body:JSON.stringify(mk("max_completion_tokens"))});
+    else throw new Error("HTTP 400: "+t.slice(0,180));
+  }
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const j=await r.json();
+  const c=j.choices&&j.choices[0]&&j.choices[0].message;
+  return (c&&(c.content||"")).trim();
+}
+async function aiRoute(){
+  const id=(CONFIG.AI&&CONFIG.AI.provider)||"openrouter";
+  const meta=AI_PROVIDERS[id]||AI_PROVIDERS.openrouter, cfg=aiCfg(id);
+  const base= id==="custom" ? (cfg.base||"").replace(/\/$/,"") : meta.base;
+  return {id,meta,cfg,base,
+    ready: !!base && !!cfg.model && (id==="custom" || !!cfg.key)};
+}
+async function llmComplete(userMsg,sys,maxTok){
+  const r=await aiRoute();
+  if(!r.ready) throw new Error("AI_NOT_CONFIGURED");
+  return callOAI(r.base,r.cfg,userMsg,sys,maxTok);
+}
+/* LLM-фильтр новостных триггеров: подтверждает, что заголовок сообщает о ФАКТЕ события */
+async function llmVerifyNews(){
+  state.newsLLM="off";
+  const r=await aiRoute();
+  if(!r.ready) return;                                   /* ИИ не настроен — работаем на regex+NEG */
+  const cap=state.news.capex, bdc=state.news.bdcHard;
+  if(!cap.length&&!bdc.length){state.newsLLM="idle";return;}
+  try{
+    const list=[...cap.map((n,i)=>`C${i}|${n.sym}|${n.h}`),
+                ...bdc.map((n,i)=>`B${i}|${n.sym}|${n.h}`)].join("\n");
+    const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
+    const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
+C-заголовки: гиперскейлер СНИЗИЛ капекс-гайденс, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
+B-заголовки: BDC-фонд ВВЁЛ гейт/приостановку выкупа паёв или ОБЪЯВИЛ снижение дивиденда.
+НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may"), вопросы, мнения аналитиков, обзоры сектора.
+Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
+Заголовки:\n`+list;
+    const txt=await llmComplete(prompt,sys,300);
+    const m=(txt||"").match(/\{[\s\S]*\}/); if(!m) throw new Error("no json");
+    const ok=new Set((JSON.parse(m[0]).confirmed)||[]);
+    state.news.capex  =cap.filter((n,i)=>ok.has("C"+i));
+    state.news.bdcHard=bdc.filter((n,i)=>ok.has("B"+i));
+    state.newsLLM="ok";
+  }catch(e){ state.newsLLM="fail"; }
+}
+async function askAI(){
+  const r=await aiRoute(), out=$("aiOut"),st=$("aiStatus"),btn=$("aiBtn");
+  if(!r.ready){
+    out.hidden=false;
+    out.innerHTML="<p><b>ИИ не настроен.</b> "+(
+      r.id==="custom"
+        ? "Для «своего endpoint» заполните base URL (напр. http://localhost:11434/v1 для Ollama) и id модели."
+        : "Вставьте API-ключ ("+r.meta.keyUrl+") и id модели ("+(r.meta.hint||"")+"); постоянно — в CONFIG.AI.")+"</p>";
+    return;
+  }
+  const deep=!$("aiDepth")||$("aiDepth").value!=="brief";
+  btn.disabled=true;st.textContent=(r.meta.label.split(" · ")[0])+(deep?" пишет эссе…":" думает…");
+  out.hidden=false;out.innerHTML="<p>Снимок панели отправлен ("+r.cfg.model+"), жду "+(deep?"развёрнутый разбор (мощной модели нужно 20–60 сек.)":"сводку")+"…</p>";
+  const userMsg="СНИМОК ПАНЕЛИ (JSON):\n"+JSON.stringify(buildSnapshot());
+  try{
+    const text=await callOAI(r.base,r.cfg,userMsg,deep?AI_SYS_DEEP:AI_SYS_BRIEF,deep?3400:1200);
+    if(!text) throw new Error("пустой ответ модели");
+    out.innerHTML=esc(text).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>")
+      .split(/\n{2,}/).map(par=>"<p>"+par.replace(/\n/g,"<br>")+"</p>").join("");
+    st.textContent="разбор · "+r.meta.label+" · "+new Date().toLocaleTimeString("ru-RU");
+  }catch(e){
+    const m=String(e&&e.message||e);
+    out.innerHTML="<p><b>Не получилось.</b> "+(
+      /401|403/.test(m)?"Ключ не принят провайдером — проверьте его ("+r.meta.keyUrl+").":
+      /404/.test(m)?"Модель «"+r.cfg.model+"» не найдена — сверьте id ("+(r.meta.hint||"")+").":
+      /429/.test(m)?"Лимит запросов провайдера — подождите минуту.":
+      /Failed to fetch/.test(m)?(
+        r.id==="musespark"
+          ? "Браузерный запрос заблокирован (CORS) или нет доступа: Meta Model API в превью (изначально только США). Обход: локальный OpenAI-совместимый прокси (LiteLLM) через «свой endpoint», либо другая модель через OpenRouter."
+          : "Браузерный запрос заблокирован (CORS) или нет сети. Надёжные пути: OpenRouter или локальный сервер через «свой endpoint»."):
+      "Ошибка: "+m)+"</p>";
+    st.textContent="";
+  }
+  btn.disabled=false;
+}
+$("aiBtn").addEventListener("click",askAI);
+$("refreshBtn").addEventListener("click",loadAll);
+$("applyKeys").addEventListener("click",loadAll);
+setInterval(()=>{countLeft--;if(countLeft<=0&&!loading){loadAll();countLeft=900;}
+  $("countdown").textContent=loading?"обновление…":"через "+String(Math.floor(Math.max(countLeft,0)/60)).padStart(2,"0")+":"+String(Math.max(countLeft,0)%60).padStart(2,"0");
+},1000);
+let rsTimer=null;
+window.addEventListener("resize",()=>{drawTape();clearTimeout(rsTimer);
+  rsTimer=setTimeout(()=>{for(const id in SPARKREG){
+    const c=$("card_"+id),cv=c&&c.querySelector("canvas");
+    if(cv)spark(cv,SPARKREG[id].series,SPARKREG[id].score,id);}},180);});
+
+renderBlocks();renderDetectors();drawSources();
+$("fredKey").value=CONFIG.FRED_KEY;
+$("finnhubKey").value=CONFIG.FINNHUB_KEY;
+(()=>{const c=new Date(CONFIG.CALIBRATED+"-01T00:00:00Z");     /* v4.6: напоминание о ревизии порогов */
+  $("calib").textContent=CONFIG.CALIBRATED+((Date.now()-c)/864e5>400?" · ⚠ старше года — пересмотрите пороги":"");})();
+aiInitUI();
+loadAll();
+</script>
+</body>
+</html>
