@@ -179,7 +179,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>СЕЙСМОСТАНЦИЯ «РАЗЛОМ-26»</b><span class="num">v4.7.2 · сайт (серверный снимок) · бюллетень наблюдений за линиями разлома рынка</span></div>
+  <div class="station"><b>СЕЙСМОСТАНЦИЯ «РАЗЛОМ-26»</b><span class="num">v4.7.3 · сайт (серверный снимок) · бюллетень наблюдений за линиями разлома рынка</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -323,6 +323,13 @@
      его нет в серверном снимке (лампочка Stooq серая, а не красная; ноль
      ожидания), а крипта при серверном 429 CoinGecko мгновенно берёт
      Stooq-daily из снимка вместо сетевой погони при каждом заходе.
+   ═ v4.7.3 (2-я итерация внешнего аудита): фоновая догонка интрадея из
+     браузера, когда сервер его не добыл (Stooq блокирует раннеры GitHub) —
+     мгновенная отрисовка + свежесть, лампочка не краснеет из-за надстройки;
+     строка сбоев сборки переехала в панель «Источники» (компактно для stq);
+     symDrift читает картридж CYCLE (рецензент прав — мой литерал был
+     дублёром); 14-дневный потолок возраста заголовков; воркфлоу публикует
+     по схеме commit → pull --rebase → push (мой прежний rebase был мёртвым).
    ═ Хостинг: режим серверного снимка (CONFIG.SNAPSHOT_URL) — страница читает
      готовый snapshot.json, собранный расписанием; один хук snapKey в fetchJSON
      покрывает все 12 источников; ключи из опубликованной страницы удаляются. */
@@ -505,9 +512,14 @@ function drawSources(){
   }
   const old=document.getElementById("srvfails"); if(old) old.remove();
   if(SNAP&&Array.isArray(SNAP.failed)&&SNAP.failed.length){
+    const keys=SNAP.failed.map(f=>String(f).split(" — ")[0]);
+    const onlyStq=keys.every(k=>k.startsWith("stq:"));
     const p=document.createElement("div"); p.id="srvfails"; p.className="tagline";
-    p.textContent="сбои последней серверной сборки: "+SNAP.failed.map(f=>String(f).split(" — ")[0]).join(", ");
-    box.parentNode.appendChild(p);
+    p.textContent= onlyStq
+      ? "серверная сборка: интрадей Stooq недоступен с раннеров — страница добирает его фоном из браузера"
+      : "сбои последней серверной сборки: "+keys.join(", ");
+    const panel=document.querySelector("details.panel .panel-body");
+    (panel||box.parentNode).appendChild(p);
   }
 }
 
@@ -1215,7 +1227,8 @@ async function scanNews(){
   const pull=async sym=>{
     try{
       const j=await fetchJSON(`https://finnhub.io/api/v1/company-news?symbol=${sym}&from=${from}&to=${to}&token=${key}`,"finnhub");
-      return Array.isArray(j)?j.slice(0,60):[];
+      const cutoff=Date.now()/1000-14*86400; /* окно детекторов: слитое из прошлого снимка старьё не жуём */
+      return Array.isArray(j)?j.filter(n=>(n.datetime||0)>cutoff).slice(0,60):[];
     }catch(e){return [];}
   };
   await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
@@ -1230,7 +1243,8 @@ async function scanNews(){
     });
   });
   try{
-    const g=await fetchJSON(`https://finnhub.io/api/v1/news?category=general&token=${key}`,"finnhub");
+    const g0=await fetchJSON(`https://finnhub.io/api/v1/news?category=general&token=${key}`,"finnhub");
+    const g=(Array.isArray(g0)?g0:[]).filter(n=>(n.datetime||0)>Date.now()/1000-14*86400);
     (Array.isArray(g)?g.slice(0,120):[]).forEach(n=>{
       const h=n.headline||"";
       if(RX.geo.test(h))news.geo.push({sym:"GEO",h,u:n.url,t:n.datetime});
@@ -1651,6 +1665,21 @@ async function loadAll(){
   btn.disabled=false;btn.textContent="Обновить";
   setTimeout(()=>{$("pbar").style.width="0";},800);
   countLeft=900;loading=false;
+  /* фоновая догонка интрадея: сервер не добыл котировки (Stooq блокирует раннеры) → после отрисовки тихо пробуем из браузера */
+  if(SNAP&&["cl.f","^vix","usdjpy"].some(sym=>!snapHas("stq:"+sym))){
+    (async()=>{                                   /* fire-and-forget: страница уже отрисована и интерактивна */
+      state.allowLiveIntraday=true;
+      let got=false;
+      for(const id of ["oil","vix","jpy"]){
+        const ind=IND.find(x=>x.id===id); if(!ind) continue;
+        try{ await loadOne(ind); if(((state.data[id]||{}).delta||"").includes("интрадей")) got=true; }catch(e){}
+      }
+      state.allowLiveIntraday=false;
+      compute();
+      if(!got&&SOURCES.stooq==="fail") SOURCES.stooq="idle"; /* надстройка не красит панель красным */
+      drawSources();
+    })();
+  }
 }
 async function autoHeal(){
   const detSeries=["DGS2","CPILFESL","CES0500000003","NFCI","GDP"];
