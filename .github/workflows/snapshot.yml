@@ -19,6 +19,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +33,7 @@ jobs:
         run: |
           git config user.name  "razlom26-bot"
           git config user.email "bot@users.noreply.github.com"
+          git pull --rebase origin main || true
           git add docs/snapshot.json
           git diff --cached --quiet || git commit -m "снимок $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
           git push
