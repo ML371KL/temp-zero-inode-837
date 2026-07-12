@@ -1,0 +1,33 @@
+name: Обновление снимка данных
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"      # каждые 20 минут; поменяйте при желании
+  workflow_dispatch:             # и кнопка ручного запуска
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - name: Сбор данных
+        env:
+          FRED_KEY:    ${{ secrets.FRED_KEY }}
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+        run: node scripts/fetch-snapshot.mjs
+      - name: Публикация снимка
+        run: |
+          git config user.name  "razlom26-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add docs/snapshot.json
+          git diff --cached --quiet || git commit -m "снимок $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+          git push
