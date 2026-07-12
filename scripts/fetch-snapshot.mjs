@@ -5,7 +5,7 @@
    snapKey() и не делает ни одного внешнего запроса.
    Ключи: переменные окружения FRED_KEY и FINNHUB_KEY (секреты репозитория). */
 
-import {writeFileSync, mkdirSync} from "node:fs";
+import {writeFileSync, mkdirSync, readFileSync, existsSync} from "node:fs";
 
 const FRED_KEY   = process.env.FRED_KEY   || "";
 const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
@@ -33,10 +33,23 @@ async function getJSON(url,tries=3){
   throw last;
 }
 
+async function getTEXT(url,tries=3){
+  let last;
+  for(let i=0;i<tries;i++){
+    try{
+      const r=await fetch(url,{signal:AbortSignal.timeout(12000),headers:{"User-Agent":"razlom26-snapshot/1.0"}});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return await r.text();
+    }catch(e){last=e; await sleep(1000*(i+1));}
+  }
+  throw last;
+}
+
 const R={};                     /* responses под логическими ключами */
 const failed=[];
 /* валидатор формы: пустой/битый ответ = сбой источника, а не «успех» */
 function valid(key,j){
+  if(key.startsWith("stqd:")) return typeof j==="string"&&j.trim().split(/\r?\n/).length>10; /* дневная история CSV */
   if(key.startsWith("stq:")) return typeof j==="string"&&j.split(",").length>=7; /* интрадей — CSV-строка */
   if(!j||typeof j!=="object") return false;
   if(key.startsWith("fred:"))   return Array.isArray(j.observations)&&j.observations.length>3;
@@ -84,6 +97,14 @@ async function main(){
   await put("cg:pax-gold",()=>getJSON("https://api.coingecko.com/api/v3/coins/pax-gold/market_chart?vs_currency=usd&days=35&interval=daily"));
   if(!R["cg:bitcoin"])  await put("bin:BTCUSDT", ()=>getJSON("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=91"));
   if(!R["cg:pax-gold"]) await put("bin:PAXGUSDT",()=>getJSON("https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=36"));
+  /* с раннеров GitHub (США) Binance отвечает 451 — третий эшелон: дневная история Stooq */
+  const stooqDaily=async sym=>{
+    const csv=await getTEXT("https://stooq.com/q/d/l/?s="+sym+"&i=d");
+    if(String(csv).trim().split(/\r?\n/).length<10) throw new Error("битая форма ответа");
+    return csv;
+  };
+  if(!R["cg:bitcoin"]&&!R["bin:BTCUSDT"])   await put("stqd:btcusd", ()=>stooqDaily("btcusd"));
+  if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",()=>stooqDaily("xauusd"));
 
   /* ── Валюты: Frankfurter (два хоста), резерв FRED H.10 ── */
   const end=iso(new Date()), start=iso(new Date(Date.now()-100*864e5));
@@ -95,7 +116,7 @@ async function main(){
       }catch(e){ return await getJSON(`https://api.frankfurter.app/${start}..${end}?from=USD&to=${cur}`); }
     });
     if(!R["fx:"+cur]) await put("fred:"+(cur==="JPY"?"DEXJPUS":"DEXCHUS"),
-      ()=>getJSON(fredURL(cur==="JPY"?"DEXJPUS":"DEXCHUS",LAZY.DEXJPUS)));
+      ()=>getJSON(fredURL(cur==="JPY"?"DEXJPUS":"DEXCHUS",(cur==="JPY"?LAZY.DEXJPUS:LAZY.DEXCHUS))));
   }
 
   /* ── резервы каскадов, если первичный путь упал ── */
@@ -107,25 +128,15 @@ async function main(){
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
     const syms=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
+    const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime}));
     for(const s of syms)
-      await put("fh:news:"+s,()=>getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`));
-    await put("fh:general",()=>getJSON(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`));
+      await put("fh:news:"+s,async()=>slim(await getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`)).slice(0,120));
+    await put("fh:general",async()=>slim(await getJSON(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`)).slice(0,80));
     for(const s of ["BIZD","SMH","SPY","RSP"])
       await put("fh:quote:"+s,()=>getJSON(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${FINNHUB_KEY}`));
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
-  async function getTEXT(url,tries=3){
-    let last;
-    for(let i=0;i<tries;i++){
-      try{
-        const r=await fetch(url,{signal:AbortSignal.timeout(12000),headers:{"User-Agent":"razlom26-snapshot/1.0"}});
-        if(!r.ok) throw new Error("HTTP "+r.status);
-        return await r.text();
-      }catch(e){last=e; await sleep(1000*(i+1));}
-    }
-    throw last;
-  }
   for(const sym of ["cl.f","^vix","usdjpy"]){
     await put("stq:"+sym, async()=>{
       const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");
@@ -135,11 +146,30 @@ async function main(){
     });
   }
 
+  /* ── слияние с последним удачным снимком: сбой источника ≠ дырка на сайте ── */
+  const stale_keys={};
+  try{
+    if(existsSync(OUT)){
+      const prev=JSON.parse(readFileSync(OUT,"utf-8"));
+      const failedKeys=failed.map(f=>String(f).split(" — ")[0]);
+      for(const k of failedKeys){
+        if(prev&&prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
+          R[k]=prev.responses[k];
+          stale_keys[k]=(prev.stale_keys&&prev.stale_keys[k])||prev.generated_at;
+          const i=failed.findIndex(f=>String(f).startsWith(k+" "));
+          if(i>=0) failed[i]+=" (подложено из снимка "+String(stale_keys[k]).slice(0,16)+")";
+        }
+      }
+    }
+  }catch(e){console.log("merge с прошлым снимком пропущен:",String(e&&e.message||e));}
+
   /* ── запись ── */
   mkdirSync(OUT.split("/").slice(0,-1).join("/")||".",{recursive:true});
   const fredOk=Object.keys(R).filter(k=>k.startsWith("fred:")).length;
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
-    ok:Object.keys(R).length, failed, responses:R}));
+    ok:Object.keys(R).length, failed, stale_keys,
+    meta:{symbols:["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"]},
+    responses:R}));
   console.log(`снимок: ${Object.keys(R).length} источников (fred: ${fredOk}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));
   if(fredOk<18) { console.error("критично мало серий FRED — помечаю запуск неудачным"); process.exit(1); }
