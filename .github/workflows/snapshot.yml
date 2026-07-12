@@ -2,7 +2,7 @@ name: Обновление снимка данных
 
 on:
   schedule:
-    - cron: "*/20 * * * *"      # каждые 20 минут; поменяйте при желании
+    - cron: "6,26,46 * * * *"      # каждые 20 минут; поменяйте при желании
   workflow_dispatch:             # и кнопка ручного запуска
 
 permissions:
@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: 20}
+        with: {node-version: 24}
       - name: Сбор данных
         env:
           FRED_KEY:    ${{ secrets.FRED_KEY }}
