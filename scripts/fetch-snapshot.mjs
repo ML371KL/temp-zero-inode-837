@@ -20,12 +20,12 @@ const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
 const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function getJSON(url,tries=3){
+async function getJSON(url,tries=3,hdrs){
   let last;
   for(let i=0;i<tries;i++){
     try{
       const r=await fetch(url,{signal:AbortSignal.timeout(15000),
-        headers:{"User-Agent":"razlom26-snapshot/1.0"}});
+        headers:hdrs||{"User-Agent":"razlom26-snapshot/1.0"}});
       if(!r.ok) throw new Error("HTTP "+r.status);
       return await r.json();
     }catch(e){last=e; await sleep(1200*(i+1));}
@@ -43,6 +43,43 @@ async function getTEXT(url,tries=3){
     }catch(e){last=e; await sleep(1000*(i+1));}
   }
   throw last;
+}
+
+/* ── Yahoo v8 chart: рабочая лошадка интрадея и крипто-резерва ──
+   Балансируется между query1/query2; требует браузерный User-Agent.
+   Ответ нормализуем в ЛЕГАСИ-CSV формата Stooq: клиент читает те же ключи
+   тем же парсером — ни одна строка страницы не меняется. */
+const YUA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+           "Accept":"application/json"};
+async function yahooChart(sym,range,interval){
+  let last;
+  for(const host of ["query1","query2"]){
+    try{
+      const j=await getJSON(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=${interval}`,2,YUA);
+      const r=j&&j.chart&&j.chart.result&&j.chart.result[0];
+      if(r) return r;
+      throw new Error("пустой chart");
+    }catch(e){last=e;}
+  }
+  throw last||new Error("yahoo недоступен");
+}
+const isoD=t=>new Date(t*1000).toISOString().slice(0,10);
+async function yahooQuoteCSV(ySym,legacySym,lo,hi){       /* одна строка-котировка в форме Stooq q/l */
+  const r=await yahooChart(ySym,"5d","1d");
+  let px=r.meta&&r.meta.regularMarketPrice, t=r.meta&&r.meta.regularMarketTime;
+  if(!(px>0)){ const c=(r.indicators&&r.indicators.quote&&r.indicators.quote[0]&&r.indicators.quote[0].close)||[];
+    for(let i=c.length-1;i>=0;i--) if(c[i]>0){px=c[i];t=r.timestamp[i];break;} }
+  if(!(px>lo&&px<hi&&t>0)) throw new Error("вне диапазона/пусто");
+  return "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
+        +legacySym.toUpperCase()+","+isoD(t)+",00:00:00,"+px+","+px+","+px+","+px+",0";
+}
+async function yahooDailyCSV(ySym,days){                  /* дневная история в форме Stooq q/d/l */
+  const r=await yahooChart(ySym,"6mo","1d");
+  const ts=r.timestamp||[], cl=(r.indicators&&r.indicators.quote&&r.indicators.quote[0]&&r.indicators.quote[0].close)||[];
+  const rows=["Date,Open,High,Low,Close,Volume"];
+  for(let i=0;i<ts.length;i++){const v=cl[i]; if(v>0) rows.push(isoD(ts[i])+","+v+","+v+","+v+","+v+",0");}
+  if(rows.length<10) throw new Error("битая форма ответа");
+  return [rows[0],...rows.slice(1).slice(-days)].join("\n");
 }
 
 const R={};                     /* responses под логическими ключами */
@@ -104,8 +141,12 @@ async function main(){
     if(lines.length<10) throw new Error("битая форма ответа");
     return [lines[0],...lines.slice(-100)].join("\n");   /* полная история xauusd — десятилетия; храним хвост */
   };
-  if(!R["cg:bitcoin"]&&!R["bin:BTCUSDT"])   await put("stqd:btcusd", ()=>stooqDaily("btcusd"));
-  if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",()=>stooqDaily("xauusd"));
+  const cryptoDailyCSV=async(ySym,stSym)=>{
+    try{ return await yahooDailyCSV(ySym,100); }            /* Yahoo: работает с раннеров, где Binance=451, Stooq=блок */
+    catch(e){ return await stooqDaily(stSym); }
+  };
+  if(!R["cg:bitcoin"]&&!R["bin:BTCUSDT"])   await put("stqd:btcusd", ()=>cryptoDailyCSV("BTC-USD","btcusd"));
+  if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",()=>cryptoDailyCSV("GC=F","xauusd"));  /* GC=F: фьючерс золота ≈ спот $/oz */
 
   /* ── Валюты: Frankfurter (два хоста), резерв FRED H.10 ── */
   const end=iso(new Date()), start=iso(new Date(Date.now()-100*864e5));
@@ -138,12 +179,17 @@ async function main(){
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
-  for(const sym of ["cl.f","^vix","usdjpy"]){
+  const IQ={ "cl.f":{y:"CL=F",lo:15,hi:300}, "^vix":{y:"^VIX",lo:5,hi:150}, "usdjpy":{y:"JPY=X",lo:80,hi:250} };
+  for(const sym of Object.keys(IQ)){
     await put("stq:"+sym, async()=>{
-      const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");
-      const c=String(csv).trim().split(/\r?\n/).pop().split(",");
-      if(c.length<7||!(+c[6]>0)) throw new Error("битая форма ответа");
-      return csv;
+      const q=IQ[sym];
+      try{ return await yahooQuoteCSV(q.y,sym,q.lo,q.hi); }              /* эшелон 1–2: Yahoo query1/query2 */
+      catch(e){                                                          /* эшелон 3: легаси Stooq (вдруг оживёт) */
+        const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");
+        const c=String(csv).trim().split(/\r?\n/).pop().split(",");
+        if(c.length<7||!(+c[6]>0)) throw new Error("Yahoo и Stooq недоступны");
+        return csv;
+      }
     });
   }
 
