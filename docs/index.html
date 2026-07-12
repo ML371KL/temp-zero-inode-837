@@ -550,9 +550,9 @@ const pctOf=(s,v)=>{const w=s.slice(-520).map(p=>p.v);if(w.length<120)return nul
   return Math.round(w.filter(x=>x<v).length/w.length*100);};
 /* --- общие данные (мемоизация + stale-fallback), чтобы карточки не дублировали запросы --- */
 const SHARED={},SHAREDIN={};
-async function getShared(key,loader){
+async function getShared(key,loader,src){
   const c=SHARED[key];
-  if(c&&Date.now()-c.ts<5*60*1000) return c.v;
+  if(c&&Date.now()-c.ts<5*60*1000){ if(src&&SOURCES[src]==="idle")SOURCES[src]="ok"; return c.v; }
   if(!SHAREDIN[key]) SHAREDIN[key]=loader().then(v=>{SHARED[key]={v,ts:Date.now()};return v;}).finally(()=>{delete SHAREDIN[key];});
   try{ return await SHAREDIN[key]; }
   catch(e){ if(c) return c.v; throw e; }
@@ -635,8 +635,8 @@ addInd({id:"netliq",block:"plumb",family:"qty",lead:true,staleDays:12,name:"Чи
  link:"https://fred.stlouisfed.org/series/WALCL",
  async load(){
    const w=await fred("WALCL");
-   const t=(await getShared("tga",loadTGAseries)).rows;   /* $млрд */
-   const r=(await getShared("rrp",loadRRPseries)).rows;   /* $млрд */
+   const t=(await getShared("tga",loadTGAseries,"treasury")).rows;   /* $млрд */
+   const r=(await getShared("rrp",loadRRPseries,"nyfed")).rows;   /* $млрд */
    const rows=[];
    for(const p of w){
      const tg=[...t].reverse().find(x=>x.d<=p.d), rp=[...r].reverse().find(x=>x.d<=p.d);
@@ -670,7 +670,7 @@ addInd({id:"tga",block:"plumb",family:"qty",lead:true,name:"Касса Минф�
  zones:[{l:"слив >75",s:2},{l:"слив 0–75",s:1},{l:"набор 0–75",s:-1},{l:"набор >75",s:-2}],
  link:"https://fiscaldata.treasury.gov/datasets/daily-treasury-statement/",
  async load(){
-   const sh=await getShared("tga",loadTGAseries), series=sh.rows;
+   const sh=await getShared("tga",loadTGAseries,"treasury"), series=sh.rows;
    const l=last(series),prev=agoDays(series,28),chg=l.v-prev.v;
    const zi= chg<-75?0: chg<0?1: chg<75?2:3;
    return {value:fmt(l.v,0),delta:sign(chg)+fmt(chg,0)+" за 4 нед. · "+sh.src,
@@ -681,7 +681,7 @@ addInd({id:"rrp",block:"plumb",family:"qty",name:"Обратное репо (RRP
  zones:[{l:">300 буфер",s:1},{l:"50–300",s:0},{l:"<50 нет буфера",s:0}],
  link:"https://www.newyorkfed.org/markets/desk-operations/reverse-repo",
  async load(){
-   const sh=await getShared("rrp",loadRRPseries), s=sh.rows; const v=last(s).v; /* $млрд */
+   const sh=await getShared("rrp",loadRRPseries,"nyfed"), s=sh.rows; const v=last(s).v; /* $млрд */
    const zi= v>300?0: v>50?1:2;
    return {value:fmt(v,0),delta:last(s).d.toISOString().slice(0,10)+" · "+sh.src,
      note:"Пустой буфер — структурный факт этого цикла (нейтраль): его ПОСЛЕДСТВИЯ ловят SOFR−IORB и SRF. Буфер >$300 млрд — плюс к запасу прочности.",
@@ -1523,9 +1523,12 @@ async function loadAll(){
       const r=await fetchWithTimeout(CONFIG.SNAPSHOT_URL+(CONFIG.SNAPSHOT_URL.includes("?")?"&":"?")+"t="+Date.now(),9000);
       if(r.ok){const js=await r.json();
         if(js&&js.responses&&js.generated_at){SNAP=js;
+          for(const k in SHARED) delete SHARED[k];        /* снимок и есть кэш — сессионный сбрасываем */
+          const prev=state.lastSnapGen; state.lastSnapGen=js.generated_at;
           const age=Math.max(0,Math.round((Date.now()-new Date(js.generated_at).getTime())/60000));
           state.snapInfo="снимок сервера · "+new Date(js.generated_at).toLocaleString("ru-RU",{hour:"2-digit",minute:"2-digit"})
-            +(age>90?" · УСТАРЕЛ ("+age+" мин) — проверьте Actions":" · "+age+" мин назад");
+            +(age>90?" · УСТАРЕЛ ("+age+" мин) — проверьте Actions":" · "+age+" мин назад")
+            +(prev&&prev===js.generated_at?" · новее на сервере пока нет (сборка ~раз в 20 мин)":"");
         }}
     }catch(e){dbg("snapshot",String(e));}
     if(!SNAP) state.snapInfo="снимок недоступен — запустите workflow «Обновление снимка» во вкладке Actions (шаг 4 README)";
