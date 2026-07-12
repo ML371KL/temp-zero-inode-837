@@ -100,8 +100,9 @@ async function main(){
   /* с раннеров GitHub (США) Binance отвечает 451 — третий эшелон: дневная история Stooq */
   const stooqDaily=async sym=>{
     const csv=await getTEXT("https://stooq.com/q/d/l/?s="+sym+"&i=d");
-    if(String(csv).trim().split(/\r?\n/).length<10) throw new Error("битая форма ответа");
-    return csv;
+    const lines=String(csv).trim().split(/\r?\n/);
+    if(lines.length<10) throw new Error("битая форма ответа");
+    return [lines[0],...lines.slice(-100)].join("\n");   /* полная история xauusd — десятилетия; храним хвост */
   };
   if(!R["cg:bitcoin"]&&!R["bin:BTCUSDT"])   await put("stqd:btcusd", ()=>stooqDaily("btcusd"));
   if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",()=>stooqDaily("xauusd"));
@@ -153,6 +154,8 @@ async function main(){
       const prev=JSON.parse(readFileSync(OUT,"utf-8"));
       const failedKeys=failed.map(f=>String(f).split(" — ")[0]);
       for(const k of failedKeys){
+        const prevAge=Date.now()-new Date(prev.generated_at).getTime();
+        if(k.startsWith("fh:")&&prevAge>3*86400e3) continue;  /* новости старше 3 суток не подкладываем: окно детекторов 14 дн. */
         if(prev&&prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
           R[k]=prev.responses[k];
           stale_keys[k]=(prev.stale_keys&&prev.stale_keys[k])||prev.generated_at;
