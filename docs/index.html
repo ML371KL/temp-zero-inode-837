@@ -1141,6 +1141,7 @@ async function scanNews(){
   if(!key&&!snapHas("fh:general")) return;   /* в режиме снимка ключ не нужен */
   const from=iso(new Date(Date.now()-14*864e5)),to=iso(new Date());
   const news={capex:[],bdcHard:[],bdcSoft:[],geo:[],tariff:[]};
+  const llmReady=(await aiRoute()).ready;  /* при активном ИИ мнения судит LLM-фильтр — OP лишь для безключевого режима */
   const pull=async sym=>{
     try{
       const j=await fetchJSON(`https://finnhub.io/api/v1/company-news?symbol=${sym}&from=${from}&to=${to}&token=${key}`,"finnhub");
@@ -1149,12 +1150,12 @@ async function scanNews(){
   };
   await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{const h=n.headline||"";
-      if(trigNoNeg(h,RX.capexHard)&&!OP.test(h)) news.capex.push({sym,h,u:n.url,t:n.datetime});});
+      if(trigNoNeg(h,RX.capexHard)&&(llmReady||!OP.test(h))) news.capex.push({sym,h,u:n.url,t:n.datetime});});
   });
   await pool(CONFIG.CYCLE.bdcTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{
       const h=n.headline||"";
-      if(trigNoNeg(h,RX.bdcHard)&&!OP.test(h)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
+      if(trigNoNeg(h,RX.bdcHard)&&(llmReady||!OP.test(h))) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
       else if(RX.bdcHard.test(h)||RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime});
     });
   });
@@ -1186,7 +1187,7 @@ const DETECTORS=[
       inputs:"SRF₃ "+fmt(srf,1)+" млрд ("+(state.srfDays25??0)+" дн. >25"+(state.srfQtrEnd?", кв.-конец":"")+") · спред "+fmt(sp,1)+" б.п. (ср₃ "+fmt(sp3,1)+")"};
   }},
  {id:"d_capex",triad:true,name:"Капекс / амортизация гиперскейлеров",
-  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера), мнения/листиклы («to sell», «top N», вопросы, could/should) — OP-фильтром; при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
+  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера), мнения/листиклы («to sell», «top N», вопросы, could/should) — OP-фильтром (при активном ИИ их судит LLM, чтобы не терять факты со спекулятивным хвостом); при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
   eval(){
     const n=state.news.capex.length, syms=distinct(state.news.capex,x=>x.sym);
     const st= syms>=2?"fired": n>=1?"watch":"calm";
