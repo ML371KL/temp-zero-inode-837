@@ -69,6 +69,8 @@
   .ai-sel,.ai-inp{font-family:var(--mono);font-size:12.5px;padding:7px 9px;border:1.5px solid var(--line);border-radius:3px;background:#fff}
   .ai-inp{min-width:150px}
   .ai-inp.wide{min-width:240px;flex:1;max-width:330px}
+  .ai-remember{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-soft);user-select:none;white-space:nowrap}
+  .ai-remember input{accent-color:var(--calm)}
   .ai-strip .note{font-size:12px;color:var(--ink-soft)}
   .ai-out{padding:14px 24px 18px;border-top:1px dashed var(--line);font-size:14px;line-height:1.62;max-width:920px}
   .ai-out p{margin:0 0 10px}
@@ -214,7 +216,8 @@
   <div class="ai-strip">
     <select id="aiProvider" class="ai-sel" title="Провайдер ИИ"></select>
     <input id="aiModel" class="ai-inp" placeholder="модель" title="ID модели у провайдера">
-    <input id="aiKey" class="ai-inp wide" type="password" placeholder="API-ключ провайдера" title="Хранится в памяти вкладки; постоянно — в CONFIG.AI">
+    <input id="aiKey" class="ai-inp wide" type="password" placeholder="API-ключ провайдера" title="Хранится в памяти вкладки; постоянно — в CONFIG.AI или галка «запомнить»">
+    <label class="ai-remember" title="Ключ и модель сохранятся в браузере ТОЛЬКО этого устройства (localStorage). Не включайте на чужих устройствах."><input type="checkbox" id="aiRemember"> запомнить на устройстве</label>
     <input id="aiBase" class="ai-inp wide" placeholder="base URL (напр. http://localhost:1234/v1)" style="display:none">
     <select id="aiDepth" class="ai-sel" title="Формат разбора">
       <option value="deep" selected>эссе · глубокий</option>
@@ -235,7 +238,7 @@
       <div class="keyfield"><label for="finnhubKey">Finnhub key</label><input id="finnhubKey" type="password" autocomplete="off"></div>
       <button class="btn" id="applyKeys">Применить и обновить</button>
     </div>
-    <p class="hint">FRED не отдаёт CORS-заголовки браузеру — это свойство самого API, поэтому его серии всегда идут через шлюзы: страница обходит их по одному, начиная с самого надёжного за сессию (сбой — штраф рейтинга шлюза, 429 — пауза); янтарная точка в шапке — норма, а не ошибка. Надёжнее и приватнее всего — собственный шлюз в <code>CONFIG.OWN_PROXY</code> (готовый код Cloudflare Worker — в комментарии рядом с конфигом): встроенный ключ FRED через публичные шлюзы виден их операторам, а ключ Finnhub через них не отправляется вовсе — при недоступности прямого пути его карточки честно помечаются сбоем. Серии кэшируются: при обновлении старые значения остаются на экране и заменяются по мере прихода свежих. NY Fed, Treasury, CoinGecko, Frankfurter и Finnhub обычно работают напрямую. Блок «Спросить ИИ» под вердиктом устойчив к смене моделей и провайдеров — три пути: <b>OpenRouter</b> (агрегатор: почти любая модель мира одним ключом; ключ — openrouter.ai/keys, каталог id — openrouter.ai/models), <b>Meta · Muse Spark</b> (напрямую через Meta Model API, поскольку в OpenRouter её нет: ключ — developer.meta.com/ai, модель muse-spark-1.1, цена $1,25/$4,25 за Мток — один разбор ≈ цента, новым аккаунтам $20 кредитов; превью изначально только для США — при блокировке браузерного запроса обход через локальный LiteLLM-прокси в «своём endpoint») и <b>свой endpoint</b> — любой OpenAI-совместимый сервер: локальные Ollama (http://localhost:11434/v1) и LM Studio (http://localhost:1234/v1) — бесплатно и приватно, vLLM, LiteLLM, либо прямой API любого провайдера по его base URL. Провайдер, модель и ключ — в полосе кнопки; постоянные значения — в <code>CONFIG.AI</code>. Снимок показателей уходит <b>напрямую</b> провайдеру, ключи ИИ через CORS-шлюзы не ходят. Этот же настроенный провайдер используется для LLM-верификации новостных триггеров детекторов. У кнопки два формата: <b>эссе</b> — развёрнутое объяснение смысла комбинации (причинные цепочки, три сценария с сигналами-порогами, фальсификаторы; рассчитано на мощные модели уровня Claude Opus 4.8 / Fable 5 / GPT-5.6 / DeepSeek V4 Pro; 700–1100 слов, 20–60 сек., на Opus ≈ 8–12 центов за разбор) и <b>сводка</b> — короткая выжимка, посильная слабым и локальным моделям.</p>
+    <p class="hint">FRED не отдаёт CORS-заголовки браузеру — это свойство самого API, поэтому его серии всегда идут через шлюзы: страница обходит их по одному, начиная с самого надёжного за сессию (сбой — штраф рейтинга шлюза, 429 — пауза); янтарная точка в шапке — норма, а не ошибка. Надёжнее и приватнее всего — собственный шлюз в <code>CONFIG.OWN_PROXY</code> (готовый код Cloudflare Worker — в комментарии рядом с конфигом): встроенный ключ FRED через публичные шлюзы виден их операторам, а ключ Finnhub через них не отправляется вовсе — при недоступности прямого пути его карточки честно помечаются сбоем. Серии кэшируются: при обновлении старые значения остаются на экране и заменяются по мере прихода свежих. NY Fed, Treasury, CoinGecko, Frankfurter и Finnhub обычно работают напрямую. Блок «Спросить ИИ» под вердиктом устойчив к смене моделей и провайдеров — три пути: <b>OpenRouter</b> (агрегатор: почти любая модель мира одним ключом; ключ — openrouter.ai/keys, каталог id — openrouter.ai/models), <b>Meta · Muse Spark</b> (напрямую через Meta Model API, поскольку в OpenRouter её нет: ключ — developer.meta.com/ai, модель muse-spark-1.1, цена $1,25/$4,25 за Мток — один разбор ≈ цента, новым аккаунтам $20 кредитов; превью изначально только для США — при блокировке браузерного запроса обход через локальный LiteLLM-прокси в «своём endpoint») и <b>свой endpoint</b> — любой OpenAI-совместимый сервер: локальные Ollama (http://localhost:11434/v1) и LM Studio (http://localhost:1234/v1) — бесплатно и приватно, vLLM, LiteLLM, либо прямой API любого провайдера по его base URL. Провайдер, модель и ключ — в полосе кнопки; постоянные значения — в <code>CONFIG.AI</code>. Снимок показателей уходит <b>напрямую</b> провайдеру, ключи ИИ через CORS-шлюзы не ходят. Галка «запомнить на устройстве» (opt-in) сохраняет провайдера/модель/ключ в браузере ТОЛЬКО этого устройства — удобно для телефона; не включайте на чужих машинах, снять галку = стереть. Введённый ключ автоматически дозапускает LLM-проверку новостных триггеров: статус на карточках сменится с «без LLM» на «LLM-фильтр пройден» за несколько секунд, без полного обновления. Этот же настроенный провайдер используется для LLM-верификации новостных триггеров детекторов. У кнопки два формата: <b>эссе</b> — развёрнутое объяснение смысла комбинации (причинные цепочки, три сценария с сигналами-порогами, фальсификаторы; рассчитано на мощные модели уровня Claude Opus 4.8 / Fable 5 / GPT-5.6 / DeepSeek V4 Pro; 700–1100 слов, 20–60 сек., на Opus ≈ 8–12 центов за разбор) и <b>сводка</b> — короткая выжимка, посильная слабым и локальным моделям.</p>
   </div>
 </details>
 
@@ -298,7 +301,7 @@
      разделяет режимы без зоны неоднозначности), sanity-низ расширен до
      долговых-потолочных минимумов TGA; контракт «Спросить ИИ» переписан с
      пересказа на интерпретацию; финал: ДВА контракта на выбор в полосе кнопки —
-     эссе-мандат для мощных моделей (причинная механика, три сценария с
+     v4.6.1: OP-фильтр мнений/листиклов (спекулятивные заголовки без ИИ не считаются «жёсткими»), автозапуск LLM-проверки при вводе ключа и перед каждым эссе, галка «запомнить на устройстве» (opt-in, localStorage) для телефона; эссе-мандат для мощных моделей (причинная механика, три сценария с
      порогами-сигналами из зон панели, фальсификаторы; 700–1100 слов, бюджет
      вывода 3400 токенов) и краткая сводка для слабых/локальных (150–250 слов,
      1200 токенов); в снимок добавлены баллы блоков; вечная вкладка не копит
@@ -1126,6 +1129,9 @@ const RX={
    обстоятельства ПОСЛЕ события, а не отменяют его. Настоящие отрицания
    (not/denies/won't/rules out…) стоят перед глаголом и ловятся окном. */
 const NEG=/\b(not|no|never|deni\w*|won'?t|will not|rule[sd]? out|maintain\w*|reiterat\w*|refus\w*|dismiss\w*)\b/i;
+/* Маркеры мнений/прогнозов/листиклов: «2 BDCs To Sell…», «Could X cut…», «Top 5…», вопросы.
+   Без ИИ такие заголовки не считаются ФАКТОМ: капекс — отсев, жёсткий BDC — в «мягкие». */
+const OP=/\?|\bto (sell|buy|avoid|watch|own)\b|\bbefore (it|they|the)\b|\bcould\b|\bmight\b|\bmay\b(?!\s+\d)|\bshould\b|\bwould\b|\btop \d+\b|\b\d+ (bdcs?|stocks?|reits?|funds?)\b|\bbest\b|\bworst\b|\bwhy\b|\bpredict\w*|\bforecast\w*|\bwatchlist\b|\bopinion\b|\bbull(ish)?\b|\bbear(ish)?\b/i;
 const trigNoNeg=(h,rx)=>{
   const m=rx.exec(h); if(!m) return false;
   return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));
@@ -1143,12 +1149,12 @@ async function scanNews(){
   };
   await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{const h=n.headline||"";
-      if(trigNoNeg(h,RX.capexHard)) news.capex.push({sym,h,u:n.url,t:n.datetime});});
+      if(trigNoNeg(h,RX.capexHard)&&!OP.test(h)) news.capex.push({sym,h,u:n.url,t:n.datetime});});
   });
   await pool(CONFIG.CYCLE.bdcTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{
       const h=n.headline||"";
-      if(trigNoNeg(h,RX.bdcHard)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
+      if(trigNoNeg(h,RX.bdcHard)&&!OP.test(h)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
       else if(RX.bdcHard.test(h)||RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime});
     });
   });
@@ -1180,7 +1186,7 @@ const DETECTORS=[
       inputs:"SRF₃ "+fmt(srf,1)+" млрд ("+(state.srfDays25??0)+" дн. >25"+(state.srfQtrEnd?", кв.-конец":"")+") · спред "+fmt(sp,1)+" б.п. (ср₃ "+fmt(sp3,1)+")"};
   }},
  {id:"d_capex",triad:true,name:"Капекс / амортизация гиперскейлеров",
-  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера, не по всему заголовку); при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
+  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера), мнения/листиклы («to sell», «top N», вопросы, could/should) — OP-фильтром; при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
   eval(){
     const n=state.news.capex.length, syms=distinct(state.news.capex,x=>x.sym);
     const st= syms>=2?"fired": n>=1?"watch":"calm";
@@ -1189,7 +1195,7 @@ const DETECTORS=[
       inputs:state.newsAt?("триггеров: "+n+" по "+syms+" тикерам"+llm):"сканер: ожидание"};
   }},
  {id:"d_bdc",triad:true,name:"Стресс BDC (гейты · дивиденды)",
-  logic:"Сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней. Жёсткие триггеры: гейт/приостановка выкупа, срезка дивиденда. Мягкие: non-accrual, NAV-markdown; сюда же считаются опровержения жёстких триггеров («нет дыма без огня»). СРАБОТАЛ: жёсткие по ≥2 тикерам. НАБЛЮДЕНИЕ: 1 жёсткий или ≥2 мягких. Поправка: −15 / −4.",
+  logic:"Сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней. Жёсткие триггеры: гейт/приостановка выкупа, срезка дивиденда. Мягкие: non-accrual, NAV-markdown; сюда же понижаются опровержения и МНЕНИЯ/листиклы по жёстким триггерам («нет дыма без огня»). СРАБОТАЛ: жёсткие по ≥2 тикерам. НАБЛЮДЕНИЕ: 1 жёсткий или ≥2 мягких. Поправка: −15 / −4.",
   eval(){
     const hardT=distinct(state.news.bdcHard,x=>x.sym), soft=state.news.bdcSoft.length;
     const st= hardT>=2?"fired": (hardT>=1||soft>=2)?"watch":"calm";
@@ -1604,15 +1610,37 @@ function syncAIFields(){
   $("aiBase").style.display= id==="custom"?"":"none";
   if(id==="custom") $("aiBase").value=c.base||"";
 }
+const AI_LS="razlom26.ai.v1";
+function aiSave(){ /* opt-in: работает только при галке «запомнить»; в средах без localStorage тихо бездействует */
+  try{
+    if(!$("aiRemember")||!$("aiRemember").checked){try{localStorage.removeItem(AI_LS);}catch(e){}return;}
+    localStorage.setItem(AI_LS,JSON.stringify(CONFIG.AI));
+  }catch(e){}
+}
+function aiLoad(){
+  try{
+    const j=JSON.parse(localStorage.getItem(AI_LS)||"null");
+    if(j&&j.provider){Object.assign(CONFIG.AI,j);return true;}
+  }catch(e){}
+  return false;
+}
 function aiInitUI(){
+  const restored=aiLoad();
+  if(restored&&$("aiRemember")) $("aiRemember").checked=true;
   const sel=$("aiProvider");
   sel.innerHTML=Object.entries(AI_PROVIDERS).map(([id,pr])=>`<option value="${id}">${pr.label}</option>`).join("");
   sel.value=CONFIG.AI.provider||"openrouter";
   syncAIFields();
-  sel.addEventListener("change",()=>{CONFIG.AI.provider=sel.value;syncAIFields();});
-  $("aiModel").addEventListener("input",()=>{aiCfg(sel.value).model=$("aiModel").value.trim();});
-  $("aiKey").addEventListener("input",()=>{aiCfg(sel.value).key=$("aiKey").value.trim();});
-  $("aiBase").addEventListener("input",()=>{aiCfg("custom").base=$("aiBase").value.trim();});
+  sel.addEventListener("change",()=>{CONFIG.AI.provider=sel.value;syncAIFields();aiSave();});
+  $("aiModel").addEventListener("input",()=>{aiCfg(sel.value).model=$("aiModel").value.trim();aiSave();});
+  $("aiKey").addEventListener("input",()=>{aiCfg(sel.value).key=$("aiKey").value.trim();aiSave();});
+  $("aiBase").addEventListener("input",()=>{aiCfg("custom").base=$("aiBase").value.trim();aiSave();});
+  ["aiModel","aiKey","aiBase"].forEach(id=>$(id).addEventListener("change",()=>{aiSave();ensureNewsVerified();}));
+  ["aiKey","aiModel","aiBase"].forEach(fid=>{const el=$(fid); el&&el.addEventListener("change",()=>{ensureNewsVerified();});});
+  ["aiModel","aiKey","aiBase"].forEach(id=>$(id).addEventListener("change",()=>{aiSave();ensureNewsVerified();}));
+  $("aiRemember")&&$("aiRemember").addEventListener("change",aiSave);
+  /* восстановленный с устройства ключ отдельного вызова не требует:
+     llmVerifyNews выполняется внутри scanNews при обычной загрузке и подхватит его сам */
 }
 
 /* --- снимок панели: самодокументированная схема для любой модели --- */
@@ -1720,6 +1748,20 @@ B-заголовки: BDC-фонд ВВЁЛ гейт/приостановку в
     state.newsLLM="ok";
   }catch(e){ state.newsLLM="fail"; }
 }
+/* таймер дебаунса живёт в state — без завязки на top-level let */
+let _nvBusy=false;
+async function ensureNewsVerified(){
+  if(_nvBusy||state.newsLLM==="ok"||!state.newsAt) return;
+  _nvBusy=true; try{
+  const r=await aiRoute(); if(!r.ready) return;
+  if(!((state.news.capex||[]).length||(state.news.bdcHard||[]).length)){state.newsLLM="idle";return;}
+  $("aiStatus").textContent="проверяю новостные триггеры ИИ-фильтром…";
+  await llmVerifyNews(); compute();
+  $("aiStatus").textContent= state.newsLLM==="ok"?"новостные триггеры проверены ИИ":"LLM-фильтр: сбой (regex+NEG+OP)";
+  }finally{_nvBusy=false;}
+}
+function scheduleNewsVerify(){ ensureNewsVerified(); }  /* прямой вызов: граница ввода — событие change (blur/Enter) */
+
 async function askAI(){
   const r=await aiRoute(), out=$("aiOut"),st=$("aiStatus"),btn=$("aiBtn");
   if(!r.ready){
@@ -1733,6 +1775,7 @@ async function askAI(){
   const deep=!$("aiDepth")||$("aiDepth").value!=="brief";
   btn.disabled=true;st.textContent=(r.meta.label.split(" · ")[0])+(deep?" пишет эссе…":" думает…");
   out.hidden=false;out.innerHTML="<p>Снимок панели отправлен ("+r.cfg.model+"), жду "+(deep?"развёрнутый разбор (мощной модели нужно 20–60 сек.)":"сводку")+"…</p>";
+  await ensureNewsVerified();          /* снимок для эссе несёт уже проверенные триггеры */
   const userMsg="СНИМОК ПАНЕЛИ (JSON):\n"+JSON.stringify(buildSnapshot());
   try{
     const text=await callOAI(r.base,r.cfg,userMsg,deep?AI_SYS_DEEP:AI_SYS_BRIEF,deep?3400:1200);
