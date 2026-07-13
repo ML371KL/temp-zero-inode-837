@@ -10,6 +10,8 @@ import {writeFileSync, mkdirSync, readFileSync, existsSync} from "node:fs";
 const FRED_KEY   = process.env.FRED_KEY   || "";
 const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
 const OUT        = process.env.OUT || "docs/snapshot.json";
+/* ⚠ единый список тикеров сборщика — держите в синхроне с CONFIG.CYCLE клиента (клиент сверяет и предупредит) */
+const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -175,7 +177,7 @@ async function main(){
   /* ── Finnhub: новости и котировки (если задан ключ) ── */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
-    const syms=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"]; /* ⚠ синхрон с CONFIG.CYCLE клиента — клиент сверяет и предупредит в ленте */
+    const syms=NEWS_SYMBOLS;
     const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime}));
     for(const s of syms)
       await put("fh:news:"+s,async()=>slim(await getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`)).slice(0,120));
@@ -190,8 +192,9 @@ async function main(){
     const d=(j&&j.data)||{};
     const px=[d.current_price,d.last,d.close,d.price,d.last_price].find(v=>typeof v==="number"&&v>0);
     if(!(px>5&&px<150)) throw new Error("CBOE: вне диапазона/форма");
-    const t=Date.parse(d.last_trade_time||d.timestamp||"")||Date.now();
-    return "Symbol,Date,Time,Open,High,Low,Close,Volume\n^VIX,"+new Date(t).toISOString().slice(0,10)+",00:00:00,"+px+","+px+","+px+","+px+",0";
+    const raw=String(d.last_trade_time||d.timestamp||"");
+    const day=/^\d{4}-\d{2}-\d{2}/.test(raw)? raw.slice(0,10) : new Date().toISOString().slice(0,10);
+    return "Symbol,Date,Time,Open,High,Low,Close,Volume\n^VIX,"+day+",00:00:00,"+px+","+px+","+px+","+px+",0";
   }
   const IQ={ "cl.f":{y:"CL=F",lo:15,hi:300}, "^vix":{y:"^VIX",lo:5,hi:150}, "usdjpy":{y:"JPY=X",lo:80,hi:250} };
   for(const sym of Object.keys(IQ)){
@@ -233,7 +236,7 @@ async function main(){
   const fredOk=Object.keys(R).filter(k=>k.startsWith("fred:")).length;
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
     ok:Object.keys(R).length, failed, stale_keys,
-    meta:{symbols:["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"]},
+    meta:{symbols:NEWS_SYMBOLS},
     responses:R}));
   console.log(`снимок: ${Object.keys(R).length} источников (fred: ${fredOk}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));
