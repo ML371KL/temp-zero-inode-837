@@ -142,11 +142,17 @@ async function main(){
     return [lines[0],...lines.slice(-100)].join("\n");   /* полная история xauusd — десятилетия; храним хвост */
   };
   const cryptoDailyCSV=async(ySym,stSym)=>{
+    await sleep(600+Math.random()*900);
     try{ return await yahooDailyCSV(ySym,100); }            /* Yahoo: работает с раннеров, где Binance=451, Stooq=блок */
     catch(e){ return await stooqDaily(stSym); }
   };
   if(!R["cg:bitcoin"]&&!R["bin:BTCUSDT"])   await put("stqd:btcusd", ()=>cryptoDailyCSV("BTC-USD","btcusd"));
-  if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",()=>cryptoDailyCSV("GC=F","xauusd"));  /* GC=F: фьючерс золота ≈ спот $/oz */
+  if(!R["cg:pax-gold"]&&!R["bin:PAXGUSDT"]) await put("stqd:xauusd",async()=>{
+    await sleep(600+Math.random()*900);
+    try{ return await yahooDailyCSV("PAXG-USD",100); }        /* тот же актив, что первичный путь карточки — без роллов GC=F */
+    catch(e){ try{ return await yahooDailyCSV("GC=F",100); }
+      catch(e2){ return await stooqDaily("xauusd"); } }
+  });
 
   /* ── Валюты: Frankfurter (два хоста), резерв FRED H.10 ── */
   const end=iso(new Date()), start=iso(new Date(Date.now()-100*864e5));
@@ -169,7 +175,7 @@ async function main(){
   /* ── Finnhub: новости и котировки (если задан ключ) ── */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
-    const syms=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
+    const syms=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"]; /* ⚠ синхрон с CONFIG.CYCLE клиента — клиент сверяет и предупредит в ленте */
     const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime}));
     for(const s of syms)
       await put("fh:news:"+s,async()=>slim(await getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`)).slice(0,120));
@@ -179,10 +185,20 @@ async function main(){
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
+  async function cboeVixCSV(){                    /* официальный delayed-CDN CBOE; поля парсим защитно */
+    const j=await getJSON("https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json",2,YUA);
+    const d=(j&&j.data)||{};
+    const px=[d.current_price,d.last,d.close,d.price,d.last_price].find(v=>typeof v==="number"&&v>0);
+    if(!(px>5&&px<150)) throw new Error("CBOE: вне диапазона/форма");
+    const t=Date.parse(d.last_trade_time||d.timestamp||"")||Date.now();
+    return "Symbol,Date,Time,Open,High,Low,Close,Volume\n^VIX,"+new Date(t).toISOString().slice(0,10)+",00:00:00,"+px+","+px+","+px+","+px+",0";
+  }
   const IQ={ "cl.f":{y:"CL=F",lo:15,hi:300}, "^vix":{y:"^VIX",lo:5,hi:150}, "usdjpy":{y:"JPY=X",lo:80,hi:250} };
   for(const sym of Object.keys(IQ)){
+    await sleep(700+Math.random()*1300);            /* залп с одного IP — худший паттерн для троттлинга */
     await put("stq:"+sym, async()=>{
       const q=IQ[sym];
+      if(sym==="^vix"){ try{ return await cboeVixCSV(); }catch(e){} }    /* эшелон 0 (VIX): официальный CBOE */
       try{ return await yahooQuoteCSV(q.y,sym,q.lo,q.hi); }              /* эшелон 1–2: Yahoo query1/query2 */
       catch(e){                                                          /* эшелон 3: легаси Stooq (вдруг оживёт) */
         const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");
