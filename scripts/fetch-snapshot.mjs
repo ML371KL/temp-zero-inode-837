@@ -11,13 +11,20 @@ const FRED_KEY   = process.env.FRED_KEY   || "";
 const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
 const OUT        = process.env.OUT || "docs/snapshot.json";
 /* ⚠ единый список тикеров сборщика — держите в синхроне с CONFIG.CYCLE клиента (клиент сверяет и предупредит) */
-const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
+const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","CRWV","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
+/* v4.9: грубый серверный префильтр релевантности (шире клиентских RX: NEG/OP/LLM-суд остаются клиенту).
+   Совпавшие заголовки копятся отдельным слоем fh:newsHit:SYM с 14-дневным окном и слиянием между
+   запусками — иначе у гиперскейлеров фон ~90 заголовков/день выталкивает событие из хвоста 120
+   за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
+/* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
+   правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
-  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:20,CES0500000003:20,
-  PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170};
+  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:26,CES0500000003:26,
+  PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам */
 /* ленивые резервы — добираются, если упал первичный путь */
 const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
@@ -51,7 +58,9 @@ async function getTEXT(url,tries=3){
    Балансируется между query1/query2; требует браузерный User-Agent.
    Ответ нормализуем в ЛЕГАСИ-CSV формата Stooq: клиент читает те же ключи
    тем же парсером — ни одна строка страницы не меняется. */
-const YUA={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36",
+/* v4.9: Windows-UA вместо X11/Linux — Yahoo стал отдавать 404/429 на «линуксовые» UA с
+   датацентровых IP (подтверждено сутками stq:cl.f/usdjpy в failed); с Windows-UA проходит */
+const YUA={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
            "Accept":"application/json"};
 async function yahooChart(sym,range,interval){
   let last;
@@ -100,7 +109,6 @@ function valid(key,j){
   if(key==="nyfed:sofr")        return Array.isArray(j.refRates)&&j.refRates.length>2;
   if(key==="fiscal:tga")        return Array.isArray(j.data)&&j.data.length>20;
   if(key.startsWith("fh:news")) return Array.isArray(j);
-  if(key==="fh:general")        return Array.isArray(j)&&j.length>3;
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   return true;
 }
@@ -174,14 +182,30 @@ async function main(){
   if(!R["nyfed:srf"]) await put("fred:RPONTSYD", ()=>getJSON(fredURL("RPONTSYD", LAZY.RPONTSYD)));
   if(!R["fred:SAHMREALTIME"]) await put("fred:UNRATE",()=>getJSON(fredURL("UNRATE",LAZY.UNRATE)));
 
-  /* ── Finnhub: новости и котировки (если задан ключ) ── */
+  /* ── Finnhub: новости и котировки (если задан ключ) ──
+     v4.9: секция general-новостей (гео/тарифы) удалена — на балл не влияла;
+     добавлен слой fh:newsHit:SYM — все релевантные заголовки за 14 дней с
+     накоплением между запусками (дедуп по url+datetime). */
+  let prevSnap=null;
+  try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
     const syms=NEWS_SYMBOLS;
     const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime}));
+    const cutoff=Date.now()/1000-14*86400;
     for(const s of syms)
-      await put("fh:news:"+s,async()=>slim(await getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`)).slice(0,120));
-    await put("fh:general",async()=>slim(await getJSON(`https://finnhub.io/api/v1/news?category=general&token=${FINNHUB_KEY}`)).slice(0,80));
+      await put("fh:news:"+s,async()=>{
+        const full=slim(await getJSON(`https://finnhub.io/api/v1/company-news?symbol=${s}&from=${from}&to=${to}&token=${FINNHUB_KEY}`));
+        /* релевантный слой: свежие совпадения + унаследованные из прошлого снимка, окно 14 дн. */
+        const prevHit=(prevSnap&&prevSnap.responses&&prevSnap.responses["fh:newsHit:"+s])||[];
+        const seen=new Set();
+        const hits=[...full.filter(n=>HIT_RX.test(n.headline||"")),...prevHit]
+          .filter(n=>(n.datetime||0)>cutoff)
+          .filter(n=>{const k=(n.url||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
+          .sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,400);
+        R["fh:newsHit:"+s]=hits;                       /* пишем слой напрямую: valid() к нему не применяем */
+        return full.slice(0,120);                      /* фон для ленты — как раньше */
+      });
     for(const s of ["BIZD","SMH","SPY","RSP"])
       await put("fh:quote:"+s,()=>getJSON(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${FINNHUB_KEY}`));
   }
@@ -212,16 +236,23 @@ async function main(){
     });
   }
 
-  /* ── слияние с последним удачным снимком: сбой источника ≠ дырка на сайте ── */
+  /* ── слияние с последним удачным снимком: сбой источника ≠ дырка на сайте ──
+     v4.9: критерий здоровья fredOk считается ДО подкладок (раньше протухший ключ FRED
+     вечно публиковал стареющие данные «успешно»); возраст подкладки меряется от ПЕРВОГО
+     появления данных (цепочка stale_keys), а не от прошлого снимка, который всегда свеж:
+     новости — максимум 3 суток, интрадей — 3 суток, остальные ряды — 7 суток. */
+  const fredFresh=Object.keys(R).filter(k=>k.startsWith("fred:")).length;
   const stale_keys={};
   try{
-    if(existsSync(OUT)){
-      const prev=JSON.parse(readFileSync(OUT,"utf-8"));
+    if(prevSnap){
+      const prev=prevSnap;
       const failedKeys=failed.map(f=>String(f).split(" — ")[0]);
       for(const k of failedKeys){
-        const prevAge=Date.now()-new Date(prev.generated_at).getTime();
-        if(k.startsWith("fh:")&&prevAge>3*86400e3) continue;  /* новости старше 3 суток не подкладываем: окно детекторов 14 дн. */
-        if(prev&&prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
+        const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
+        const age=Date.now()-origin;
+        const cap=(k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
+        if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
+        if(prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
           R[k]=prev.responses[k];
           stale_keys[k]=(prev.stale_keys&&prev.stale_keys[k])||prev.generated_at;
           const i=failed.findIndex(f=>String(f).startsWith(k+" "));
@@ -230,16 +261,23 @@ async function main(){
       }
     }
   }catch(e){console.log("merge с прошлым снимком пропущен:",String(e&&e.message||e));}
+  /* v4.9: слой fh:newsHit не проходит через put()/failed — наследуем его явно при сбое
+     Finnhub (иначе один неудачный запуск стирал накопленное 14-дневное окно детекторов) */
+  try{
+    const cut=Date.now()/1000-14*86400;
+    for(const s of NEWS_SYMBOLS){const k="fh:newsHit:"+s;
+      if(R[k]===undefined&&prevSnap&&prevSnap.responses&&Array.isArray(prevSnap.responses[k]))
+        R[k]=prevSnap.responses[k].filter(n=>(n.datetime||0)>cut);}
+  }catch(e){}
 
   /* ── запись ── */
   mkdirSync(OUT.split("/").slice(0,-1).join("/")||".",{recursive:true});
-  const fredOk=Object.keys(R).filter(k=>k.startsWith("fred:")).length;
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
     ok:Object.keys(R).length, failed, stale_keys,
     meta:{symbols:NEWS_SYMBOLS},
     responses:R}));
-  console.log(`снимок: ${Object.keys(R).length} источников (fred: ${fredOk}), сбоев: ${failed.length}`);
+  console.log(`снимок: ${Object.keys(R).length} источников (fred свежих: ${fredFresh}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));
-  if(fredOk<18) { console.error("критично мало серий FRED — помечаю запуск неудачным"); process.exit(1); }
+  if(fredFresh<18) { console.error("критично мало СВЕЖИХ серий FRED — помечаю запуск неудачным"); process.exit(1); }
 }
 main().catch(e=>{console.error("сборщик упал:",e);process.exit(1);});
