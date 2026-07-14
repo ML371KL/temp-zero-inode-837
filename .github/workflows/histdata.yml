@@ -1,0 +1,43 @@
+name: Историческая выгрузка для бэктеста (одноразовая)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: histdata
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: data
+      - name: Скачать полную историю серий FRED (fredgraph.csv, без ключа)
+        run: |
+          mkdir -p histdata
+          series="SOFR IORB IOER WALCL WTREGEN WRESBAL RRPONTSYD NFCI GDP BAMLH0A0HYM2 BAMLC0A0CM DRTSCILM SP500 VIXCLS VXVCLS PAYEMS SAHMREALTIME CCSA T10Y3M DFII10 T10YIE DGS2 DGS10 CPILFESL CES0500000003 UNRATE DCOILWTICO DTWEXBGS DEXJPUS DEXCHUS DTB3"
+          for s in $series; do
+            for try in 1 2 3; do
+              curl -sf -A "Mozilla/5.0" "https://fred.stlouisfed.org/graph/fredgraph.csv?id=$s" -o "histdata/$s.csv" && break
+              sleep $((try*3))
+            done
+            [ -s "histdata/$s.csv" ] && echo "ok $s $(wc -l < histdata/$s.csv)" || echo "FAIL $s"
+            sleep 1
+          done
+      - name: Скачать дневную историю Stooq (SPX/BTC/золото)
+        run: |
+          curl -sf -A "Mozilla/5.0" "https://stooq.com/q/d/l/?s=%5Espx&i=d" -o histdata/SPX_stooq.csv || echo "FAIL spx"
+          sleep 2
+          curl -sf -A "Mozilla/5.0" "https://stooq.com/q/d/l/?s=btcusd&i=d" -o histdata/BTCUSD_stooq.csv || echo "FAIL btc"
+          sleep 2
+          curl -sf -A "Mozilla/5.0" "https://stooq.com/q/d/l/?s=xauusd&i=d" -o histdata/XAUUSD_stooq.csv || echo "FAIL xau"
+          ls -la histdata/
+      - name: Закоммитить в ветку data
+        run: |
+          git config user.name "histdata-bot"
+          git config user.email "actions@github.com"
+          git add histdata
+          git commit -m "историческая выгрузка для бэктеста" || echo "нечего коммитить"
+          git push origin data
