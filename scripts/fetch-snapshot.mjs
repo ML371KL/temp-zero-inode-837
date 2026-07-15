@@ -115,6 +115,7 @@ function valid(key,j){
   if(key==="nyfed:sofr")        return Array.isArray(j.refRates)&&j.refRates.length>2;
   if(key==="fiscal:tga")        return Array.isArray(j.data)&&j.data.length>20;
   if(key.startsWith("fh:news")) return Array.isArray(j);
+  if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=4;
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   return true;
 }
@@ -212,6 +213,7 @@ async function main(){
   })();
   const CAPEX_SET=new Set(NEWS_SYMBOLS.slice(0,6));   /* первые 6 — капекс-радар (порядок в NEWS_SYMBOLS = картридж) */
   const CAND=[];                                       /* жёсткие кандидаты для LLM-судьи */
+  let LLM_JUDGED=0;                                    /* рассужено в ЭТОМ прогоне (для meta.llm) */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
     const syms=NEWS_SYMBOLS;
@@ -234,6 +236,21 @@ async function main(){
       });
     for(const s of ["BIZD","SMH","SPY","RSP"])
       await put("fh:quote:"+s,()=>getJSON(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${FINNHUB_KEY}`));
+  }
+
+  /* ── дивидендная data-нога BDC-детектора (v4.11): история выплат из Yahoo (events=div) ──
+     Срезку дивиденда клиент вычисляет ИЗ ДАННЫХ (последняя выплата < модальной за 4 прежних),
+     независимо от новостей и LLM — детерминированная вторая нога детектора. */
+  for(const s of NEWS_SYMBOLS.slice(6)){                 /* BDC-половина списка */
+    await sleep(400+Math.random()*600);
+    await put("ydiv:"+s,async()=>{
+      const j=await getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${s}?range=2y&interval=1mo&events=div`,2,YUA);
+      const ev=j&&j.chart&&j.chart.result&&j.chart.result[0]&&j.chart.result[0].events;
+      const list=ev&&ev.dividends?Object.values(ev.dividends).filter(x=>x&&x.amount>0&&x.date>0)
+        .sort((a,b)=>a.date-b.date).map(x=>[x.date,x.amount]).slice(-10):[];
+      if(list.length<4) throw new Error("мало точек ("+list.length+")");
+      return list;
+    });
   }
 
   /* ── серверный LLM-судья кандидатов (fh:newsVer: [заголовок, "fact"|"opinion", tсуда]) ── */
@@ -266,7 +283,8 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
         if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
         const ok=new Set(cj.confirmed);
         fresh.slice(0,40).forEach((c,i)=>known.set(c.h,[c.h, ok.has((c.capex?"C":"B")+i)?"fact":"opinion", nowSec]));
-        console.log("LLM-судья: рассужено "+Math.min(fresh.length,40)+" новых кандидатов ("+OPENROUTER_MODEL+")");
+        LLM_JUDGED=Math.min(fresh.length,40);
+        console.log("LLM-судья: рассужено "+LLM_JUDGED+" новых кандидатов ("+OPENROUTER_MODEL+")");
       }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }
     } else if(fresh.length){ console.log("LLM-судья пропущен (нет OPENROUTER_KEY): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
     if(known.size||CAND.length) R["fh:newsVer"]=[...known.values()];
@@ -336,7 +354,8 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
   mkdirSync(OUT.split("/").slice(0,-1).join("/")||".",{recursive:true});
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
     ok:Object.keys(R).length, failed, stale_keys,
-    meta:{symbols:NEWS_SYMBOLS},
+    meta:{symbols:NEWS_SYMBOLS,
+      llm:OPENROUTER_KEY?{model:OPENROUTER_MODEL,verdicts:(R["fh:newsVer"]||[]).length,judged_now:LLM_JUDGED}:null},
     responses:R}));
   console.log(`снимок: ${Object.keys(R).length} источников (fred свежих: ${fredFresh}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));
