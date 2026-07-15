@@ -127,7 +127,9 @@
   .zone.act.z0{background:var(--neutral)}
   .zone.act.z-1{background:var(--tension)}
   .zone.act.z-2{background:var(--fault)}
-  .c-meta{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);border-top:1px dotted var(--line);padding-top:6px;padding-left:6px}
+  .c-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:3px 8px;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);border-top:1px dotted var(--line);padding-top:6px;padding-left:6px}
+  .obs{white-space:nowrap}
+  .c-prov{display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap}
   .c-kind{white-space:nowrap;padding:1px 7px;border-radius:9px;border:1px dashed var(--ink-soft)}
   .c-kind.lead{color:#8a5c14;border-color:#c9a25e;background:rgba(183,121,31,.08)}
   .c-kind.coin{color:var(--ink-soft)}
@@ -1749,7 +1751,7 @@ function renderBlocks(){
         <div class="c-val">···</div><div class="c-delta"></div><div class="c-note">в очереди…</div>
         <div class="c-spark"><canvas></canvas></div>
         ${zonesHTML(ind,-1)}
-        <div class="c-meta"><span class="obs">—</span><span class="c-kind ${ind.info?"":ind.lead?"lead":"coin"}" title="${ind.info?"не входит в композит":ind.lead?"балл идёт в шкалу ОПЕРЕЖАЮЩИХ (куда клонится) — гейт покупки/защиты":"балл идёт в шкалу ПОДТВЕРЖДАЮЩИХ (условия сейчас)"}">${ind.info?"справочно":ind.lead?"→ опережающий":"◆ подтверждающий"}</span><a href="${ind.link}" target="_blank" rel="noopener">источник ↗</a></div>`;
+        <div class="c-meta"><span class="obs">—</span><span class="c-prov"><span class="c-kind ${ind.info?"":ind.lead?"lead":"coin"}" title="${ind.info?"не входит в композит":ind.lead?"балл идёт в шкалу ОПЕРЕЖАЮЩИХ (куда клонится) — гейт покупки/защиты":"балл идёт в шкалу ПОДТВЕРЖДАЮЩИХ (условия сейчас)"}">${ind.info?"справочно":ind.lead?"→ опережающий":"◆ подтверждающий"}</span><a href="${ind.link}" target="_blank" rel="noopener">источник ↗</a></span></div>`;
       $("grid_"+bid).appendChild(c);
     });
   }
