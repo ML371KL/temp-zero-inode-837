@@ -2022,20 +2022,22 @@ function compute(){
       : word.indexOf("ДОКУПАТЬ")>=0 ? "HOLDP"
       : word.indexOf("ДЕРЖАТЬ")>=0 ? "HOLD" : "NA";
     var D={
-      BUY:    {pct:100,ac:"var(--calm)",   act:"Довести риск до <b>полной нормы</b>. Докупки — на откатах к 200-дневной. Без плеча.", dn:"при опереж &lt; +10 или композите &lt; +30"},
-      HOLDP:  {pct:85, ac:"var(--calm)",   act:"Держать ядро, докупать <b>выборочно на откатах</b>. Без плеча.", dn:"при композите ≤ +10"},
-      HOLD:   {pct:65, ac:"var(--neutral)",act:"<b>Базовая доля</b> риска. Сделки — только ребаланс, не направленные ставки.", up:"при композите ≥ +10", dn:"при ≤ −10"},
-      REDUCE: {pct:35, ac:"var(--tension)",act:"Снизить экспозицию/бету <b>на ступень</b>. Держать хеджи. Первые −5–7% не выкупать.", up:"только по Триаде разворота", dn:"защита при ≤ −30 / рубильнике"},
-      PROTECT:{pct:0,  ac:"var(--fault)",  act:"Убрать тактический риск. Остаток — <b>короткий кэш</b> (3-мес. вексель). Отскоки не выкупать без Триады разворота.", up:"возврат ступенчато по Триаде разворота"},
+      BUY:    {pct:100,ac:"var(--calm)",   act:"Довести риск до <b>полной нормы</b>. Докупки — на откатах к 200-дневной. Без плеча.", actF:"Довести риск до <b>полной нормы</b>. Без плеча.", dn:"до 85% при композите &lt; +30 или опереж &lt; +10"},
+      HOLDP:  {pct:85, ac:"var(--calm)",   act:"Держать ядро, докупать <b>выборочно на откатах</b>. Без плеча.", actF:"Держать ядро. Без плеча.", dn:"до 65% при композите &lt; +10"},
+      HOLD:   {pct:65, ac:"var(--neutral)",act:"<b>Базовая доля</b> риска. Сделки — только ребаланс, не направленные ставки.", up:"до 85% при композите ≥ +10", dn:"до 35% при композите ≤ −10"},
+      REDUCE: {pct:35, ac:"var(--tension)",act:"Снизить экспозицию/бету <b>на ступень</b>. Держать хеджи. Первые −5–7% не выкупать.", up:"до 65% при композите &gt; −10 и опереж ≥ 0 (Отбой)", dn:"в защиту при композите &lt; −30 и опереж ≤ −10 (или рубильник)"},
+      PROTECT:{pct:0,  ac:"var(--fault)",  act:"Убрать тактический риск. Остаток — <b>короткий кэш</b> (3-мес. вексель). Отскоки не выкупать без Триады разворота.", up:"возврат ступенчато по Триаде разворота; полная — при опереж ≥ +10"},
       NA:     {pct:null,ac:"var(--neutral)",act:"Покрытие &lt; 60% — позицию по панели <b>не менять</b>."}
     };
     var m=D[lvl], RUNGS=[100,85,65,35,0], ri=RUNGS.indexOf(m.pct);
     var ladder=RUNGS.map(function(p,i){return '<i class="'+(i===ri?"on":"")+'" style="height:'+(8+(4-i)*3.6)+'px"></i>';}).join("");
     var fired=[]; if(F.fund)fired.push("Фондинг"); if(F.capex)fired.push("Капекс"); if(F.bdc)fired.push("Стресс BDC");
+    var frozen = !override && fired.length && m.pct>0;
+    var act = (frozen && m.actF) ? m.actF : m.act;
     var warn = override ? '<div class="as-warn">⚠ Рубильник: защита независимо от баллов.</div>'
-              : ((fired.length && m.pct>0) ? '<div class="as-warn">⚠ Докупки на паузе, пока <b>'+fired.join(" · ")+'</b> = СРАБОТАЛ. Держать хеджи.</div>' : "");
+              : (frozen ? '<div class="as-warn">⚠ Докупки на паузе, пока <b>'+fired.join(" · ")+'</b> = СРАБОТАЛ. Держать хеджи.</div>' : "");
     var upTxt = override ? "возврат — только по Триаде разворота (АКТИВЕН)"
-              : (lvl==="HOLDP" ? ("до 100% при опереж ≥ +10 (сейчас "+(leadScore>0?"+":"")+Math.round(leadScore)+")") : (m.up||""));
+              : (lvl==="HOLDP" ? ("до 100% при композите ≥ +30 и опереж ≥ +10 (опереж сейчас "+(leadScore>0?"+":"")+Math.round(leadScore)+")") : (m.up||""));
     var dnTxt = override ? "" : (m.dn||"");
     var up = upTxt ? '<span class="up">↑</span> '+upTxt : "";
     var dn = dnTxt ? '<span class="dn">↓</span> '+dnTxt : "";
@@ -2043,9 +2045,9 @@ function compute(){
     el.style.setProperty("--asAccent", m.ac);
     el.innerHTML =
       '<div class="as-lead"><span class="as-eyebrow">что делать сейчас</span>'
-      +'<div class="as-pctrow"><span class="as-pct">'+(m.pct===null?"—":m.pct+"%")+'<small>доля нормы акций</small></span>'
+      +'<div class="as-pctrow"><span class="as-pct">'+(m.pct===null?"—":m.pct+"%")+'<small>доля стратегической нормы акций</small></span>'
       +'<div class="as-ladder">'+ladder+'</div></div></div>'
-      +'<div class="as-mid"><div class="as-act">'+m.act+'</div>'+warn+'</div>'
+      +'<div class="as-mid"><div class="as-act">'+act+'</div>'+warn+'</div>'
       +trig
       +'<div class="as-foot">действие — только на смене ступени · исполнять на следующей сессии</div>';
   })();
