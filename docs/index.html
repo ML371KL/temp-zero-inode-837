@@ -182,7 +182,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>СЕЙСМОСТАНЦИЯ «РАЗЛОМ-26»</b><span class="num">v4.9 · сайт (серверный снимок) · бюллетень наблюдений за линиями разлома рынка</span></div>
+  <div class="station"><b>СЕЙСМОСТАНЦИЯ «РАЗЛОМ-26»</b><span class="num">v4.10 · сайт (серверный снимок) · бюллетень наблюдений за линиями разлома рынка</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -259,7 +259,7 @@
     <p><b>Что это.</b> Панель — ежедневный монитор режима, формализующий одну ставку рынка: «денежные потоки от ИИ придут по расписанию, а короткое долларовое фондирование останется дешёвым и бесперебойным». Пять блоков — водопровод ликвидности, кредит, рынок, макро-цикл, режим-детекторы — рассматриваются как производные этой ставки; задача панели — заметить, когда она начинает трещать. Вердикт означает «какой режим подтверждают данные», а не «дёшево/дорого» и не «купить сегодня»: это позиционный барометр (какую долю риска положено нести в этом режиме), а не тайминг-триггер.</p>
     <p><b>Скоринг.</b> Каждый индикатор попадает в одну из зон с баллом −2…+2 (зонная шкала на карточке, активная зона подсвечена; у HY/IG/VIX в строке динамики дан P₂ᵧ — перцентиль за два года, контекст к абсолютным порогам). Родственные индикаторы объединены в «семьи» (уровень + импульс HY; тренд + импульс S&amp;P; четыре количественных меры ликвидности; цена фондирования: SOFR−IORB, SRF, вола ставок): семья голосует в блоке один раз — одна серия данных не считается дважды. Балл блока = среднее семейств × 50; композит = взвешенное по блокам (25/25/20/15/15), −100…+100, плюс поправки автодетекторов. Вердикты: ≥+30 «покупать» · +10…+30 «держать, докупать выборочно» · −10…+10 «держать» · −30…−10 «сокращать/хеджировать» · &lt;−30 «защитный режим»; при покрытии &lt;60% вердикт не ставится.</p>
     <p><b>Два измерения и гейт.</b> Индикаторы разделены на <b>подтверждающие</b> (условия сейчас: уровни спредов, тренд, вола, резервы — по своей природе зелёные до самой вершины цикла) и <b>опережающие</b> (куда клонится: импульсы кредита и волы ставок, канарейки ликвидности, кривая после инверсии, TGA, SLOOS, заявки, доллар и юань). Обе шкалы считаются по тем же семьям и показаны в шапке. Гейт: «ПОКУПАТЬ» требует опережающих ≥ +10, полная «ЗАЩИТА» по баллам — опережающих ≤ −10; иначе вердикт сдвигается на ступень с пояснением. Расхождение шкал — главный сигнал стадии: «подтверждающие сильны, опережающие остыли» = поздняя Фаза 0.</p>
-    <p><b>Автодетекторы и триада.</b> Семь детекторов с двумя уровнями (НАБЛЮДЕНИЕ — ранние признаки, малая поправка; СРАБОТАЛ/АКТИВЕН — полная). Фондинговый стресс: SRF устойчиво &gt;$25 млрд (≥2 дня из трёх либо вне окна квартального конца — разовый квартальный всплеск является косметикой дилерских балансов и срабатыванием не считается), или SOFR−IORB &gt;15 б.п. вне кв.-конца, или средний спред за 3 дня &gt;10 б.п. Капекс/амортизация гиперскейлеров и стресс BDC: сканер заголовков за 14 дней с фильтром отрицаний и LLM-подтверждением факта (при заданном ИИ-ключе); полноту 14-дневного окна гарантирует серверный префильтр (все релевантные заголовки копятся отдельным слоем — плотный новостной фон мегакапов больше не выталкивает событие из ленты); срабатывание — по ≥2 разным тикерам, совпадения публикуются под детекторами. Нефтяной шок — по цене и скорости WTI. Инфляционный узел — базовый CPI × динамика зарплат. Разворот ФРС даёт плюс только при упорядоченном смягчении (HY &lt;400, спокойная вола ставок); 2-летка −50 б.п. при HY ≥450 или воле &gt;10 — паническое смягчение, плюса нет. Триада разворота (+10, v4.8) механизирует вход после стресса: кредит был &gt;450, спреды перестали расширяться, доллар развернулся вниз, S&amp;P-импульс не отрицателен и фондинг спокоен — две автоматизируемые ноги «триады разворота» ниже; третья (стабилизация ревизий прибыли) остаётся ручной. <b>Рубильник триады</b>: (фондинговый + капекс или BDC) ИЛИ (капекс + BDC при ≥1 жёстком рыночном подтверждении) ИЛИ (фондинговый + ≥2 подтверждения) → «ЗАЩИТНЫЙ РЕЖИМ» независимо от суммы баллов — в «проверке кэшем» корреляции уходят к единице, и обычный скоринг структурно запаздывает.</p>
+    <p><b>Автодетекторы и триада.</b> Семь детекторов с двумя уровнями (НАБЛЮДЕНИЕ — ранние признаки, малая поправка; СРАБОТАЛ/АКТИВЕН — полная). Фондинговый стресс: SRF устойчиво &gt;$25 млрд (≥2 дня из трёх либо вне окна квартального конца — разовый квартальный всплеск является косметикой дилерских балансов и срабатыванием не считается), или SOFR−IORB &gt;15 б.п. вне кв.-конца, или средний спред за 3 дня &gt;10 б.п. Капекс/амортизация гиперскейлеров и стресс BDC: сканер заголовков за 14 дней (полноту окна гарантирует серверный префильтр — плотный фон мегакапов больше не выталкивает событие из ленты). Каждый жёсткий кандидат получает класс: <b>факт</b> (подтверждён LLM — серверным судьёй, работающим по секрету OPENROUTER_KEY при каждой сборке, или ИИ-ключом вкладки — либо твёрдым факт-якорем вроде impairment/«X cuts dividend»), <b>неподтверждённый</b> (нейтральный источник без подтверждения), <b>мнение</b> (маркеры прогнозов/листиклов или мнение-источник — статьи контрибьюторов Seeking Alpha и т.п.). В балл идут только факты (СРАБОТАЛ −15 при ≥2 тикерах; НАБЛЮДЕНИЕ −5/−4 при факте по одному тикеру) и неподтверждённые при ≥2 тикерах (тоже НАБЛЮДЕНИЕ); <b>мнения и мягкие упоминания (non-accrual, NAV-markdown) на балл не влияют</b> — они показываются справочно. Калибровка бэктестом 2006–2026: хронический «шум мнений» в балле стоил −0,7 п.п. годовых при нулевой информационной ценности, а страховочная поправка −15 по подтверждённым фактам нечувствительна к суточному лагу подтверждения — поэтому точность важнее скорости. Реальное ухудшение, не попавшее в новости, всё равно придёт через цены: HY-импульс, BIZD, фондинг. Нефтяной шок — по цене и скорости WTI. Инфляционный узел — базовый CPI × динамика зарплат. Разворот ФРС даёт плюс только при упорядоченном смягчении (HY &lt;400, спокойная вола ставок); 2-летка −50 б.п. при HY ≥450 или воле &gt;10 — паническое смягчение, плюса нет. Триада разворота (+10, v4.8) механизирует вход после стресса: кредит был &gt;450, спреды перестали расширяться, доллар развернулся вниз, S&amp;P-импульс не отрицателен и фондинг спокоен — две автоматизируемые ноги «триады разворота» ниже; третья (стабилизация ревизий прибыли) остаётся ручной. <b>Рубильник триады</b>: (фондинговый + капекс или BDC) ИЛИ (капекс + BDC при ≥1 жёстком рыночном подтверждении) ИЛИ (фондинговый + ≥2 подтверждения) → «ЗАЩИТНЫЙ РЕЖИМ» независимо от суммы баллов — в «проверке кэшем» корреляции уходят к единице, и обычный скоринг структурно запаздывает.</p>
     <p><b>Фазы (нелинейны).</b> 0 (рост) → 0-поздняя → 1 «проверка кэшем» (падает почти всё, включая будущих победителей — в маржин-волну не ловят даже золото и дюрацию) → 2 «ответ политики» (первое снижение ставки исторически — сигнал продажи; вход — только по триаде разворота: спреды перестали расширяться + ревизии прибыли стабилизировались + доллар развернулся) → 3 (дебейсмент: слабый доллар, золото лидирует). Стагфляционный узел (растущие брейк-ивены на падающем рынке) приоритетнее Фазы 2: у политики связаны руки, защита — реальные активы и короткий кэш, а не длинная дюрация.</p>
     <p><b>Ключевые калибровки.</b> Пустой RRP — нейтраль: структурный факт цикла, последствия ловят SOFR−IORB и SRF. Экстремальный штиль не награждается ни по VIX (&lt;13), ни по воле ставок (&lt;2,5 б.п./день — набранное плечо базис-трейда). Растяжение S&amp;P &gt;12% над 200-дневной срезает трендовый балл до +1 — встроенный валюационный противовес. Просадка биткоина 10–25% при VIX&lt;20 — дивергенция ликвидности (−1). Обвал нефти &gt;20%/30дн при устойчивом рынке — дезинфляционный плюс, при падающем — без плюса. Выход кривой из инверсии различается по 2-летке: бычье раскручивание −2 (острый рецессионный таймер), медвежье −1 (его дюрационный пресс уже считает TIPS-карточка). Резервы нормированы на ВВП: стресс-2019 случился при ~7%, современная комфортная зона ~10–11%; на границе 10% — переходная зона 9,5–10 → 0 (v4.8), обрыва +1→−1 больше нет. Sahm занижен падением участия — рядом пейроллы (порог безубыточности ~40–60 тыс./мес). Калибровки v4.8 по итогам аудита и бэктеста: у TGA нейтральная полоса ±$25 млрд/4нед (дыхание налогового календаря — не сигнал); заявки считаются только относительно 26-нед. среднего с мёртвой зоной ±2% (абсолютные 2,05М убраны — порог не нормирован на размер рынка труда); падение реальной 10-летки &gt;40 б.п. даёт плюс только при устойчивом рынке (в крах TIPS рушится от бегства в качество — это не смягчение); нефтяные пороги 80/85/95 автоиндексируются базовым CPI от базы май-2026; разовый спайк SOFR−IORB в окне кв.-конца не жмёт детектор фондинга (симметрия с SRF); интрадей-VIX подмешивается и в термструктуру.</p>
     <p><b>Ритм использования.</b> Почти все ряды T+1, балансы ФРС — еженедельно: смотреть чаще раза в день бессмысленно. Спокойная фаза: один взгляд вечером (по Москве — когда вышли вчерашние данные США и дневные операции ФРС), 2–3 минуты — вердикт, две шкалы, колонка «тянут вниз», состояния детекторов; чуть внимательнее в четверг–пятницу (H.4.1, заявки, NFCI) и по календарю: первая пятница месяца (пейроллы), середина месяца (CPI), февраль/май/август/ноябрь (SLOOS), дни FOMC. Повышенное внимание — любой детектор в НАБЛЮДЕНИИ, опережающие ниже нуля или HY-импульс &gt;+25: дважды в день. Событие — детектор СРАБОТАЛ или рынок падает: панель отвечает на главный вопрос дня — трёхдневная встряска или смена режима.</p>
@@ -430,7 +430,33 @@
        «→ опережающий / ◆ подтверждающий» на карточках, колонка «Тип» в таблице вкладов,
        тултипы шкал; ранжирование «тянут вверх/вниз» уравняло масштабы карточек и
        детекторов (×2); клиентский Stooq-эндпоинт q/l отключён (удалён самим Stooq),
-       живой слой — CBOE-VIX + серверный снимок; диагностика «лента пуста по всем тикерам». */
+       живой слой — CBOE-VIX + серверный снимок; диагностика «лента пуста по всем тикерам».
+   ═ v4.10 «Новости 2.0» (по кейсу пользователя: две SA-статьи-мнения давали −4, а реальный
+     факт FT о волне redemption requests у Blue Owl не ловился вовсе).
+     · Классы вместо бинарного «жёсткий/мягкий»: ФАКТ (LLM-вердикт или твёрдый якорь) /
+       НЕПОДТВЕРЖДЁННЫЙ (нейтральный источник) / МНЕНИЕ (маркеры прогнозов или
+       мнение-источник: SA-контрибьюторы, Fool, Zacks…) / МЯГКИЙ.
+     · В балл: факты (−15 при ≥2 тикерах, −5/−4 при одном) и неподтверждённые при ≥2;
+       МНЕНИЯ И МЯГКИЕ — ТОЛЬКО СПРАВОЧНО. Демоция «нет дыма без огня» удалена.
+     · Бэктест: хронический «−4 от мнений» стоил −0,7 п.п. годовых (Sharpe −0,03);
+       страховка −15 по фактам нечувствительна к лагу подтверждения 0–5 дней; полная
+       новая система против старой: +0,23 п.п. годовых при равном Sharpe. Точность >
+       скорость: цены (HY, фондинг) всё равно ловят то, что новости пропустят.
+     · Серверный LLM-судья (секрет OPENROUTER_KEY, модель vars.OPENROUTER_MODEL,
+       дефолт haiku): при каждой сборке классифицирует НОВЫХ жёстких кандидатов,
+       вердикты кэшируются в fh:newsVer (14 дн.) — страница получает проверенные
+       факты БЕЗ ИИ-ключа во вкладке; кандидаты извлекаются регэкспами, читаемыми
+       из docs/index.html (единый источник истины). Клиентский LLM судит только то,
+       что сервер не видел; сбой LLM не требует отката (правила консервативны).
+     · slim() сохраняет source; тир источника участвует в классификации.
+     · Регэкспы: + волна redemption requests / investor exodus (кейс Blue Owl·FT);
+       OP + about to/set to/poised/likely/loom/on the verge/i'm/how to/here's;
+       FACT + срезка дивиденда в 3-м лице (cuts/reduces/slashes… dividend) — факт
+       из пресс-релиза скорит и без LLM; HIT_RX + exodus/outflow.
+     · Лента: метки классов, сортировка факты→неподтверждённые→мнения (мнения не
+       вытесняют факт из среза), подпись «в балл идут только факты…».
+     · BT3 на живых данных: заголовки, дающие сегодня −4, при новых правилах дают 0;
+       10/10 канонических кейсов (пресс-релизные срезки → факт даже без LLM). */
 /* ============ КОНФИГ ============ */
 const CONFIG={
   /* ⚠ Ключи ниже встроены, чтобы страница работала «из коробки». Помните:
@@ -1359,12 +1385,12 @@ const CAPEX_VERBS="cut(s|ting)?|trim\\w*|lower\\w*|reduc\\w*|slash\\w*|cancel\\w
 const CAPEX_NOUN="(capex|capital expenditure|capital spending)s?\\b|data ?cent(er|re)s? (spend\\w*|build\\w*|plan\\w*|construction|project\\w*|expansion|lease\\w*)|ai infrastructure|spending[^.]{0,30}\\b(gpu|server|chip|data ?cent)|(spend(ing)?|investment) (outlook|plan\\w*|forecast|target\\w*|guidance)";
 const RX={
   capexHard:new RegExp("("+CAPEX_NOUN+")[^.]{0,80}\\b("+CAPEX_VERBS+")|\\b("+CAPEX_VERBS+")\\b[^.]{0,60}("+CAPEX_NOUN+")|(shorten\\w*|cut\\w*|reduc\\w*|lower\\w*|accelerat\\w*)[^.]{0,40}(useful li(fe|ves)|depreciat)|(useful li(fe|ves)|depreciat\\w*)[^.]{0,40}(shorten\\w*|cut\\w*|reduc\\w*|accelerat\\w*|down)|impairment|writ(e|es|ten|ing)?[ -]?downs?","i"),
-  bdcHard:/\bgat(e|es|ed|ing)\b[^.]{0,40}\b(redemption|withdrawal|investor)|\b(fund|bdc|redemption|withdrawal)s?\b[^.]{0,30}\bgat(e|es|ed|ing)\b|suspend\w*[^.]{0,40}(redemption|withdrawal)|(redemption|withdrawal)s?[^.]{0,40}(suspend|halt|limit|gate)|(dividend|distribution|payout)[^.]{0,40}(cut|reduc\w*|lower\w*|slash\w*|suspend)|(cut|cuts|reduc\w*|slash\w*|suspend\w*)[^.]{0,30}(dividend|distribution|payout)/i,
+  bdcHard:/\bgat(e|es|ed|ing)\b[^.]{0,40}\b(redemption|withdrawal|investor)|\b(fund|bdc|redemption|withdrawal)s?\b[^.]{0,30}\bgat(e|es|ed|ing)\b|suspend\w*[^.]{0,40}(redemption|withdrawal)|(redemption|withdrawal)s?[^.]{0,40}(suspend|halt|limit|gate)|(dividend|distribution|payout)[^.]{0,40}(cut|reduc\w*|lower\w*|slash\w*|suspend)|(cut|cuts|reduc\w*|slash\w*|suspend\w*)[^.]{0,30}(dividend|distribution|payout)|redemption requests?|redemption[^.]{0,30}(surge|spike|exodus|mount\w*)|investor exodus|(hit|flooded|swamped) by[^.]{0,40}redemption/i,
   bdcSoft:/non-?accrual|nav[^.]{0,30}(markdown|writ(e|es|ten|ing)?[ -]?downs?|decline)|default rate|pik income/i
 };
 /* зеркало серверного HIT_RX (fetch-snapshot.mjs) — грубый префильтр релевантности для ЖИВОГО
    режима: без него страховочный потолок в pull() резал бы сырой фид до RX-фильтрации */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
 /* Отрицания: "will NOT cut capex", "denies dividend cut".
    v4.6: NEG проверяется в КЛАУЗЕ триггера (35 симв. до + сам матч), а не по всему
    заголовку — «cuts capex despite strong demand» больше не гибнет как отрицание;
@@ -1374,22 +1400,50 @@ const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastru
 const NEG=/\b(not|no|never|deni\w*|won'?t|will not|rule[sd]? out|maintain\w*|reiterat\w*|refus\w*|refut\w*|reject\w*|dismiss\w*|downplay\w*|debunk\w*|push(es|ed)? back)\b/i;
 /* Маркеры мнений/прогнозов/листиклов: «2 BDCs To Sell…», «Could X cut…», «Top 5…», вопросы.
    Без ИИ такие заголовки не считаются ФАКТОМ: капекс — отсев, жёсткий BDC — в «мягкие». */
-const OP=/\?|\bto (sell|buy|avoid|watch|own)\b|\bbefore (it|they|the)\b|\bcould\b|\bmight\b|\bmay\b(?!\s+\d)|\bshould\b|\bwould\b|\btop \d+\b|\b\d+ (bdcs?|stocks?|reits?|funds?)\b|\bbest\b|\bworst\b|\bwhy\b|\bpredict\w*|\bforecast\w*|\bwatchlist\b|\bopinion\b|\bbull(ish)?\b|\bbear(ish)?\b/i;
+/* v4.10: добавлены маркеры прогнозов/личного мнения (about to, set to, poised, likely, loom,
+   on the verge, i'm, how to, here's) — «OBDC is about to cut its dividend» это прогноз, не факт */
+const OP=/\?|\bto (sell|buy|avoid|watch|own)\b|\bbefore (it|they|the)\b|\bcould\b|\bmight\b|\bmay\b(?!\s+\d)|\bshould\b|\bwould\b|\btop \d+\b|\b\d+ (bdcs?|stocks?|reits?|funds?)\b|\bbest\b|\bworst\b|\bwhy\b|\bpredict\w*|\bforecast\w*|\bwatchlist\b|\bopinion\b|\bbull(ish)?\b|\bbear(ish)?\b|\babout to\b|\bset to\b|\bpoised\b|\blikely\b|\bloom(s|ing)?\b|\bon the verge\b|\bi'?m\b|\bhow to\b|\bhere'?s\b/i;
 /* твёрдый факт сильнее маркеров мнений; v4.9: добавлена каноническая форма гайденс-срезки
    («X cuts capex forecast/outlook») — 3-е лицо наст. времени не матчится модальными
    could/may, поэтому мнения сюда не просочатся, а OP-маркер forecast её больше не убивает */
-const FACT=/impairment|writ(e|es|ten|ing)?[ -]?downs?|suspends? redemption|files (for )?bankruptcy|\b(cuts?|lowers|reduces|trims|slashes)\b [^.]{0,40}(capex|capital expenditure|capital spending|spending)[^.]{0,20}(guidance|outlook|forecast|target)/i;
+/* v4.10: + срезка дивиденда/дистрибуции в 3-м лице ед. числа (cuts/reduces/slashes…) —
+   форма пресс-релиза/новостной ленты; модальные «could cut» и мн. число «they cut» не матчатся */
+const FACT=/impairment|writ(e|es|ten|ing)?[ -]?downs?|suspends? redemption|files (for )?bankruptcy|\b(cuts?|lowers|reduces|trims|slashes)\b [^.]{0,40}(capex|capital expenditure|capital spending|spending)[^.]{0,20}(guidance|outlook|forecast|target)|\b(cuts|reduces|lowers|slashes|suspends|halves)\b[^.]{0,30}\b(dividend|distribution)s?\b/i;
 const trigNoNeg=(h,rx)=>{
   const m=rx.exec(h); if(!m) return false;
   return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));
 };
+/* ═══ v4.10: классификация новостных кандидатов (вместо бинарного «жёсткий/мягкий») ═══
+   fact         — подтверждённое событие: LLM-вердикт (серверный из снимка или клиентский)
+                  либо твёрдый факт-якорь FACT (impairment, «X cuts dividend» в 3-м лице…)
+   unverified   — жёсткий кандидат из нейтрального источника без подтверждения
+   opinion      — маркеры мнений/прогнозов ИЛИ мнение-источник (SA-контрибьюторы и т.п.)
+                  без LLM-подтверждения; НА БАЛЛ НЕ ВЛИЯЕТ
+   soft         — мягкие фундаментальные упоминания (non-accrual, NAV); НА БАЛЛ НЕ ВЛИЯЕТ
+   Бэктест 2006–2026: хронический «−4 от мнений» стоил −0,7 п.п. годовых; страховка −15
+   по подтверждённым фактам нечувствительна к лагу подтверждения 0–5 дней. */
+const OPINION_SRC=/seeking ?alpha|motley|zacks|investorplace|tipranks|gurufocus|simply wall|insider monkey|benzinga|247 ?wall/i;
+const tier1Src=s=>!OPINION_SRC.test(s||"");
+function classifyNews(h,src){
+  const ver=state.newsVer&&state.newsVer.get(h);
+  if(ver) return ver==="fact"?"fact":"opinion";
+  if(FACT.test(h)) return "fact";       /* твёрдый якорь сильнее маркеров мнений (v4.6.1):
+                                           «X cuts capex forecast» — факт, хотя forecast∈OP;
+                                           модальные/мн.число в якоря не проходят (3-е лицо) */
+  if(OP.test(h)) return "opinion";
+  return tier1Src(src)?"unverified":"opinion";
+}
 async function scanNews(){
   const key=finnK();
   const anySnapNews=CONFIG.CYCLE.capexTickers.some(s=>snapHas("fh:news:"+s))||CONFIG.CYCLE.bdcTickers.some(s=>snapHas("fh:news:"+s));
   if(!key&&!anySnapNews) return;   /* в режиме снимка ключ не нужен */
   const from=iso(new Date(Date.now()-14*864e5)),to=iso(new Date());
   const news={capex:[],bdcHard:[],bdcSoft:[]};
-  const llmReady=(await aiRoute()).ready;  /* при активном ИИ мнения судит LLM-фильтр — OP лишь для безключевого режима */
+  /* v4.10: серверные LLM-вердикты (fh:newsVer, судятся сборщиком по секрету OPENROUTER_KEY)
+     читаются ДО классификации — страница получает проверенные факты без ключа во вкладке */
+  state.newsVer=new Map(); state.newsVerSrv=0;
+  const sv=SNAP&&SNAP.responses&&SNAP.responses["fh:newsVer"];
+  if(Array.isArray(sv)) for(const e of sv){ if(Array.isArray(e)&&e.length>=2&&typeof e[0]==="string"){state.newsVer.set(e[0],e[1]);state.newsVerSrv++;} }
   /* v4.9: релевантность фильтруется ДО любого усечения (раньше slice(0,60) съедал 14-дневное
      окно у тикеров с плотным фоном); дополнительно подмешивается серверный префильтр-слой
      fh:newsHit:SYM — ВСЕ релевантные заголовки за 14 дней, независимо от объёма фона. */
@@ -1410,21 +1464,23 @@ async function scanNews(){
   };
   await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{const h=n.headline||"";
-      if(trigNoNeg(h,RX.capexHard)&&(llmReady||FACT.test(h)||!OP.test(h))) news.capex.push({sym,h,u:n.url,t:n.datetime});});
+      if(trigNoNeg(h,RX.capexHard)) news.capex.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:classifyNews(h,n.source)});});
   });
   await pool(CONFIG.CYCLE.bdcTickers,3,async sym=>{
     (await pull(sym)).forEach(n=>{
       const h=n.headline||"";
-      if(trigNoNeg(h,RX.bdcHard)&&(llmReady||FACT.test(h)||!OP.test(h))) news.bdcHard.push({sym,h,u:n.url,t:n.datetime});
-      else if(RX.bdcHard.test(h)||RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime});
+      if(trigNoNeg(h,RX.bdcHard)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:classifyNews(h,n.source)});
+      else if(RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:"soft"});
     });
   });
   /* v4.9: дедуп по (заголовок·тикер), а не по заголовку — общая новость «MSFT and META cut…»
-     из фидов двух тикеров легитимно считается за два тикера в distinct(); сортировка по
-     свежести до среза, чтобы волна по одному тикеру не вытесняла событие по другому */
+     из фидов двух тикеров легитимно считается за два тикера в distinct().
+     v4.10: сортировка сперва по классу (факты → неподтверждённые → мнения), потом по свежести —
+     волна мнений не может вытеснить факт из среза. */
+  const clsRank={fact:0,unverified:1,opinion:2,soft:3};
   for(const k in news){const seen=new Set();
     news[k]=news[k].filter(x=>{const kk=x.h+"|"+x.sym;if(seen.has(kk))return false;seen.add(kk);return true;})
-      .sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,12);}
+      .sort((a,b)=>((clsRank[a.cls]??9)-(clsRank[b.cls]??9))||((b.t||0)-(a.t||0))).slice(0,12);}
   state.news=news;state.newsAt=new Date();
   state.symDrift=null;
   if(SNAP&&SNAP.responses){
@@ -1459,22 +1515,27 @@ const DETECTORS=[
         +(state.sofrSpread!=null?" · спред "+fmt(sp,1)+" б.п. (ср₃ "+fmt(sp3,1)+")":" · SOFR: нет данных")};
   }},
  {id:"d_capex",triad:true,name:"Капекс / амортизация гиперскейлеров",
-  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней: срезка капекса, укорочение сроков службы, impairment/write-down. Отрицания режутся NEG-фильтром (по клаузе триггера), мнения/листиклы («to sell», «top N», вопросы, could/should) — OP-фильтром (при активном ИИ их судит LLM, чтобы не терять факты со спекулятивным хвостом); при заданном ИИ-ключе каждый триггер дополнительно подтверждается LLM (факт, а не мнение/прогноз). СРАБОТАЛ: подтверждённые триггеры по ≥2 РАЗНЫМ тикерам. НАБЛЮДЕНИЕ: 1 тикер. Поправка: −15 / −5. Совпадения публикуются ниже.",
+  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней (серверный префильтр гарантирует полноту окна): срезка капекса/гайденса расходов, укорочение сроков службы, impairment/write-down. Каждый кандидат классифицируется: ФАКТ (подтверждён LLM — серверным судьёй из снимка или ИИ-ключом вкладки — либо твёрдым факт-якорем), НЕПОДТВЕРЖДЁННЫЙ (нейтральный источник, подтверждения нет), МНЕНИЕ (маркеры прогнозов/листиклов или мнение-источник типа SA-контрибьюторов). СРАБОТАЛ: ФАКТЫ по ≥2 разным тикерам → −15. НАБЛЮДЕНИЕ: факт по 1 тикеру ИЛИ неподтверждённые по ≥2 → −5. Мнения и опровержения на балл НЕ влияют (бэктест: хронический шум мнений стоил −0,7 п.п. годовых).",
   eval(){
-    const n=state.news.capex.length, syms=distinct(state.news.capex,x=>x.sym);
-    const st= syms>=2?"fired": n>=1?"watch":"calm";
-    const llm= state.newsLLM==="ok"?" · LLM-фильтр пройден": state.newsLLM==="fail"?" · LLM-сбой (regex+NEG)": state.newsLLM==="off"?" · без LLM (нет ключа)":"";
+    const cap=state.news.capex;
+    const fN=cap.filter(x=>x.cls==="fact"), uN=cap.filter(x=>x.cls==="unverified"), oN=cap.filter(x=>x.cls==="opinion").length;
+    const fT=distinct(fN,x=>x.sym), uT=distinct(uN,x=>x.sym);
+    const st= fT>=2?"fired": (fT>=1||uT>=2)?"watch":"calm";
+    const llm= state.newsLLM==="server"?" · LLM: сервер": state.newsLLM==="ok"?" · LLM: вкладка": state.newsLLM==="fail"?" · LLM-сбой (классы по правилам)": state.newsLLM==="off"?" · без LLM (правила: источник/маркеры/якоря)":"";
     return {st,pts:st==="fired"?-15:st==="watch"?-5:0,
-      inputs:state.newsAt?("триггеров: "+n+" по "+syms+" тикерам"+llm):"сканер: ожидание"};
+      inputs:state.newsAt?("фактов: "+fN.length+" ("+fT+" тик.) · неподтв.: "+uN.length+" ("+uT+" тик.) · мнений: "+oN+" (не в балле)"+llm):"сканер: ожидание"};
   }},
  {id:"d_bdc",triad:true,name:"Стресс BDC (гейты · дивиденды)",
-  logic:"Сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней. Жёсткие триггеры: гейт/приостановка выкупа, срезка дивиденда. Мягкие: non-accrual, NAV-markdown; сюда же понижаются опровержения и МНЕНИЯ/листиклы по жёстким триггерам («нет дыма без огня»). СРАБОТАЛ: жёсткие по ≥2 тикерам. НАБЛЮДЕНИЕ: 1 жёсткий или ≥2 мягких. Поправка: −15 / −4.",
+  logic:"Сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней. Жёсткие кандидаты: гейт/приостановка выкупа, срезка дивиденда/дистрибуции, волна redemption requests. Классы как у капекса: ФАКТ / НЕПОДТВЕРЖДЁННЫЙ / МНЕНИЕ. СРАБОТАЛ: факты по ≥2 тикерам → −15. НАБЛЮДЕНИЕ: факт по 1 тикеру ИЛИ неподтверждённые по ≥2 → −4. Мнения («2 BDCs To Sell…») и мягкие упоминания (non-accrual, NAV-markdown) показываются справочно и на балл НЕ влияют — реальное ухудшение придёт пресс-релизом (факт) или ценой (HY, BIZD).",
   eval(){
-    const hardT=distinct(state.news.bdcHard,x=>x.sym), soft=state.news.bdcSoft.length;
-    const st= hardT>=2?"fired": (hardT>=1||soft>=2)?"watch":"calm";
-    const llm= state.newsLLM==="ok"?" · LLM-фильтр пройден": state.newsLLM==="fail"?" · LLM-сбой": state.newsLLM==="off"?" · без LLM":"";
+    const hard=state.news.bdcHard;
+    const fN=hard.filter(x=>x.cls==="fact"), uN=hard.filter(x=>x.cls==="unverified"), oN=hard.filter(x=>x.cls==="opinion").length;
+    const fT=distinct(fN,x=>x.sym), uT=distinct(uN,x=>x.sym);
+    const soft=state.news.bdcSoft.length;
+    const st= fT>=2?"fired": (fT>=1||uT>=2)?"watch":"calm";
+    const llm= state.newsLLM==="server"?" · LLM: сервер": state.newsLLM==="ok"?" · LLM: вкладка": state.newsLLM==="fail"?" · LLM-сбой": state.newsLLM==="off"?" · без LLM":"";
     return {st,pts:st==="fired"?-15:st==="watch"?-4:0,
-      inputs:state.newsAt?("жёстких: "+state.news.bdcHard.length+" ("+hardT+" тик.) · мягких: "+soft+llm):"сканер: ожидание"};
+      inputs:state.newsAt?("фактов: "+fN.length+" ("+fT+" тик.) · неподтв.: "+uN.length+" ("+uT+" тик.) · мнений: "+oN+" · мягких: "+soft+" (мнения и мягкие не в балле)"+llm):"сканер: ожидание"};
   }},
  {id:"d_oil",triad:false,name:"Нефтяной шок / Ормуз",
   logic:"По цене WTI (ряд EIA/FRED + внутридневной фьючерс поверх — шоковый день виден сразу): СРАБОТАЛ — >$95 (порог CPI-индексирован от базы 2026) или +25% за 30 дней. НАБЛЮДЕНИЕ — >$85 или +15%. Поправка: −10 / −4.",
@@ -1588,9 +1649,12 @@ function evalDetectors(){
   return linesShown;
 }
 function taggedTriggers(){
-  const mk=(arr,tag)=>arr.map(n=>({...n,tag}));
-  return [...mk(state.news.capex,"КАПЕКС"),...mk(state.news.bdcHard,"BDC-жёсткий"),...mk(state.news.bdcSoft,"BDC-мягкий")]
-    .sort((a,b)=>(b.t||0)-(a.t||0));
+  /* v4.10: метка = корзина · класс; сортировка: сперва классы, влияющие на балл */
+  const L={fact:"ФАКТ",unverified:"неподтв.",opinion:"мнение",soft:"мягкий"};
+  const R2={fact:0,unverified:1,opinion:2,soft:3};
+  const mk=(arr,tag)=>arr.map(n=>({...n,tag:tag+"·"+(L[n.cls]||"—")}));
+  return [...mk(state.news.capex,"КАПЕКС"),...mk(state.news.bdcHard,"BDC"),...mk(state.news.bdcSoft,"BDC")]
+    .sort((a,b)=>((R2[a.cls]??9)-(R2[b.cls]??9))||((b.t||0)-(a.t||0)));
 }
 function renderNews(){
   const nb=$("newsbox");
@@ -1610,7 +1674,7 @@ function renderNews(){
   nb.innerHTML=(state.newsAt?`<p class="tagline">новостной сканер Finnhub (${CONFIG.CYCLE.capexTickers.length+CONFIG.CYCLE.bdcTickers.length} тикеров · окно 14 дн. · серверный префильтр) · ${state.newsAt.toLocaleTimeString("ru-RU")} · эвристика по ключевым словам — проверяйте первоисточники</p>`:"")
     +emptyWarn
     +(state.symDrift?`<p class="tagline">⚠ ${esc(state.symDrift)}</p>`:"")
-    +sec("Совпадения детекторов (капекс · BDC)",trig,"влияют на балл")+(trig.length?more:"");
+    +sec("Совпадения детекторов (капекс · BDC)",trig,"в балл идут только ФАКТЫ (и неподтверждённые при ≥2 тикерах); мнения и мягкие — справочно")+(trig.length?more:"");
 }
 
 /* ============ РЕНДЕР КАРТОЧЕК ============ */
@@ -2015,7 +2079,8 @@ function buildSnapshot(){
     leading_score:$("vLead").textContent, confirming_score:$("vCoin").textContent,
     detectors_adjustment:$("vDet").textContent, data_coverage:$("vCover").textContent,
     phase_and_gate:$("vPhase").textContent.replace(/\s+/g," "),
-    llm_news_filter:state.newsLLM||"idle",
+    llm_news_filter:(state.newsLLM||"idle")+(state.newsVerSrv?(" · серверных вердиктов: "+state.newsVerSrv):""),
+    news_class_rules:"в композит идут только ФАКТЫ (LLM-подтверждение или твёрдый якорь; −15 при ≥2 тикерах, иначе −5/−4) и НЕПОДТВЕРЖДЁННЫЕ при ≥2 тикерах; мнения/прогнозы и мягкие упоминания — справочный контекст с нулевым весом",
     block_weights:"водопровод 25% · кредит 25% · рынок 20% · макро 15% · режимы 15%",
     indicators, detectors, news};
 }
@@ -2092,48 +2157,35 @@ async function llmComplete(userMsg,sys,maxTok,timeoutMs){
   if(!r.ready) throw new Error("AI_NOT_CONFIGURED");
   return callOAI(r.base,r.cfg,userMsg,sys,maxTok,timeoutMs);
 }
-/* LLM-фильтр новостных триггеров: подтверждает, что заголовок сообщает о ФАКТЕ события */
+/* LLM-фильтр новостных триггеров (v4.10): судит только жёсткие кандидаты БЕЗ вердикта
+   (серверного fh:newsVer или прежнего клиентского). Подтверждён → fact, нет → opinion.
+   Записи не удаляются и не «понижаются» — меняется только класс; детерминированные классы
+   консервативны сами по себе, поэтому сбой LLM не требует отката. */
 async function llmVerifyNews(){
-  state.newsLLM="off";
-  const r=await aiRoute();
-  if(!r.ready) return;                                   /* ИИ не настроен — работаем на regex+NEG */
+  const srv=state.newsVerSrv>0;
   const cap=state.news.capex, bdc=state.news.bdcHard;
-  if(!cap.length&&!bdc.length){state.newsLLM="idle";return;}
+  const pend=[...cap.map((n,i)=>({tag:"C"+i,n})),...bdc.map((n,i)=>({tag:"B"+i,n}))]
+    .filter(x=>!(state.newsVer&&state.newsVer.has(x.n.h)));
+  const r=await aiRoute();
+  if(!r.ready){ state.newsLLM= srv?"server":"off"; return; }
+  if(!pend.length){ state.newsLLM= srv?"server":((cap.length||bdc.length)?"ok":"idle"); return; }
   try{
-    const list=[...cap.map((n,i)=>`C${i}|${n.sym}|${n.h}`),
-                ...bdc.map((n,i)=>`B${i}|${n.sym}|${n.h}`)].join("\n");
+    const list=pend.map(x=>x.tag+"|"+x.n.sym+"|"+x.n.h).join("\n");
     const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
     const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
-C-заголовки: гиперскейлер СНИЗИЛ капекс-гайденс, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
-B-заголовки: BDC-фонд ВВЁЛ гейт/приостановку выкупа паёв или ОБЪЯВИЛ снижение дивиденда.
-НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may"), вопросы, мнения аналитиков, обзоры сектора.
+C-заголовки: гиперскейлер СНИЗИЛ капекс/гайденс расходов, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
+B-заголовки: BDC-фонд/его управляющий ВВЁЛ гейт или приостановку выкупа, ОБЪЯВИЛ снижение дивиденда/дистрибуции, СТОЛКНУЛСЯ с волной заявок на выкуп (redemption requests).
+НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may","about to","likely"), вопросы, мнения и модельные портфели аналитиков, обзоры сектора.
 Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
 Заголовки:\n`+list;
     const txt=await llmComplete(prompt,sys,1500,60000);
-    /* v4.9: матч без вложенных скобок (жадный \{[\s\S]*\} ловил хвостовой мусор), строгая
-       валидация формы: {"confirmed":null} / строка / чужие ключи — это сбой, а не «все мимо» */
     const m=(txt||"").match(/\{[^{}]*\}/); if(!m) throw new Error("no json");
     const cj=JSON.parse(m[0]);
     if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string"&&/^[CB]\d+$/.test(x))) throw new Error("bad shape");
     const ok=new Set(cj.confirmed);
-    /* отклонённые LLM жёсткие BDC-триггеры понижаются в «мягкие» («нет дыма без огня»), а не исчезают */
-    const demoted=bdc.filter((n,i)=>!ok.has("B"+i));
-    state.news.capex  =cap.filter((n,i)=>ok.has("C"+i));
-    state.news.bdcHard=bdc.filter((n,i)=>ok.has("B"+i));
-    if(demoted.length){const seen=new Set(state.news.bdcSoft.map(x=>x.h+"|"+x.sym));
-      state.news.bdcSoft=[...state.news.bdcSoft,...demoted.filter(x=>!seen.has(x.h+"|"+x.sym))].slice(0,12);}
+    pend.forEach(x=>{const cls=ok.has(x.tag)?"fact":"opinion"; x.n.cls=cls; state.newsVer.set(x.n.h,cls);});
     state.newsLLM="ok";
-  }catch(e){
-    /* v4.9: LLM упал — мнения нельзя оставлять жёсткими триггерами (они прошли мимо
-       OP-фильтра «до суда LLM»): применяем OP-фоллбэк задним числом */
-    const pass=n=>FACT.test(n.h)||!OP.test(n.h);
-    const demoted=state.news.bdcHard.filter(n=>!pass(n));
-    state.news.capex=state.news.capex.filter(pass);
-    state.news.bdcHard=state.news.bdcHard.filter(pass);
-    if(demoted.length){const seen=new Set(state.news.bdcSoft.map(x=>x.h+"|"+x.sym));
-      state.news.bdcSoft=[...state.news.bdcSoft,...demoted.filter(x=>!seen.has(x.h+"|"+x.sym))].slice(0,12);}
-    state.newsLLM="fail";
-  }
+  }catch(e){ state.newsLLM= srv?"server":"fail"; }
 }
 /* таймер дебаунса живёт в state — без завязки на top-level let */
 let _nvBusy=false;
@@ -2141,10 +2193,10 @@ async function ensureNewsVerified(){
   if(_nvBusy||state.newsLLM==="ok"||!state.newsAt) return;
   _nvBusy=true; try{
   const r=await aiRoute(); if(!r.ready) return;
-  if(!((state.news.capex||[]).length||(state.news.bdcHard||[]).length)){state.newsLLM="idle";return;}
+  if(!((state.news.capex||[]).length||(state.news.bdcHard||[]).length)){if(state.newsLLM!=="server")state.newsLLM="idle";return;}
   $("aiStatus").textContent="проверяю новостные триггеры ИИ-фильтром…";
   await llmVerifyNews(); compute();
-  $("aiStatus").textContent= state.newsLLM==="ok"?"новостные триггеры проверены ИИ":"LLM-фильтр: сбой (regex+NEG+OP)";
+  $("aiStatus").textContent= state.newsLLM==="ok"?"новостные триггеры проверены ИИ":state.newsLLM==="server"?"триггеры проверены серверным LLM":"LLM-фильтр: сбой (классы по правилам)";
   }finally{_nvBusy=false;}
 }
 function scheduleNewsVerify(){ ensureNewsVerified(); }  /* прямой вызов: граница ввода — событие change (blur/Enter) */

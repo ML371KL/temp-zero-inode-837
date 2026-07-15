@@ -9,6 +9,12 @@ import {writeFileSync, mkdirSync, readFileSync, existsSync} from "node:fs";
 
 const FRED_KEY   = process.env.FRED_KEY   || "";
 const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
+/* v4.10: серверный LLM-судья новостных кандидатов (опционально). Секрет OPENROUTER_KEY →
+   каждый прогон дешёвая модель классифицирует НОВЫЕ жёсткие кандидаты (факт/мнение),
+   вердикты кэшируются в снимке (fh:newsVer) — страница получает проверенные факты
+   без ИИ-ключа во вкладке. Кандидатов обычно 0–3 за прогон ≈ доли цента. */
+const OPENROUTER_KEY  = process.env.OPENROUTER_KEY  || "";
+const OPENROUTER_MODEL= process.env.OPENROUTER_MODEL|| "anthropic/claude-haiku-4.5";
 const OUT        = process.env.OUT || "docs/snapshot.json";
 /* ⚠ единый список тикеров сборщика — держите в синхроне с CONFIG.CYCLE клиента (клиент сверяет и предупредит) */
 const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","CRWV","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
@@ -18,7 +24,7 @@ const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","CRWV","ARCC","OBDC","FS
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
 /* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
    правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -185,13 +191,31 @@ async function main(){
   /* ── Finnhub: новости и котировки (если задан ключ) ──
      v4.9: секция general-новостей (гео/тарифы) удалена — на балл не влияла;
      добавлен слой fh:newsHit:SYM — все релевантные заголовки за 14 дней с
-     накоплением между запусками (дедуп по url+datetime). */
+     накоплением между запусками (дедуп по url+datetime).
+     v4.10: slim сохраняет source (клиент различает мнение-источники);
+     жёсткие кандидаты собираются для серверного LLM-судьи. */
   let prevSnap=null;
   try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
+  /* регэкспы кандидатов извлекаются из docs/index.html — единый источник истины с клиентом */
+  const CL=(()=>{
+    try{
+      const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
+      const g=n=>{const m=page.match(new RegExp("const "+n+"=([^\\n]*?);\\n"));if(!m)throw new Error("нет "+n);return m[1];};
+      const verbs=eval(g("CAPEX_VERBS")), noun=eval(g("CAPEX_NOUN"));
+      /* шаблон сборки capexHard — копия клиентского (index.html, RX.capexHard); держать в синхроне */
+      const capexHard=new RegExp("("+noun+")[^.]{0,80}\\b("+verbs+")|\\b("+verbs+")\\b[^.]{0,60}("+noun+")|(shorten\\w*|cut\\w*|reduc\\w*|lower\\w*|accelerat\\w*)[^.]{0,40}(useful li(fe|ves)|depreciat)|(useful li(fe|ves)|depreciat\\w*)[^.]{0,40}(shorten\\w*|cut\\w*|reduc\\w*|accelerat\\w*|down)|impairment|writ(e|es|ten|ing)?[ -]?downs?","i");
+      const bdcHard=eval(page.match(/bdcHard:(\/[^\n]+\/i),\n/)[1]);
+      const NEG=eval(page.match(/\nconst NEG=(\/[^\n]+\/i);/)[1]);
+      const trigNoNeg=(h,rx)=>{const m=rx.exec(h);if(!m)return false;return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));};
+      return {capexHard,bdcHard,trigNoNeg};
+    }catch(e){console.log("извлечение клиентских регэкспов не удалось:",String(e&&e.message||e));return null;}
+  })();
+  const CAPEX_SET=new Set(NEWS_SYMBOLS.slice(0,6));   /* первые 6 — капекс-радар (порядок в NEWS_SYMBOLS = картридж) */
+  const CAND=[];                                       /* жёсткие кандидаты для LLM-судьи */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
     const syms=NEWS_SYMBOLS;
-    const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime}));
+    const slim=a=>(Array.isArray(a)?a:[]).map(n=>({headline:n.headline,url:n.url,datetime:n.datetime,source:n.source||""}));
     const cutoff=Date.now()/1000-14*86400;
     for(const s of syms)
       await put("fh:news:"+s,async()=>{
@@ -204,10 +228,48 @@ async function main(){
           .filter(n=>{const k=(n.url||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
           .sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,400);
         R["fh:newsHit:"+s]=hits;                       /* пишем слой напрямую: valid() к нему не применяем */
+        if(CL) hits.forEach(n=>{const h=n.headline||"";
+          if(CL.trigNoNeg(h,CAPEX_SET.has(s)?CL.capexHard:CL.bdcHard)) CAND.push({sym:s,h,capex:CAPEX_SET.has(s)});});
         return full.slice(0,120);                      /* фон для ленты — как раньше */
       });
     for(const s of ["BIZD","SMH","SPY","RSP"])
       await put("fh:quote:"+s,()=>getJSON(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${FINNHUB_KEY}`));
+  }
+
+  /* ── серверный LLM-судья кандидатов (fh:newsVer: [заголовок, "fact"|"opinion", tсуда]) ── */
+  {
+    const nowSec=Math.floor(Date.now()/1000), cutSec=nowSec-14*86400;
+    const prevVer=((prevSnap&&prevSnap.responses&&prevSnap.responses["fh:newsVer"])||[])
+      .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>cutSec);
+    const known=new Map(prevVer.map(e=>[e[0],e]));
+    const fresh=[]; const seenH=new Set();
+    for(const c of CAND){ if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);} }
+    if(OPENROUTER_KEY&&fresh.length){
+      try{
+        const list=fresh.slice(0,40).map((c,i)=>(c.capex?"C":"B")+i+"|"+c.sym+"|"+c.h).join("\n");
+        const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
+        const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
+C-заголовки: гиперскейлер СНИЗИЛ капекс/гайденс расходов, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
+B-заголовки: BDC-фонд/его управляющий ВВЁЛ гейт или приостановку выкупа, ОБЪЯВИЛ снижение дивиденда/дистрибуции, СТОЛКНУЛСЯ с волной заявок на выкуп (redemption requests).
+НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may","about to","likely"), вопросы, мнения и модельные портфели аналитиков, обзоры сектора.
+Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
+Заголовки:\n`+list;
+        const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
+          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
+          signal:AbortSignal.timeout(90000)});
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        const j=await r.json();
+        const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
+        const m=txt.match(/\{[^{}]*\}/); if(!m) throw new Error("нет JSON");
+        const cj=JSON.parse(m[0]);
+        if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
+        const ok=new Set(cj.confirmed);
+        fresh.slice(0,40).forEach((c,i)=>known.set(c.h,[c.h, ok.has((c.capex?"C":"B")+i)?"fact":"opinion", nowSec]));
+        console.log("LLM-судья: рассужено "+Math.min(fresh.length,40)+" новых кандидатов ("+OPENROUTER_MODEL+")");
+      }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }
+    } else if(fresh.length){ console.log("LLM-судья пропущен (нет OPENROUTER_KEY): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
+    if(known.size||CAND.length) R["fh:newsVer"]=[...known.values()];
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
