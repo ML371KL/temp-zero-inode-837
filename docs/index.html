@@ -470,7 +470,16 @@
        свежее 45 дней — детерминированный ФАКТ без новостей и LLM; вторая нога
        детектора, независимая от Finnhub. Проверено: ARCC 8 выплат/2г, стабильные
        $0.48 — среза нет. Атрибуция первоисточника в заголовке («…» - Financial Times
-       через Benzinga) повышает тир агрегатора (живой кейс Blue Owl). */
+       через Benzinga) повышает тир агрегатора (живой кейс Blue Owl).
+   ═ v4.11.1 (проверка «−15 при трёх новостях» на живых данных). Данные выплат чисты:
+     4 из 6 BDC срезали в 2026 (GBDC/MFIC — март, вне окна 45 дн; OBDC 0.37→0.31 и
+     FSK 0.70→0.48→0.42 — свежие) — модальная логика отработала и суплемент $0.02
+     в окне приоров OBDC. Правки прозрачности: срезка = ступенька именно в ПОСЛЕДНЕЙ
+     выплате (lastA<prev·0.98 — давние срезки с ровными выплатами по-новому не
+     считаются свежими); data-срезки публикуются в ленту как записи «BDC·ФАКТ·данные»
+     со ссылкой на историю выплат — драйвер поправки −15 всегда виден глазами;
+     давние срезки показываются в детекторе как контекст («не в балле»); счётчик
+     фактов уточнён («фактов: N по K тикерам»). */
 /* ============ КОНФИГ ============ */
 const CONFIG={
   /* ⚠ Ключи ниже встроены, чтобы страница работала «из коробки». Помните:
@@ -1547,28 +1556,35 @@ const DETECTORS=[
   eval(){
     const hard=state.news.bdcHard;
     const fN=hard.filter(x=>x.cls==="fact"), uN=hard.filter(x=>x.cls==="unverified"), oN=hard.filter(x=>x.cls==="opinion").length;
-    /* v4.11: дивидендная data-нога — срезка видна в самих выплатах, независимо от новостей */
-    const divCut=[];
+    /* v4.11: дивидендная data-нога — срезка видна в самих выплатах, независимо от новостей.
+       v4.11.1: детали срезок публикуются в ленту (state.divCuts) — драйвер поправки виден
+       глазами, а давние срезки (ступенька была раньше, выплаты уже ровные) показываются
+       как контекст и в балл не идут. */
+    const divCut=[],divStale=[];
+    state.divCuts=[];
     for(const s of CONFIG.CYCLE.bdcTickers){
       const dv=SNAP&&SNAP.responses&&SNAP.responses["ydiv:"+s];
       if(!Array.isArray(dv)||dv.length<5) continue;
       const lastE=dv[dv.length-1], lastT=+lastE[0], lastA=+lastE[1];
-      if(!(lastA>0)||Date.now()/1000-lastT>45*86400) continue;
+      if(!(lastA>0)) continue;
       const prior=dv.slice(-5,-1).map(e=>+e[1]).filter(x=>x>0);
       if(prior.length<4) continue;
       const freq={}; prior.forEach(a=>{const k=a.toFixed(2);freq[k]=(freq[k]||0)+1;});
       const modal=+Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
       const prev=prior[prior.length-1];
-      /* срезка = ступенька ИМЕННО в последней выплате (ниже предыдущей И ниже модальной):
-         давняя срезка, за которой уже идут ровные выплаты по-новому, свежей не считается */
-      if(lastA<prev*0.98&&lastA<modal*0.95) divCut.push(s);
+      const fresh=(Date.now()/1000-lastT<=45*86400)&&lastA<prev*0.98&&lastA<modal*0.95;
+      const stale=!fresh&&lastA<modal*0.95;             /* ступенька была на прежних выплатах */
+      if(fresh){divCut.push(s);
+        state.divCuts.push({sym:s,prev,last:lastA,t:lastT,
+          h:"Дивиденд "+s+": "+fmt(prev,2)+" → "+fmt(lastA,2)+" $ (−"+fmt((1-lastA/prev)*100,0)+"%, экс-дата "+new Date(lastT*1000).toISOString().slice(0,10)+") — срезка по данным выплат"});}
+      else if(stale) divStale.push(s);
     }
     const factSyms=[...new Set([...fN.map(x=>x.sym),...divCut])];
     const fT=factSyms.length, uT=distinct(uN,x=>x.sym);
     const soft=state.news.bdcSoft.length;
     const st= fT>=2?"fired": (fT>=1||uT>=2)?"watch":"calm";
     return {st,pts:st==="fired"?-15:st==="watch"?-4:0,
-      inputs:state.newsAt?("фактов: "+(fN.length+divCut.length)+(fT?" ["+factSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+uN.length+" ("+uT+" тик.) · мнений: "+oN+" · мягких: "+soft+" (мнения/мягкие не в балле) · дивиденды по данным: "+(divCut.length?"СРЕЗКА у "+divCut.join(","):"срезок нет")+llmTag()):"сканер: ожидание"};
+      inputs:state.newsAt?("фактов: "+(fN.length+divCut.length)+" по "+fT+" тикерам"+(fT?" ["+factSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+uN.length+" ("+uT+" тик.) · мнений: "+oN+" · мягких: "+soft+" (мнения/мягкие не в балле) · дивиденды по данным: "+(divCut.length?"СВЕЖАЯ СРЕЗКА у "+divCut.join(","):"свежих срезок нет")+(divStale.length?" · давние срезки (вне окна 45 дн, не в балле): "+divStale.join(","):"")+llmTag()):"сканер: ожидание"};
   }},
  {id:"d_oil",triad:false,name:"Нефтяной шок / Ормуз",
   logic:"По цене WTI (ряд EIA/FRED + внутридневной фьючерс поверх — шоковый день виден сразу): СРАБОТАЛ — >$95 (порог CPI-индексирован от базы 2026) или +25% за 30 дней. НАБЛЮДЕНИЕ — >$85 или +15%. Поправка: −10 / −4.",
@@ -1702,7 +1718,12 @@ function taggedTriggers(){
     return "";
   };
   const mk=(arr,tag)=>arr.map(n=>({...n,tag:tag+"·"+(L[n.cls]||"—")+prov(n)}));
-  return [...mk(state.news.capex,"КАПЕКС"),...mk(state.news.bdcHard,"BDC"),...mk(state.news.bdcSoft,"BDC")]
+  /* v4.11.1: data-срезки дивидендов публикуются в ленту наравне с новостями — драйвер
+     поправки детектора всегда виден глазами (ссылка ведёт на историю выплат) */
+  const divItems=(state.divCuts||[]).map(c=>({sym:c.sym,h:c.h,t:c.t,cls:"fact",
+    u:"https://finance.yahoo.com/quote/"+c.sym+"/history/?filter=div",
+    tag:"BDC·ФАКТ·данные"}));
+  return [...divItems,...mk(state.news.capex,"КАПЕКС"),...mk(state.news.bdcHard,"BDC"),...mk(state.news.bdcSoft,"BDC")]
     .sort((a,b)=>((R2[a.cls]??9)-(R2[b.cls]??9))||((b.t||0)-(a.t||0)));
 }
 function renderNews(){
