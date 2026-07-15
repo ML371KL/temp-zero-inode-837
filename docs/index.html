@@ -65,6 +65,23 @@
   .phase b{color:var(--ink)}
   .override-banner{display:none;background:var(--fault);color:#fff;font-family:var(--mono);font-size:13px;padding:8px 24px;letter-spacing:.4px}
   .override-banner.show{display:block}
+  /* полоса «что делать сейчас» (вердикт -> % нормы акций); фон прозрачный, как у тела карточки */
+  .action-strip{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px 26px;padding:12px 24px 11px;border-top:1.5px solid var(--line)}
+  .action-strip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--asAccent,var(--calm))}
+  .as-lead{display:flex;flex-direction:column;gap:3px;min-width:158px}
+  .as-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
+  .as-pctrow{display:flex;align-items:flex-end;gap:11px}
+  .as-pct{font-family:var(--mono);font-size:30px;font-weight:700;line-height:.95;color:var(--asAccent,var(--calm))}
+  .as-pct small{font-size:11px;color:var(--ink-soft);font-weight:400;display:block;margin-top:2px}
+  .as-ladder{display:flex;gap:2.5px;align-items:flex-end;height:22px;padding-bottom:2px}
+  .as-ladder i{width:9px;border-radius:1px;background:var(--neutral-bg);border:1px solid var(--line)}
+  .as-ladder i.on{background:var(--asAccent,var(--calm));border-color:var(--asAccent,var(--calm))}
+  .as-mid{flex:1;min-width:280px}
+  .as-act{font-size:13px;line-height:1.45;color:var(--ink)}
+  .as-warn{font-size:12px;color:var(--fault);margin-top:3px;line-height:1.4}
+  .as-trig{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.65;min-width:210px}
+  .as-trig .up{color:var(--calm)} .as-trig .dn{color:var(--fault)}
+  .as-foot{flex-basis:100%;font-family:var(--mono);font-size:10px;color:var(--ink-soft);border-top:1px dotted var(--line);padding-top:6px;margin-top:2px}
   .ai-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 24px;border-top:1.5px solid var(--line);background:rgba(31,122,99,.05)}
   .ai-sel,.ai-inp{font-family:var(--mono);font-size:12.5px;padding:7px 9px;border:1.5px solid var(--line);border-radius:3px;background:#fff}
   .ai-inp{min-width:150px}
@@ -218,6 +235,7 @@
       <div id="whyList"></div>
     </div>
   </div>
+  <div class="action-strip" id="actionStrip"></div>
   <div class="ai-strip">
     <select id="aiProvider" class="ai-sel" title="Провайдер ИИ"></select>
     <input id="aiModel" class="ai-inp" placeholder="модель" title="ID модели у провайдера">
@@ -1992,6 +2010,45 @@ function compute(){
     +(pos.map(row).join("")||"<div class='why-row'><span>—</span></div>")
     +'<div style="font-size:10.5px;letter-spacing:.7px;color:var(--fault);text-transform:uppercase;margin:8px 0 2px">Тянут вниз</div>'
     +(neg.map(row).join("")||"<div class='why-row'><span>значимых негативов нет</span></div>");
+
+  /* -- полоса «что делать сейчас»: вердикт -> % нормы акций -- */
+  (function(){
+    var el=$("actionStrip"); if(!el) return;
+    var lvl = override ? "PROTECT"
+      : word.indexOf("НЕДОСТАТОЧНО")>=0 ? "NA"
+      : word.indexOf("ЗАЩИТНЫЙ")>=0 ? "PROTECT"
+      : word.indexOf("СОКРАЩАТЬ")>=0 ? "REDUCE"
+      : word.indexOf("ПОКУПАТЬ")>=0 ? "BUY"
+      : word.indexOf("ДОКУПАТЬ")>=0 ? "HOLDP"
+      : word.indexOf("ДЕРЖАТЬ")>=0 ? "HOLD" : "NA";
+    var D={
+      BUY:    {pct:100,ac:"var(--calm)",   act:"Довести риск до <b>полной нормы</b>. Докупки — на откатах к 200-дневной. Без плеча.", dn:"при опереж &lt; +10 или композите &lt; +30"},
+      HOLDP:  {pct:85, ac:"var(--calm)",   act:"Держать ядро, докупать <b>выборочно на откатах</b>. Без плеча.", dn:"при композите ≤ +10"},
+      HOLD:   {pct:65, ac:"var(--neutral)",act:"<b>Базовая доля</b> риска. Сделки — только ребаланс, не направленные ставки.", up:"при композите ≥ +10", dn:"при ≤ −10"},
+      REDUCE: {pct:35, ac:"var(--tension)",act:"Снизить экспозицию/бету <b>на ступень</b>. Держать хеджи. Первые −5–7% не выкупать.", up:"только по Триаде разворота", dn:"защита при ≤ −30 / рубильнике"},
+      PROTECT:{pct:0,  ac:"var(--fault)",  act:"Убрать тактический риск. Остаток — <b>короткий кэш</b> (3-мес. вексель). Отскоки не выкупать без Триады разворота.", up:"возврат ступенчато по Триаде разворота"},
+      NA:     {pct:null,ac:"var(--neutral)",act:"Покрытие &lt; 60% — позицию по панели <b>не менять</b>."}
+    };
+    var m=D[lvl], RUNGS=[100,85,65,35,0], ri=RUNGS.indexOf(m.pct);
+    var ladder=RUNGS.map(function(p,i){return '<i class="'+(i===ri?"on":"")+'" style="height:'+(8+(4-i)*3.6)+'px"></i>';}).join("");
+    var fired=[]; if(F.fund)fired.push("Фондинг"); if(F.capex)fired.push("Капекс"); if(F.bdc)fired.push("Стресс BDC");
+    var warn = override ? '<div class="as-warn">⚠ Рубильник: защита независимо от баллов.</div>'
+              : ((fired.length && m.pct>0) ? '<div class="as-warn">⚠ Докупки на паузе, пока <b>'+fired.join(" · ")+'</b> = СРАБОТАЛ. Держать хеджи.</div>' : "");
+    var upTxt = override ? "возврат — только по Триаде разворота (АКТИВЕН)"
+              : (lvl==="HOLDP" ? ("до 100% при опереж ≥ +10 (сейчас "+(leadScore>0?"+":"")+Math.round(leadScore)+")") : (m.up||""));
+    var dnTxt = override ? "" : (m.dn||"");
+    var up = upTxt ? '<span class="up">↑</span> '+upTxt : "";
+    var dn = dnTxt ? '<span class="dn">↓</span> '+dnTxt : "";
+    var trig = (up||dn) ? '<div class="as-trig">'+up+(up&&dn?"<br>":"")+dn+'</div>' : '<div class="as-trig"></div>';
+    el.style.setProperty("--asAccent", m.ac);
+    el.innerHTML =
+      '<div class="as-lead"><span class="as-eyebrow">что делать сейчас</span>'
+      +'<div class="as-pctrow"><span class="as-pct">'+(m.pct===null?"—":m.pct+"%")+'<small>доля нормы акций</small></span>'
+      +'<div class="as-ladder">'+ladder+'</div></div></div>'
+      +'<div class="as-mid"><div class="as-act">'+m.act+'</div>'+warn+'</div>'
+      +trig
+      +'<div class="as-foot">действие — только на смене ступени · исполнять на следующей сессии</div>';
+  })();
 
   $("contribWrap").innerHTML=contrib.length?`<table class="contrib"><tr><th>Индикатор</th><th>Тип</th><th>Значение</th><th class="num">Балл (−2…+2)</th><th class="num">Вес, %</th></tr>${
     contrib.map(r=>`<tr><td>${r.name}</td><td>${r.lead?"→ опереж.":"◆ подтв."}</td><td>${r.val}</td><td class="num">${r.score>0?"+":""}${r.score}</td><td class="num">${r.w}</td></tr>`).join("")
