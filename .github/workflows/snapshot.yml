@@ -30,7 +30,7 @@ jobs:
           FRED_KEY:    ${{ secrets.FRED_KEY }}
           FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}     # опционально: серверный LLM-судья новостей (v4.10)
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5' }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
         run: node scripts/fetch-snapshot.mjs
       - name: Публикация снимка
         run: |
