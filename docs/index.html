@@ -1423,7 +1423,10 @@ const trigNoNeg=(h,rx)=>{
    Бэктест 2006–2026: хронический «−4 от мнений» стоил −0,7 п.п. годовых; страховка −15
    по подтверждённым фактам нечувствительна к лагу подтверждения 0–5 дней. */
 const OPINION_SRC=/seeking ?alpha|motley|zacks|investorplace|tipranks|gurufocus|simply wall|insider monkey|benzinga|247 ?wall/i;
-const tier1Src=s=>!OPINION_SRC.test(s||"");
+/* синдикация с атрибуцией первоисточника («…» - Financial Times) повышает тир: агрегатор
+   пересказывает новость издания, а не публикует мнение (живой кейс: Blue Owl·FT через Benzinga) */
+const ATTRIB=/[-–—]\s*(financial times|reuters|bloomberg|wsj|wall street journal|\bft\b|cnbc|barron)/i;
+const tier1Src=(s,h)=>!OPINION_SRC.test(s||"")||ATTRIB.test(h||"");
 function classifyNews(h,src){
   const ver=state.newsVer&&state.newsVer.get(h);
   if(ver) return ver==="fact"?"fact":"opinion";
@@ -1431,7 +1434,7 @@ function classifyNews(h,src){
                                            «X cuts capex forecast» — факт, хотя forecast∈OP;
                                            модальные/мн.число в якоря не проходят (3-е лицо) */
   if(OP.test(h)) return "opinion";
-  return tier1Src(src)?"unverified":"opinion";
+  return tier1Src(src,h)?"unverified":"opinion";
 }
 async function scanNews(){
   const key=finnK();
