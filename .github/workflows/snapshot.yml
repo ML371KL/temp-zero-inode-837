@@ -5,10 +5,12 @@ on:
     - cron: "6,26,46 * * * *"   # базовый такт: каждые 20 минут по «незагруженным» минутам
     - cron: "16,36,56 13-21 * * 1-5"  # быстрая полоса: торговые часы США (13–21 UTC) → такт 10 минут
   workflow_dispatch:             # кнопка ручного запуска и вызовы внешнего будильника через API
-  push:                          # правка воркфлоу/скриптов пере-регистрирует расписание и сразу даёт запуск
+  push:                          # правка воркфлоу/скриптов/страницы пере-регистрирует расписание и сразу даёт запуск
+    branches: [main]             # v4.12: только main — правки в служебных ветках (data) снимок не трогают
     paths:
       - ".github/workflows/snapshot.yml"
       - "scripts/**"
+      - "docs/index.html"        # сборщик извлекает боевые регэкспы из страницы — её правка требует пересборки
 
 permissions:
   contents: write
@@ -20,7 +22,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15          # v4.12: худший случай (все 16 Finnhub-ключей висят по таймауту) ~14 мин
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

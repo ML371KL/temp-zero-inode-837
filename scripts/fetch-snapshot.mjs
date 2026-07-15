@@ -24,7 +24,7 @@ const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","CRWV","ARCC","OBDC","FS
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
 /* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
    правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spending|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -115,7 +115,7 @@ function valid(key,j){
   if(key==="nyfed:sofr")        return Array.isArray(j.refRates)&&j.refRates.length>2;
   if(key==="fiscal:tga")        return Array.isArray(j.data)&&j.data.length>20;
   if(key.startsWith("fh:news")) return Array.isArray(j);
-  if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=4;
+  if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   return true;
 }
@@ -227,7 +227,7 @@ async function main(){
         const seen=new Set();
         const hits=[...full.filter(n=>HIT_RX.test(n.headline||"")),...prevHit]
           .filter(n=>(n.datetime||0)>cutoff)
-          .filter(n=>{const k=(n.url||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
+          .filter(n=>{const k=(n.url||n.headline||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
           .sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,400);
         R["fh:newsHit:"+s]=hits;                       /* пишем слой напрямую: valid() к нему не применяем */
         if(CL) hits.forEach(n=>{const h=n.headline||"";
@@ -248,7 +248,7 @@ async function main(){
       const ev=j&&j.chart&&j.chart.result&&j.chart.result[0]&&j.chart.result[0].events;
       const list=ev&&ev.dividends?Object.values(ev.dividends).filter(x=>x&&x.amount>0&&x.date>0)
         .sort((a,b)=>a.date-b.date).map(x=>[x.date,x.amount]).slice(-10):[];
-      if(list.length<4) throw new Error("мало точек ("+list.length+")");
+      if(list.length<5) throw new Error("мало точек ("+list.length+")");
       return list;
     });
   }
@@ -278,7 +278,7 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
         if(!r.ok) throw new Error("HTTP "+r.status);
         const j=await r.json();
         const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
-        const m=txt.match(/\{[^{}]*\}/); if(!m) throw new Error("нет JSON");
+        const m=txt.match(/\{[^{}]*"confirmed"[^{}]*\}/); if(!m) throw new Error("нет JSON");  /* v4.12: reasoning-модели пишут {...} в рассуждениях */
         const cj=JSON.parse(m[0]);
         if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
         const ok=new Set(cj.confirmed);
@@ -310,7 +310,7 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
       catch(e){                                                          /* эшелон 3: легаси Stooq (вдруг оживёт) */
         const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");
         const c=String(csv).trim().split(/\r?\n/).pop().split(",");
-        if(c.length<7||!(+c[6]>0)) throw new Error("Yahoo и Stooq недоступны");
+        if(c.length<7||!(+c[6]>q.lo&&+c[6]<q.hi)) throw new Error("Yahoo и Stooq недоступны/вне диапазона");
         return csv;
       }
     });
