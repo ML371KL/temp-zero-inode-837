@@ -1,0 +1,46 @@
+name: Самопроверка LLM-судьи (ручная)
+on:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Тестовая классификация той же моделью и тем же промптом
+        env:
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
+        run: |
+          node - <<'EOF'
+          const KEY=process.env.OPENROUTER_KEY, MODEL=process.env.OPENROUTER_MODEL;
+          if(!KEY){console.error("нет секрета OPENROUTER_KEY");process.exit(1);}
+          const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
+          const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
+          B-заголовки: BDC-фонд ВВЁЛ гейт, ОБЪЯВИЛ снижение дивиденда, СТОЛКНУЛСЯ с волной redemption requests.
+          Формат ответа: {"confirmed":["B0"]} — только подтверждённые.
+          Заголовки:
+          B0|TEST|Ares Capital cuts quarterly dividend to $0.40
+          B1|TEST|3 BDCs that could cut dividends next year`;
+          const t0=Date.now();
+          fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
+            headers:{"Content-Type":"application/json","Authorization":"Bearer "+KEY,"X-Title":"Razlom-26 selftest"},
+            body:JSON.stringify({model:MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
+            signal:AbortSignal.timeout(90000)})
+          .then(async r=>{
+            const txt=await r.text();
+            console.log("HTTP",r.status,"за",Date.now()-t0,"мс · модель:",MODEL);
+            if(!r.ok){console.error("ОШИБКА ПРОВАЙДЕРА:",txt.slice(0,300));process.exit(1);}
+            const j=JSON.parse(txt);
+            const c=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
+            console.log("ответ модели:",c.slice(0,200));
+            const m=c.match(/\{[^{}]*"confirmed"[^{}]*\}/);
+            if(!m){console.error("НЕТ JSON С confirmed — модель не следует формату");process.exit(1);}
+            const cj=JSON.parse(m[0]);
+            const okShape=cj&&Array.isArray(cj.confirmed);
+            const correct=okShape&&cj.confirmed.includes("B0")&&!cj.confirmed.includes("B1");
+            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факт распознан, мнение отклонено"
+                               :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(cj.confirmed));
+            if(!okShape)process.exit(1);
+          }).catch(e=>{console.error("СБОЙ:",String(e));process.exit(1);});
+          EOF
