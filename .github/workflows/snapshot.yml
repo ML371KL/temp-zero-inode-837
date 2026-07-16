@@ -22,7 +22,10 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15          # v4.12: худший случай (все 16 Finnhub-ключей висят по таймауту) ~14 мин
+    timeout-minutes: 15          # страховка узла; собственный дедлайн сборщика — 8 мин (v4.13.5):
+                                 # он жёсткий (за ним источники пропускаются, значения берёт merge),
+                                 # поэтому прогон успевает опубликоваться и до этого таймаута, и до
+                                 # отмены следующим тиком быстрой полосы (такт 10 мин, cancel-in-progress)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

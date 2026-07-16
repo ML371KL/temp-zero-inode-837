@@ -40,7 +40,7 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
 /* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
    правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|nav\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -52,10 +52,18 @@ const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* v4.13.4: глобальный дедлайн сборки. Воркфлоу обрубается на 15-й минуте БЕЗ коммита —
-   один зависший источник с полными ретраями терял всю сборку. После ~11 минут новые
-   запросы деградируют до одной короткой попытки: снимок собирается с тем, что успели,
-   недобор чинит следующая сборка через 10–20 минут. */
-const T0=Date.now(), DEADLINE_MS=11*60*1000;
+   один зависший источник с полными ретраями терял всю сборку.
+   v4.13.5 (гранд-аудит): 11 минут не сходились с бюджетами. Во-первых, после дедлайна
+   оставался хвост коротких попыток (~40 запросов × 8 с ≈ 5–6 мин) при бюджете 15−11 ≈ 3,5 мин
+   до timeout-minutes — узел всё равно умирал без коммита, т.е. ровно тот отказ, который
+   правка должна была снять. Во-вторых, в быстрой полосе (такт 10 мин) concurrency
+   cancel-in-progress отменял затянувшийся прогон РАНЬШЕ 11-й минуты — механизм не успевал
+   включиться вовсе. Теперь дедлайн 8 минут и он жёсткий: за ним источники не добираются, а
+   ПРОПУСКАЮТСЯ (put() сразу пишет их в failed) — их значения подкладывает merge из прошлого
+   снимка, и сборка публикует то, что успела, к ~8-й минуте. Хвост нулевой: укладываемся и в
+   10-минутный такт, и в 15-минутный таймаут. Здоровый прогон занимает ~30 с — дедлайна не
+   видит никогда. */
+const T0=Date.now(), DEADLINE_MS=8*60*1000;
 const late=()=>Date.now()-T0>DEADLINE_MS;
 async function getJSON(url,tries=3,hdrs){
   let last;
@@ -144,6 +152,10 @@ function valid(key,j){
   return true;
 }
 async function put(key,fn){
+  /* v4.13.5: за дедлайном источник не добирается вовсе — попадает в failed, где его значение
+     подкладывает merge из прошлого снимка (капы 3/7/45 сут.). Так сборка гарантированно
+     доходит до записи и коммита, а недобор чинит следующий прогон через 10–20 минут. */
+  if(late()){ failed.push(key+" — пропущен: дедлайн сборки ("+Math.round((Date.now()-T0)/1000)+" с)"); return; }
   try{
     const j=await fn();
     if(!valid(key,j)) throw new Error("битая форма ответа");
@@ -226,9 +238,14 @@ async function main(){
     try{
       const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
       const g=n=>{const m=page.match(new RegExp("const "+n+"=([^\\n]*?);\\n"));if(!m)throw new Error("нет "+n);return m[1];};
-      const verbs=eval(g("CAPEX_VERBS")), noun=eval(g("CAPEX_NOUN"));
-      /* шаблон сборки capexHard — копия клиентского (index.html, RX.capexHard); держать в синхроне */
-      const capexHard=new RegExp("("+noun+")[^.]{0,80}\\b("+verbs+")|\\b("+verbs+")\\b[^.]{0,60}("+noun+")|(shorten\\w*|cut\\w*|reduc\\w*|lower\\w*|accelerat\\w*)[^.]{0,40}(useful li(fe|ves)|depreciat)|(useful li(fe|ves)|depreciat\\w*)[^.]{0,40}(shorten\\w*|cut\\w*|reduc\\w*|accelerat\\w*|down)|impairment|writ(e|es|ten|ing)?[ -]?downs?","i");
+      const CAPEX_VERBS=eval(g("CAPEX_VERBS")), CAPEX_NOUN=eval(g("CAPEX_NOUN")), MACROSUBJ=eval(g("MACROSUBJ"));
+      /* v4.13.5: САМО ВЫРАЖЕНИЕ capexHard берётся со страницы и вычисляется в этой области
+         видимости — рукописная копия шаблона разошлась с оригиналом при первой же правке
+         словаря (у сборщика не было ни макро-стража, ни границ слова), и сборщик судил
+         заголовки, которых страница кандидатами уже не считает. Единый источник истины. */
+      const capexExpr=page.match(/capexHard:(new RegExp\([\s\S]*?,"i"\)),\n/);
+      if(!capexExpr) throw new Error("нет выражения capexHard");
+      const capexHard=eval(capexExpr[1]);
       const bdcHard=eval(page.match(/bdcHard:(\/[^\n]+\/i),\n/)[1]);
       const NEG=eval(page.match(/\nconst NEG=(\/[^\n]+\/i);/)[1]);
       const trigNoNeg=(h,rx)=>{const m=rx.exec(h);if(!m)return false;return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));};
@@ -285,7 +302,7 @@ async function main(){
     const known=new Map(prevVer.map(e=>[e[0],e]));
     const fresh=[]; const seenH=new Set();
     for(const c of CAND){ if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);} }
-    if(OPENROUTER_KEY&&fresh.length){
+    if(OPENROUTER_KEY&&fresh.length&&!late()){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
       try{
         const list=fresh.slice(0,40).map((c,i)=>(c.capex?"C":"B")+i+"|"+c.sym+"|"+c.h).join("\n");
         const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";

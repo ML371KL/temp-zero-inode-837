@@ -34,8 +34,12 @@ jobs:
             const j=JSON.parse(txt);
             const c=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
             console.log("ответ модели:",c.slice(0,200));
-            const m=c.match(/\{[^{}]*"confirmed"[^{}]*\}/);
-            if(!m){console.error("НЕТ JSON С confirmed — модель не следует формату");process.exit(1);}
+            /* v4.13.5: как и боевые судьи (fetch-snapshot.mjs, index.html) — берём ПОСЛЕДНИЙ
+               блок: модель может процитировать пример формата из промпта до своего вердикта,
+               и на первом блоке самопроверка давала бы ложное «✓ САМОПРОВЕРКА ПРОЙДЕНА». */
+            const mm=c.match(/\{[^{}]*"confirmed"[^{}]*\}/g);
+            if(!mm){console.error("НЕТ JSON С confirmed — модель не следует формату");process.exit(1);}
+            const m=[mm[mm.length-1]];
             const cj=JSON.parse(m[0]);
             const okShape=cj&&Array.isArray(cj.confirmed);
             const correct=okShape&&cj.confirmed.includes("B0")&&!cj.confirmed.includes("B1");
