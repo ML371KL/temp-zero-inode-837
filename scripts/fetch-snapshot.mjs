@@ -40,7 +40,7 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
 /* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
    правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non-?accrual|nav\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|nav\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -51,27 +51,35 @@ const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
 const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* v4.13.4: глобальный дедлайн сборки. Воркфлоу обрубается на 15-й минуте БЕЗ коммита —
+   один зависший источник с полными ретраями терял всю сборку. После ~11 минут новые
+   запросы деградируют до одной короткой попытки: снимок собирается с тем, что успели,
+   недобор чинит следующая сборка через 10–20 минут. */
+const T0=Date.now(), DEADLINE_MS=11*60*1000;
+const late=()=>Date.now()-T0>DEADLINE_MS;
 async function getJSON(url,tries=3,hdrs){
   let last;
+  if(late()) tries=1;
   for(let i=0;i<tries;i++){
     try{
-      const r=await fetch(url,{signal:AbortSignal.timeout(15000),
+      const r=await fetch(url,{signal:AbortSignal.timeout(late()?8000:15000),
         headers:hdrs||{"User-Agent":"razlom26-snapshot/1.0"}});
       if(!r.ok) throw new Error("HTTP "+r.status);
       return await r.json();
-    }catch(e){last=e; await sleep(1200*(i+1));}
+    }catch(e){last=e; if(i<tries-1) await sleep(1200*(i+1));}
   }
   throw last;
 }
 
 async function getTEXT(url,tries=3){
   let last;
+  if(late()) tries=1;                                    /* v4.13.4: см. дедлайн выше */
   for(let i=0;i<tries;i++){
     try{
-      const r=await fetch(url,{signal:AbortSignal.timeout(12000),headers:{"User-Agent":"razlom26-snapshot/1.0"}});
+      const r=await fetch(url,{signal:AbortSignal.timeout(late()?8000:12000),headers:{"User-Agent":"razlom26-snapshot/1.0"}});
       if(!r.ok) throw new Error("HTTP "+r.status);
       return await r.text();
-    }catch(e){last=e; await sleep(1000*(i+1));}
+    }catch(e){last=e; if(i<tries-1) await sleep(1000*(i+1));}
   }
   throw last;
 }
@@ -290,11 +298,14 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
         const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
           body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
-          signal:AbortSignal.timeout(90000)});
+          signal:AbortSignal.timeout(late()?30000:90000)});  /* v4.13.4: за дедлайном судья ждёт меньше — кандидаты досудит следующая сборка */
         if(!r.ok) throw new Error("HTTP "+r.status);
         const j=await r.json();
         const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
-        const m=txt.match(/\{[^{}]*"confirmed"[^{}]*\}/); if(!m) throw new Error("нет JSON");  /* v4.12: reasoning-модели пишут {...} в рассуждениях */
+        /* v4.12: reasoning-модели пишут {...} в рассуждениях; v4.13.4: берём ПОСЛЕДНЕЕ
+           совпадение — модель может процитировать пример формата из промпта до вердикта */
+        const mm=txt.match(/\{[^{}]*"confirmed"[^{}]*\}/g); if(!mm) throw new Error("нет JSON");
+        const m=[mm[mm.length-1]];
         const cj=JSON.parse(m[0]);
         if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
         const ok=new Set(cj.confirmed);
