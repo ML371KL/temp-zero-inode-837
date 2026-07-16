@@ -72,14 +72,14 @@
   .as-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
   .as-pctrow{display:flex;align-items:flex-end;gap:11px}
   .as-pct{font-family:var(--mono);font-size:30px;font-weight:700;line-height:.95;color:var(--asAccent,var(--calm))}
-  .as-pct small{font-size:11px;color:var(--ink-soft);font-weight:400;display:block;margin-top:2px}
+  .as-cap{font-family:var(--mono);font-size:11px;line-height:.95;color:var(--ink-soft);font-weight:400}
   .as-ladder{display:flex;gap:2.5px;align-items:flex-end;height:25px;padding-bottom:2px} /* v4.13: верхняя ступень 22.4px больше не переполняет */
   .as-since{font-family:var(--mono);font-size:10px;color:var(--ink-soft)}
   .as-since a{color:var(--ink-soft);text-decoration:none;border-bottom:1px dotted var(--ink-soft);cursor:pointer}
   .as-pend{font-size:11.5px;color:#8a5c14;margin-top:3px;font-family:var(--mono)}
   .as-ladder i{width:9px;border-radius:1px;background:var(--neutral-bg);border:1px solid var(--line)}
   .as-ladder i.on{background:var(--asAccent,var(--calm));border-color:var(--asAccent,var(--calm))}
-  .as-mid{flex:1;min-width:280px}
+  .as-mid{flex:1;min-width:min(280px,100%)} /* min() — на узких экранах (<376px) 280px раньше вылезали за полосу и давали горизонтальный скролл */
   .as-act{font-size:13px;line-height:1.45;color:var(--ink)}
   .as-warn{font-size:12px;color:var(--fault);margin-top:3px;line-height:1.4}
   .as-trig{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.65;min-width:210px}
@@ -2206,8 +2206,9 @@ function compute(){
     el.style.setProperty("--asAccent", m.ac);
     el.innerHTML =
       '<div class="as-lead"><span class="as-eyebrow">что делать сейчас</span>'
-      +'<div class="as-pctrow"><span class="as-pct" title="стратегическая норма — ваша плановая доля акций в спокойном режиме; панель масштабирует её, а не задаёт абсолют">'+(override?m.pct+"%":noData?"—":m.pct+"%")+'<small>доля стратегической нормы акций</small></span>'
+      +'<div class="as-pctrow"><span class="as-pct" title="стратегическая норма — ваша плановая доля акций в спокойном режиме; панель масштабирует её, а не задаёт абсолют">'+(override?m.pct+"%":noData?"—":m.pct+"%")+'</span>'
       +'<div class="as-ladder">'+ladder+'</div></div>'
+      +'<small class="as-cap" title="стратегическая норма — ваша плановая доля акций в спокойном режиме; панель масштабирует её, а не задаёт абсолют">доля стратегической нормы акций</small>'
       +'<span class="as-since">ступень с '+esc(since)+' · <a id="rungReset" title="забыть память ступени на этом устройстве и пересеять от текущего вердикта">сброс</a></span></div>'
       +'<div class="as-mid"><div class="as-act">'+act+'</div>'+warn+pendHtml+'</div>'
       +trig
