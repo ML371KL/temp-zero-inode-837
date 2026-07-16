@@ -16,8 +16,24 @@ const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
 const OPENROUTER_KEY  = process.env.OPENROUTER_KEY  || "";
 const OPENROUTER_MODEL= process.env.OPENROUTER_MODEL|| "anthropic/claude-haiku-4.5";
 const OUT        = process.env.OUT || "docs/snapshot.json";
-/* ⚠ единый список тикеров сборщика — держите в синхроне с CONFIG.CYCLE клиента (клиент сверяет и предупредит) */
-const NEWS_SYMBOLS=["MSFT","GOOGL","AMZN","META","ORCL","CRWV","ARCC","OBDC","FSK","BXSL","GBDC","MFIC"];
+/* v4.13.3: состав корзин извлекается из картриджа CYCLE клиента (docs/index.html) — единый
+   источник истины: смена цикла правится в одном месте. При сбое извлечения — зашитый резерв. */
+const {CAPEX_TICKERS,BDC_TICKERS}=(()=>{
+  const fb={CAPEX_TICKERS:["MSFT","GOOGL","AMZN","META","ORCL","CRWV"],
+            BDC_TICKERS:["ARCC","OBDC","FSK","BXSL","GBDC","MFIC"]};
+  try{
+    const page=readFileSync("docs/index.html","utf-8");
+    const g=n=>JSON.parse(page.match(new RegExp(n+":\\s*(\\[[^\\]]*\\])"))[1]);
+    const c=g("capexTickers"), b=g("bdcTickers");
+    const okArr=a=>Array.isArray(a)&&a.length>=1&&a.every(t=>typeof t==="string"&&/^[A-Z][A-Z0-9.\-]{0,7}$/.test(t));
+    if(!okArr(c)||!okArr(b)) throw new Error("картридж не распознан");
+    return {CAPEX_TICKERS:c,BDC_TICKERS:b};
+  }catch(e){
+    console.log("картридж CYCLE не извлечён ("+String(e&&e.message||e)+") — зашитый резерв");
+    return fb;
+  }
+})();
+const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
 /* v4.9: грубый серверный префильтр релевантности (шире клиентских RX: NEG/OP/LLM-суд остаются клиенту).
    Совпавшие заголовки копятся отдельным слоем fh:newsHit:SYM с 14-дневным окном и слиянием между
    запусками — иначе у гиперскейлеров фон ~90 заголовков/день выталкивает событие из хвоста 120
@@ -211,7 +227,7 @@ async function main(){
       return {capexHard,bdcHard,trigNoNeg};
     }catch(e){console.log("извлечение клиентских регэкспов не удалось:",String(e&&e.message||e));return null;}
   })();
-  const CAPEX_SET=new Set(NEWS_SYMBOLS.slice(0,6));   /* первые 6 — капекс-радар (порядок в NEWS_SYMBOLS = картридж) */
+  const CAPEX_SET=new Set(CAPEX_TICKERS);             /* капекс-радар — прямо из картриджа CYCLE */
   const CAND=[];                                       /* жёсткие кандидаты для LLM-судьи */
   let LLM_JUDGED=0;                                    /* рассужено в ЭТОМ прогоне (для meta.llm) */
   if(FINNHUB_KEY){
@@ -241,7 +257,7 @@ async function main(){
   /* ── дивидендная data-нога BDC-детектора (v4.11): история выплат из Yahoo (events=div) ──
      Срезку дивиденда клиент вычисляет ИЗ ДАННЫХ (последняя выплата < модальной за 4 прежних),
      независимо от новостей и LLM — детерминированная вторая нога детектора. */
-  for(const s of NEWS_SYMBOLS.slice(6)){                 /* BDC-половина списка */
+  for(const s of BDC_TICKERS){                           /* BDC-корзина из картриджа */
     await sleep(400+Math.random()*600);
     await put("ydiv:"+s,async()=>{
       const j=await getJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${s}?range=2y&interval=1mo&events=div`,2,YUA);
@@ -330,7 +346,8 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
       for(const k of failedKeys){
         const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
         const age=Date.now()-origin;
-        const cap=(k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
+        const cap=k.startsWith("ydiv:")?45*86400e3:                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
+                  (k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
         if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
         if(prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
           R[k]=prev.responses[k];
