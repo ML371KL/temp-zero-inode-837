@@ -1,0 +1,60 @@
+name: Уведомления в Telegram
+
+# Запускается ПОСЛЕ штатного прогона снимка: собственный GitHub-cron в этих репозиториях
+# ненадёжен, а снимок дёргается внешним будильником — так уведомления наследуют его такт.
+# Панель считает карточки В БРАУЗЕРЕ, поэтому состояние снимается headless-прогоном страницы:
+# это исключает вторую копию логики скоринга на сервере (она бы неизбежно разошлась).
+on:
+  workflow_run:
+    workflows: ["Обновление снимка данных"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      # Потеря кэша безопасна: скрипт зафиксирует базу заново и промолчит — худший исход это
+      # пропуск уведомления, а не лавина сообщений.
+      - name: Восстановить состояние уведомлений
+        uses: actions/cache@v5
+        with:
+          path: .notify/state.json
+          key: razlom26-notify-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            razlom26-notify-${{ github.ref_name }}-
+
+      - name: Тесты уведомлений
+        run: node scripts/notify-test.mjs
+
+      - name: Chrome для снятия состояния страницы
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then echo "Chrome на раннере не найден"; exit 1; fi
+          echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
+          npm i --no-save --no-package-lock --no-audit --no-fund puppeteer-core
+
+      - name: Разослать изменения
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          NOTIFY_MODEL: ${{ vars.NOTIFY_MODEL }}
+          NOTIFY_SOURCE: page
+          NOTIFY_PAGE: https://ml371kl.github.io/temp-zero-inode-837/
+          NOTIFY_STATE: .notify/state.json
+        run: node scripts/notify.mjs
