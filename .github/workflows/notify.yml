@@ -27,7 +27,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
+      # ref: main — ОБЯЗАТЕЛЬНО. По умолчанию workflow_run забирает коммит, на котором СТАРТОВАЛ
+      # прогон снимка, то есть состояние ДО коммита свежего снимка. Уведомления читали бы
+      # прошлый цикл и опаздывали ровно на один такт.
       - uses: actions/checkout@v5
+        with:
+          ref: main
 
       - uses: actions/setup-node@v6
         with:
@@ -60,7 +65,11 @@ jobs:
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
           NOTIFY_MODEL: ${{ vars.NOTIFY_MODEL }}
           NOTIFY_SOURCE: page
-          NOTIFY_PAGE: https://ml371kl.github.io/temp-zero-inode-837/
+          # Страница поднимается ЛОКАЛЬНО из свежего чекаута: публикация Pages идёт уже после
+          # старта уведомлений, и чтение по сети давало данные предыдущего цикла (замер в проде
+          # 28.07: страница прочитана в 14:16:19, деплой свежего снимка закончился в 14:16:37).
+          # Заодно уведомления перестают зависеть от здоровья Pages.
+          NOTIFY_PAGE_DIR: docs
           NOTIFY_STATE: .notify/state.json
           NOTIFY_PING: ${{ inputs.ping && '1' || '0' }}
         run: node scripts/notify.mjs
