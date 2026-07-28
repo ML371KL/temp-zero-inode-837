@@ -290,7 +290,12 @@ def build_scores(d, grid, era_fair=False, variants=frozenset()):
         v1 = d["VIXCLS"].s
         v3 = d["VXVCLS"].s
         r = (v1 / v3.reindex(v1.index)).dropna()
-        sc = pd.Series(np.select([r < 0.85, r < 1.0, r < 1.05], [0, 1, -1], -2), index=r.index, dtype=float)
+        if "VT" in variants:
+            # нейтраль 0.97–1.02: паритет — не сигнал, а зона шума интрадей-VIX
+            sc = pd.Series(np.select([r < 0.85, r < 0.97, r < 1.02, r < 1.05], [0, 1, 0, -1], -2),
+                           index=r.index, dtype=float)
+        else:
+            sc = pd.Series(np.select([r < 0.85, r < 1.0, r < 1.05], [0, 1, -1], -2), index=r.index, dtype=float)
         S["vixterm"] = avail_series(sc, 1)
 
     # --- пейроллы ---
@@ -597,9 +602,29 @@ def composite(df, A, variants=frozenset()):
     if wti is not None:
         ohi = A.get("oil_hi", pd.Series(95.0, index=df.index))
         omid = A.get("oil_mid", pd.Series(85.0, index=df.index))
-        o_f = (wti > ohi) | (wchg > 25)
-        o_w = ((wti > omid) | (wchg > 15)) & ~o_f
-        pts += np.where(o_f.fillna(False), -10, np.where(o_w.fillna(False), -4, 0))
+        if "OH" in variants:
+            # вход мгновенный, выход — только при отходе от порога на 1.5% (цена) / 6% (импульс)
+            v_ = wti.reindex(df.index).astype(float)
+            c_ = wchg.reindex(df.index).astype(float)
+            hi_ = ohi.reindex(df.index).astype(float)
+            mid_ = omid.reindex(df.index).astype(float)
+            st = 0            # 0 спокойно · 1 наблюдение · 2 сработал
+            arr = np.zeros(len(df.index))
+            for i in range(len(df.index)):
+                v, c, h, m = v_.iloc[i], c_.iloc[i], hi_.iloc[i], mid_.iloc[i]
+                if np.isnan(v) or np.isnan(h):
+                    arr[i] = 0 if st == 0 else (-4 if st == 1 else -10); continue
+                cc = 0.0 if np.isnan(c) else c
+                f_in, w_in = (v > h) or (cc > 25), (v > m) or (cc > 15)
+                f_hold = st == 2 and ((v > h * 0.985) or (cc > 25 * 0.94))
+                w_hold = st >= 1 and ((v > m * 0.985) or (cc > 15 * 0.94))
+                st = 2 if (f_in or f_hold) else (1 if (w_in or w_hold) else 0)
+                arr[i] = -10 if st == 2 else (-4 if st == 1 else 0)
+            pts += arr
+        else:
+            o_f = (wti > ohi) | (wchg > 25)
+            o_w = ((wti > omid) | (wchg > 15)) & ~o_f
+            pts += np.where(o_f.fillna(False), -10, np.where(o_w.fillna(False), -4, 0))
 
     # инфляционный узел
     cy = A.get("cpi_yoy"); cyp = A.get("cpi_yoy_prev"); wup = A.get("wage_up")
