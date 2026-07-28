@@ -25,7 +25,10 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15          # страховка узла; собственный дедлайн сборщика — 8 мин (v4.13.5):
+    timeout-minutes: 12          # v4.13.6: 15 → 12. Прогон-зомби 24.07 жил все 15 минут при дедлайне
+                                 # сборщика 8 мин — значит висел ВНЕ node (checkout/push); держать
+                                 # раннер лишние 3 минуты незачем.
+                                 # страховка узла; собственный дедлайн сборщика — 8 мин (v4.13.5):
                                  # он жёсткий (за ним источники пропускаются, значения берёт merge),
                                  # поэтому прогон успевает опубликоваться и до этого таймаута, и до
                                  # отмены следующим тиком быстрой полосы (такт 10 мин, cancel-in-progress)
@@ -44,8 +47,22 @@ jobs:
         run: |
           git config user.name  "razlom26-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add docs/snapshot.json
-          if git diff --cached --quiet; then echo "снимок не изменился"; exit 0; fi
-          git commit -m "снимок $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
-          git pull --rebase origin main
-          git push
+          # v4.13.6: свежесобранный снимок — источник истины. Раньше гонка с чужим пушем
+          # (правка страницы, уведомления) роняла rebase, и такт терялся целиком: собранные
+          # данные просто выбрасывались. Наш снимок всегда новее удалённого, поэтому при
+          # конфликте берём удалённую голову и кладём свой файл поверх — до 3 попыток.
+          cp docs/snapshot.json "$RUNNER_TEMP/snapshot.json"
+          for attempt in 1 2 3; do
+            git add docs/snapshot.json
+            if git diff --cached --quiet; then echo "снимок не изменился"; exit 0; fi
+            git commit -m "снимок $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
+            if git pull --rebase origin main && git push; then
+              echo "опубликовано с попытки $attempt"; exit 0
+            fi
+            echo "попытка $attempt: гонка с чужим пушем — переношу снимок на свежую голову"
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$RUNNER_TEMP/snapshot.json" docs/snapshot.json
+          done
+          echo "не удалось опубликовать за 3 попытки"; exit 1
