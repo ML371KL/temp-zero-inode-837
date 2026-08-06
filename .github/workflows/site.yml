@@ -1,0 +1,70 @@
+name: Публикация сайта в Cloudflare Pages
+
+# Сайт публикуется ТОЛЬКО при изменении его кода. Данные едут отдельно и в другое
+# место: снимок кладётся в бакет R2 шагом внутри snapshot.yml, страница забирает его
+# через functions/snapshot.json.js. Пока данные ехали публикацией, каждый такт стоил
+# сборки — около сотни в сутки при бесплатном потолке Cloudflare Pages в 500 в месяц.
+#
+# snapshot.json из публикации исключён намеренно: попав в неё, статический файл
+# соревновался бы с функцией за один и тот же путь, и какая версия ответит — зависело
+# бы от порядка, которого мы не контролируем.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "!docs/snapshot.json"
+      - "functions/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: razlom26-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Собрать каталог публикации
+        run: |
+          set -euo pipefail
+          rm -rf site && mkdir -p site
+          cp -r docs/. site/
+          rm -f site/snapshot.json
+          echo "публикуется:"; ls -la site
+
+      - name: Опубликовать
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # Версия зафиксирована точечно: публикация сайта не должна однажды утром
+          # начать вести себя иначе сама по себе.
+          npx --yes wrangler@4.119.0 pages deploy site \
+            --project-name tzi-837 \
+            --branch main \
+            --commit-dirty=true
+
+      - name: Проверить, что опубликованное отвечает
+        run: |
+          set -euo pipefail
+          # С повторами, а не однократным curl: публикация доезжает до края не
+          # мгновенно, и однократная проверка краснела бы просто от медленной сети.
+          for attempt in 1 2 3 4 5 6; do
+            page=$(curl -s -o /dev/null -w '%{http_code}' https://tzi-837.pages.dev/ || true)
+            data=$(curl -s -o /dev/null -w '%{http_code}' https://tzi-837.pages.dev/snapshot.json || true)
+            echo "попытка $attempt: страница $page, снимок $data"
+            if [ "$page" = "200" ] && [ "$data" = "200" ]; then exit 0; fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::опубликованный сайт не отвечает 200 на / и /snapshot.json"
+          exit 1

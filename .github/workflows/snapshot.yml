@@ -44,6 +44,7 @@ jobs:
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
         run: node scripts/fetch-snapshot.mjs
       - name: Публикация снимка
+        id: commit
         run: |
           git config user.name  "razlom26-bot"
           git config user.email "bot@users.noreply.github.com"
@@ -66,3 +67,52 @@ jobs:
             cp "$RUNNER_TEMP/snapshot.json" docs/snapshot.json
           done
           echo "не удалось опубликовать за 3 попытки"; exit 1
+
+      # То, что читает живая страница, лежит здесь, а не в коммите выше. Коммит —
+      # история и то, из чего снимок восстанавливается; бакет — то, что открывает
+      # браузер. Раньше вторым была публикация GitHub Pages, и она связывала частоту
+      # данных (четыре такта в час) с частотой пересборки сайта — около сотни сборок
+      # в сутки; 6 августа очередь Pages встала, и страница несколько часов показывала
+      # то, что давно лежало в репозитории.
+      #
+      # Условие, а не `always()`, и не умолчание. Проигранная гонка за пуш не должна
+      # лишать читателя свежих данных — эти две публикации независимы, и ни одна не
+      # вправе отменять другую; ровно тот урок, который стоил соседней панели шести
+      # часов простоя. Но `always()` пустил бы сюда и провал СБОРА, а сборщик пишет
+      # docs/snapshot.json на месте: недописанный файл уехал бы читателю как текущие
+      # данные. Поэтому пропускаем ровно один вид отказа — отказ коммита.
+      #
+      # curl --aws-sigv4, а не AWS CLI: R2 говорит по протоколу S3, подпись у curl
+      # встроенная, и это на одну зависимость меньше.
+      - name: Опубликовать снимок в R2
+        if: success() || steps.commit.conclusion == 'failure'
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          # Разбор перед отправкой. Сборщик пишет файл на месте, и обрезанный JSON —
+          # это не «плохие данные», а страница, которая не открывается вовсе.
+          node -e 'JSON.parse(require("fs").readFileSync("docs/snapshot.json","utf8"))'
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          code=$(curl -sS -X PUT -o "$RUNNER_TEMP/r2-put.log" -w '%{http_code}' \
+            --user "${R2_ACCESS_KEY_ID}:${R2_SECRET_ACCESS_KEY}" \
+            --aws-sigv4 "aws:amz:auto:s3" \
+            -H "Content-Type: application/json" \
+            --data-binary @docs/snapshot.json \
+            "${endpoint}/dash-837/snapshot.json")
+          if [ "$code" != "200" ]; then
+            echo "::error::R2 PUT вернул $code"; cat "$RUNNER_TEMP/r2-put.log"; exit 1
+          fi
+          # Читаем обратно и сверяем побайтово: успешный PUT говорит, что запрос принят,
+          # а вопрос другой — лежит ли в бакете именно тот снимок, что собрал этот прогон.
+          curl -sS --fail \
+            --user "${R2_ACCESS_KEY_ID}:${R2_SECRET_ACCESS_KEY}" \
+            --aws-sigv4 "aws:amz:auto:s3" \
+            -o "$RUNNER_TEMP/r2-readback.json" \
+            "${endpoint}/dash-837/snapshot.json"
+          if ! cmp -s docs/snapshot.json "$RUNNER_TEMP/r2-readback.json"; then
+            echo "::error::в R2 лежит не то, что опубликовали"; exit 1
+          fi
+          echo "опубликовано $(wc -c < docs/snapshot.json) байт, сверено побайтово"
