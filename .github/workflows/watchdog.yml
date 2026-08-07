@@ -1,0 +1,47 @@
+name: Сторож свежести
+
+# Второй наблюдатель, живущий не там, где публикатор.
+#
+# Сбор данных уехал на VPS, и там есть свой сторож — он быстрее и знает подробности.
+# Но сообщить о собственной смерти вместе с машиной он не может, а именно после такого
+# отказа панель молча показывает вчерашние цифры. Этот прогон живёт у GitHub и потому
+# переживает падение сервера.
+#
+# Порог здесь намеренно мягче местного втрое: двое сторожей на один отказ — это два
+# сообщения об одном и том же. Голос подаётся только тогда, когда местный уже не может.
+#
+# Собственный планировщик GitHub в этих репозиториях ненадёжен — тики приходят через
+# раз, — поэтому воркфлоу принимает и внешний вызов будильником, как соседний монитор.
+
+on:
+  schedule:
+    - cron: "37 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - name: Проверить возраст опубликованного снимка
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERT_BOT_TOKEN: ${{ secrets.ALERT_BOT_TOKEN }}
+          ALERT_CHAT_ID: ${{ secrets.ALERT_CHAT_ID }}
+          SNAPSHOT_URL: ${{ vars.SNAPSHOT_URL || 'https://tzi-837.pages.dev/snapshot.json' }}
+          # Три часа: шесть пропущенных тактов при получасовом. Меняется переменной
+          # репозитория, чтобы разгон такта не требовал правки файла.
+          MAX_AGE_MINUTES: ${{ vars.WATCHDOG_MAX_AGE_MINUTES || '180' }}
+          CADENCE_TEXT: ${{ vars.WATCHDOG_CADENCE_TEXT || '30 мин' }}
+        run: node scripts/watch-freshness.mjs
