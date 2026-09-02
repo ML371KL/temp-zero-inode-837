@@ -144,6 +144,7 @@ const failed=[];
 function valid(key,j){
   if(key.startsWith("stqd:")) return typeof j==="string"&&j.trim().split(/\r?\n/).length>10; /* дневная история CSV */
   if(key.startsWith("stq:")) return typeof j==="string"&&j.split(",").length>=7; /* интрадей — CSV-строка */
+  if(key==="cboe:cor1m")        return typeof j==="string"&&j.trim().split(/\r?\n/).length>260&&/^DATE,/i.test(j.trim()); /* v4.15: CSV-строка, ≥ год дневных точек — ДО отсечения «не объект» */
   if(!j||typeof j!=="object") return false;
   if(key.startsWith("fred:"))   return Array.isArray(j.observations)&&j.observations.length>3;
   if(key.startsWith("fx:"))     return j.rates&&Object.keys(j.rates).length>10;
@@ -157,7 +158,6 @@ function valid(key,j){
   if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
-  if(key==="cboe:cor1m")        return typeof j==="string"&&j.trim().split(/\r?\n/).length>260&&/^DATE,/i.test(j.trim());       /* v4.15: ≥ год дневных точек */
   return true;
 }
 async function put(key,fn){
