@@ -1,0 +1,141 @@
+=== rev2 reproduction, grid 2003-01-02..2026-09-01 n=5954 | splits: start..end | 2003-01-01..2014-12-31 | 2015-01-01..end
+
+--- (1) metrics ---
+BASE                                         | Sh 0.762 DD -18.2 CAGR  9.28 E 0.707 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.656 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.759 | sw/yr 8.5
+P1 (grid shift21, as in finding)             | Sh 0.813 DD -16.8 CAGR  9.78 E 0.700 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.648 | Sh 0.784 DD -16.8 CAGR 10.47 E 0.753 | sw/yr 8.8
+P1raw (change on raw obs, no lead NaN)       | Sh 0.824 DD -16.5 CAGR  9.89 E 0.699 | Sh 0.867 DD -11.0 CAGR  9.24 E 0.647 | Sh 0.793 DD -16.5 CAGR 10.58 E 0.753 | sw/yr 8.8
+DROP vix card                                | Sh 0.800 DD -16.9 CAGR  9.82 E 0.717 | Sh 0.795 DD -13.1 CAGR  8.79 E 0.670 | Sh 0.809 DD -16.9 CAGR 10.89 E 0.765 | sw/yr 9.0
+P1 cal22 (22 calendar days ago)              | Sh 0.840 DD -15.9 CAGR 10.06 E 0.698 | Sh 0.883 DD -11.1 CAGR  9.38 E 0.648 | Sh 0.809 DD -15.9 CAGR 10.76 E 0.751 | sw/yr 8.4
+P1 cal30 (30 calendar days ago)              | Sh 0.825 DD -16.2 CAGR  9.91 E 0.700 | Sh 0.869 DD -11.0 CAGR  9.26 E 0.648 | Sh 0.793 DD -16.2 CAGR 10.58 E 0.753 | sw/yr 8.8
+P1 log (+40/+20/-20%)                        | Sh 0.826 DD -16.5 CAGR  9.86 E 0.697 | Sh 0.857 DD -11.0 CAGR  9.09 E 0.646 | Sh 0.806 DD -16.5 CAGR 10.66 E 0.750 | sw/yr 10.1
+P1 log (+50/+25/-25%)                        | Sh 0.825 DD -15.9 CAGR  9.87 E 0.699 | Sh 0.864 DD -11.0 CAGR  9.21 E 0.647 | Sh 0.796 DD -15.9 CAGR 10.56 E 0.752 | sw/yr 9.5
+P1raw lag2 (VIX avail +2 cal days)           | Sh 0.833 DD -16.0 CAGR  9.98 E 0.698 | Sh 0.863 DD -10.6 CAGR  9.19 E 0.646 | Sh 0.813 DD -16.0 CAGR 10.80 E 0.751 | sw/yr 8.8
+BASE lag2 (level card avail +2 cal days)     | Sh 0.794 DD -18.2 CAGR  9.59 E 0.706 | Sh 0.809 DD -11.3 CAGR  8.70 E 0.655 | Sh 0.786 DD -18.2 CAGR 10.52 E 0.758 | sw/yr 8.4
+P1 grid extra 1 trading-day shift            | Sh 0.820 DD -16.0 CAGR  9.85 E 0.699 | Sh 0.839 DD -10.6 CAGR  8.98 E 0.648 | Sh 0.809 DD -16.0 CAGR 10.76 E 0.752 | sw/yr 8.8
+BASE level extra 1 trading-day shift         | Sh 0.802 DD -18.2 CAGR  9.70 E 0.706 | Sh 0.814 DD -11.3 CAGR  8.76 E 0.655 | Sh 0.796 DD -18.2 CAGR 10.66 E 0.758 | sw/yr 8.4
+P1raw lag0 (same-day close, info only)       | Sh 0.807 DD -18.1 CAGR  9.70 E 0.698 | Sh 0.866 DD -11.1 CAGR  9.20 E 0.647 | Sh 0.761 DD -18.1 CAGR 10.21 E 0.752 | sw/yr 8.7
+P1 zones shifted +2 (12/7/-3)                | Sh 0.824 DD -16.5 CAGR  9.94 E 0.704 | Sh 0.863 DD -11.1 CAGR  9.25 E 0.653 | Sh 0.796 DD -16.5 CAGR 10.64 E 0.756 | sw/yr 9.3
+P1 sym zones (+2 below -10)                  | Sh 0.809 DD -16.8 CAGR  9.75 E 0.700 | Sh 0.852 DD -11.0 CAGR  9.12 E 0.648 | Sh 0.777 DD -16.8 CAGR 10.41 E 0.754 | sw/yr 8.8
+P1 no +1 (falling -> 0)                      | Sh 0.818 DD -16.2 CAGR  9.79 E 0.695 | Sh 0.862 DD -10.9 CAGR  9.15 E 0.644 | Sh 0.786 DD -16.2 CAGR 10.45 E 0.748 | sw/yr 8.6
+P1 only +1/0 (rising -> 0)                   | Sh 0.837 DD -15.8 CAGR 10.13 E 0.703 | Sh 0.885 DD -11.0 CAGR  9.46 E 0.650 | Sh 0.802 DD -15.8 CAGR 10.82 E 0.759 | sw/yr 7.8
+P1 5-day change (10/5/-5)                    | Sh 0.837 DD -15.8 CAGR 10.02 E 0.698 | Sh 0.878 DD -11.6 CAGR  9.34 E 0.647 | Sh 0.806 DD -15.8 CAGR 10.73 E 0.750 | sw/yr 8.3
+P1 63-day change (10/5/-5)                   | Sh 0.809 DD -18.4 CAGR  9.70 E 0.697 | Sh 0.866 DD  -9.4 CAGR  9.22 E 0.649 | Sh 0.764 DD -18.4 CAGR 10.19 E 0.747 | sw/yr 8.7
+VIX card := SPX 21d ret zones (<-8:-2,<-4:-1,<=4:0,>4:+1) | Sh 0.782 DD -18.5 CAGR  9.47 E 0.701 | Sh 0.802 DD -11.1 CAGR  8.63 E 0.650 | Sh 0.770 DD -18.5 CAGR 10.33 E 0.753 | sw/yr 9.3
+VIX card := copy of spx_mom card             | Sh 0.791 DD -17.8 CAGR  9.55 E 0.702 | Sh 0.802 DD -11.6 CAGR  8.62 E 0.653 | Sh 0.787 DD -17.8 CAGR 10.52 E 0.754 | sw/yr 9.9
+VIX card := SPX 21d ret, only +1 (>4%) else 0 | Sh 0.824 DD -15.8 CAGR 10.01 E 0.705 | Sh 0.860 DD -10.6 CAGR  9.26 E 0.653 | Sh 0.799 DD -15.8 CAGR 10.78 E 0.759 | sw/yr 8.1
+
+--- (2) paired circular block bootstrap of Sharpe diff (4000 draws) + HAC t of daily return diff ---
+  P1 (grid shift21, as in findin vs BASE                    full..end : dSh +0.050 P<=0 bl21 0.011 bl63 0.012 bl126 0.012 CI63 [+0.005,+0.100] | ret diff +45 bp/yr HAC-t +1.93
+  P1 (grid shift21, as in findin vs BASE                    2003..2014: dSh +0.085 P<=0 bl21 0.005 bl63 0.009 bl126 0.008 CI63 [+0.014,+0.162] | ret diff +73 bp/yr HAC-t +2.20
+  P1 (grid shift21, as in findin vs BASE                    2015..end : dSh +0.020 P<=0 bl21 0.257 bl63 0.272 bl126 0.254 CI63 [-0.037,+0.085] | ret diff +15 bp/yr HAC-t +0.49
+  P1raw (change on raw obs, no l vs BASE                    full..end : dSh +0.062 P<=0 bl21 0.001 bl63 0.001 bl126 0.002 CI63 [+0.020,+0.110] | ret diff +55 bp/yr HAC-t +2.43
+  P1raw (change on raw obs, no l vs BASE                    2003..2014: dSh +0.100 P<=0 bl21 0.000 bl63 0.000 bl126 0.000 CI63 [+0.041,+0.172] | ret diff +84 bp/yr HAC-t +2.68
+  P1raw (change on raw obs, no l vs BASE                    2015..end : dSh +0.030 P<=0 bl21 0.165 bl63 0.181 bl126 0.167 CI63 [-0.029,+0.096] | ret diff +25 bp/yr HAC-t +0.77
+  DROP vix card                  vs BASE                    full..end : dSh +0.038 P<=0 bl21 0.031 bl63 0.041 bl126 0.040 CI63 [-0.005,+0.083] | ret diff +50 bp/yr HAC-t +2.33
+  DROP vix card                  vs BASE                    2003..2014: dSh +0.028 P<=0 bl21 0.199 bl63 0.231 bl126 0.203 CI63 [-0.046,+0.103] | ret diff +46 bp/yr HAC-t +1.33
+  DROP vix card                  vs BASE                    2015..end : dSh +0.046 P<=0 bl21 0.014 bl63 0.021 bl126 0.029 CI63 [+0.001,+0.102] | ret diff +55 bp/yr HAC-t +2.16
+  P1 (grid shift21, as in findin vs DROP vix card           full..end : dSh +0.012 P<=0 bl21 0.273 bl63 0.280 bl126 0.275 CI63 [-0.024,+0.052] | ret diff -6 bp/yr HAC-t -0.30
+  P1 (grid shift21, as in findin vs DROP vix card           2003..2014: dSh +0.057 P<=0 bl21 0.025 bl63 0.028 bl126 0.029 CI63 [-0.001,+0.119] | ret diff +27 bp/yr HAC-t +0.89
+  P1 (grid shift21, as in findin vs DROP vix card           2015..end : dSh -0.025 P<=0 bl21 0.873 bl63 0.885 bl126 0.903 CI63 [-0.064,+0.018] | ret diff -39 bp/yr HAC-t -1.64
+  P1raw (change on raw obs, no l vs DROP vix card           full..end : dSh +0.024 P<=0 bl21 0.119 bl63 0.117 bl126 0.119 CI63 [-0.014,+0.066] | ret diff +4 bp/yr HAC-t +0.22
+  P1raw (change on raw obs, no l vs DROP vix card           2003..2014: dSh +0.072 P<=0 bl21 0.011 bl63 0.010 bl126 0.014 CI63 [+0.011,+0.140] | ret diff +38 bp/yr HAC-t +1.18
+  P1raw (change on raw obs, no l vs DROP vix card           2015..end : dSh -0.016 P<=0 bl21 0.781 bl63 0.775 bl126 0.795 CI63 [-0.056,+0.028] | ret diff -30 bp/yr HAC-t -1.22
+  P1 cal22 (22 calendar days ago vs BASE                    full..end : dSh +0.078 P<=0 bl21 0.000 bl63 0.000 bl126 0.000 CI63 [+0.035,+0.126] | ret diff +70 bp/yr HAC-t +3.06
+  P1 cal22 (22 calendar days ago vs BASE                    2003..2014: dSh +0.116 P<=0 bl21 0.000 bl63 0.000 bl126 0.000 CI63 [+0.054,+0.189] | ret diff +97 bp/yr HAC-t +3.02
+  P1 cal22 (22 calendar days ago vs BASE                    2015..end : dSh +0.046 P<=0 bl21 0.054 bl63 0.057 bl126 0.051 CI63 [-0.010,+0.110] | ret diff +41 bp/yr HAC-t +1.29
+  P1 log (+40/+20/-20%)          vs BASE                    full..end : dSh +0.064 P<=0 bl21 0.002 bl63 0.002 bl126 0.003 CI63 [+0.016,+0.118] | ret diff +51 bp/yr HAC-t +2.06
+  P1 log (+40/+20/-20%)          vs BASE                    2003..2014: dSh +0.089 P<=0 bl21 0.002 bl63 0.003 bl126 0.002 CI63 [+0.024,+0.167] | ret diff +70 bp/yr HAC-t +2.08
+  P1 log (+40/+20/-20%)          vs BASE                    2015..end : dSh +0.043 P<=0 bl21 0.108 bl63 0.119 bl126 0.120 CI63 [-0.024,+0.117] | ret diff +32 bp/yr HAC-t +0.87
+  P1raw lag2 (VIX avail +2 cal d vs BASE lag2 (level card   full..end : dSh +0.040 P<=0 bl21 0.010 bl63 0.008 bl126 0.004 CI63 [+0.007,+0.077] | ret diff +35 bp/yr HAC-t +1.86
+  P1raw lag2 (VIX avail +2 cal d vs BASE lag2 (level card   2003..2014: dSh +0.054 P<=0 bl21 0.012 bl63 0.006 bl126 0.005 CI63 [+0.011,+0.101] | ret diff +44 bp/yr HAC-t +1.82
+  P1raw lag2 (VIX avail +2 cal d vs BASE lag2 (level card   2015..end : dSh +0.027 P<=0 bl21 0.139 bl63 0.152 bl126 0.132 CI63 [-0.018,+0.083] | ret diff +24 bp/yr HAC-t +0.86
+  P1 grid extra 1 trading-day sh vs BASE level extra 1 tra  full..end : dSh +0.018 P<=0 bl21 0.184 bl63 0.186 bl126 0.174 CI63 [-0.021,+0.059] | ret diff +14 bp/yr HAC-t +0.69
+  P1 grid extra 1 trading-day sh vs BASE level extra 1 tra  2003..2014: dSh +0.024 P<=0 bl21 0.206 bl63 0.201 bl126 0.211 CI63 [-0.036,+0.080] | ret diff +20 bp/yr HAC-t +0.73
+  P1 grid extra 1 trading-day sh vs BASE level extra 1 tra  2015..end : dSh +0.012 P<=0 bl21 0.334 bl63 0.349 bl126 0.343 CI63 [-0.038,+0.070] | ret diff +8 bp/yr HAC-t +0.26
+
+--- (3) per-year: Sharpe BASE / P1 / DROP, cum return diff P1-BASE (pp), timing contribution sum((eP1-eB)*(tr-cash)) (pp), days rung differs ---
+  2003: Sh B +1.70 P1 +1.66 DROP +1.61 | dSh(P1-B) -0.05 | cumret diff -0.62 pp | timing -0.56 pp | rung differs  54 d | E B 0.66 P1 0.64
+  2004: Sh B +0.74 P1 +0.86 DROP +0.79 | dSh(P1-B) +0.13 | cumret diff +1.15 pp | timing +1.00 pp | rung differs  32 d | E B 0.91 P1 0.89
+  2005: Sh B +0.16 P1 +0.16 DROP +0.13 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.90 P1 0.90
+  2006: Sh B +0.95 P1 +0.95 DROP +1.00 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.87 P1 0.87
+  2007: Sh B -0.13 P1 -0.13 DROP -0.00 | dSh(P1-B) -0.00 | cumret diff +0.03 pp | timing +0.01 pp | rung differs   8 d | E B 0.68 P1 0.68
+  2008: Sh B +0.93 P1 +1.34 DROP +0.93 | dSh(P1-B) +0.42 | cumret diff +0.88 pp | timing +0.86 pp | rung differs   1 d | E B 0.00 P1 0.00
+  2009: Sh B +0.38 P1 +0.38 DROP +0.40 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.33 P1 0.33
+  2010: Sh B +0.68 P1 +0.93 DROP +0.63 | dSh(P1-B) +0.26 | cumret diff +3.37 pp | timing +3.03 pp | rung differs  25 d | E B 0.62 P1 0.63
+  2011: Sh B -0.21 P1 +0.11 DROP +0.03 | dSh(P1-B) +0.32 | cumret diff +3.55 pp | timing +3.63 pp | rung differs  37 d | E B 0.59 P1 0.58
+  2012: Sh B +1.08 P1 +1.28 DROP +1.17 | dSh(P1-B) +0.20 | cumret diff +1.13 pp | timing +0.96 pp | rung differs  69 d | E B 0.71 P1 0.66
+  2013: Sh B +2.72 P1 +2.72 DROP +2.57 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.77 P1 0.77
+  2014: Sh B +1.07 P1 +1.04 DROP +1.06 | dSh(P1-B) -0.03 | cumret diff -0.38 pp | timing -0.31 pp | rung differs  11 d | E B 0.84 P1 0.83
+  2015: Sh B -0.19 P1 -0.06 DROP -0.12 | dSh(P1-B) +0.13 | cumret diff +1.56 pp | timing +1.58 pp | rung differs  43 d | E B 0.76 P1 0.73
+  2016: Sh B +0.80 P1 +0.79 DROP +0.88 | dSh(P1-B) -0.01 | cumret diff -0.24 pp | timing -0.19 pp | rung differs  54 d | E B 0.73 P1 0.73
+  2017: Sh B +2.95 P1 +2.86 DROP +2.83 | dSh(P1-B) -0.09 | cumret diff -1.18 pp | timing -1.06 pp | rung differs  61 d | E B 0.90 P1 0.86
+  2018: Sh B -0.32 P1 -0.31 DROP -0.32 | dSh(P1-B) +0.01 | cumret diff +0.22 pp | timing +0.25 pp | rung differs   8 d | E B 0.81 P1 0.81
+  2019: Sh B +1.75 P1 +1.82 DROP +1.79 | dSh(P1-B) +0.07 | cumret diff +0.15 pp | timing +0.18 pp | rung differs  24 d | E B 0.77 P1 0.75
+  2020: Sh B +1.10 P1 +1.12 DROP +1.27 | dSh(P1-B) +0.02 | cumret diff +0.51 pp | timing +0.51 pp | rung differs  36 d | E B 0.54 P1 0.55
+  2021: Sh B +2.04 P1 +2.03 DROP +2.05 | dSh(P1-B) -0.01 | cumret diff -0.18 pp | timing -0.14 pp | rung differs   2 d | E B 0.93 P1 0.93
+  2022: Sh B -1.70 P1 -1.51 DROP -1.51 | dSh(P1-B) +0.20 | cumret diff +1.36 pp | timing +1.59 pp | rung differs  29 d | E B 0.50 P1 0.53
+  2023: Sh B +1.33 P1 +1.31 DROP +1.38 | dSh(P1-B) -0.02 | cumret diff -0.37 pp | timing -0.32 pp | rung differs  10 d | E B 0.67 P1 0.66
+  2024: Sh B +1.39 P1 +1.39 DROP +1.44 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.85 P1 0.85
+  2025: Sh B +0.77 P1 +0.74 DROP +0.77 | dSh(P1-B) -0.03 | cumret diff -0.51 pp | timing -0.37 pp | rung differs  11 d | E B 0.84 P1 0.83
+  2026: Sh B +1.01 P1 +1.01 DROP +1.01 | dSh(P1-B) +0.00 | cumret diff +0.00 pp | timing +0.00 pp | rung differs   0 d | E B 0.83 P1 0.83
+  sum of yearly cumret diffs +10.45 pp; total final-wealth ratio P1/BASE 1.1130
+  daily diff: n nonzero 599, top10 |diff| days: 2020-04-21 -1.07%, 2011-10-27 +1.03%, 2010-07-07 +0.95%, 2020-04-17 +0.90%, 2010-09-01 +0.89%, 2003-01-24 -0.88%, 2022-05-27 +0.87%, 2008-12-30 +0.83%, 2020-04-22 +0.80%, 2015-08-24 +0.79%
+  cum diff (sum of daily) +10.54 pp; ex top-10 days +5.43 pp; ex top-20 +1.91 pp
+  cum diff inside 2008-09-01..2009-06-30: +0.86 pp
+  cum diff inside 2020-02-19..2020-06-30: +1.03 pp
+  cum diff inside 2022-01-03..2022-12-31: +1.66 pp
+  cum diff EXCLUDING 2008-09..2009-06 and 2020-02..2020-06: +8.65 pp
+  Sharpe excluding those two windows: BASE 0.817  P1 0.862  DROP 0.852
+  calendar years P1>BASE on return: 11/18 nonzero years (ties 6)
+
+--- (4) exposure confound: constant-exposure benchmark with same mean exposure (no costs) ---
+  BASE                    full..end : E 0.707 | strat Sh 0.762 CAGR  9.28 DD -18.2 | const-E Sh 0.593 CAGR  9.05 DD -41.8 | edge Sh +0.169 CAGR +0.23
+  BASE                    2003..2014: E 0.656 | strat Sh 0.767 CAGR  8.32 DD -11.7 | const-E Sh 0.495 CAGR  7.14 DD -39.1 | edge Sh +0.272 CAGR +1.18
+  BASE                    2015..end : E 0.759 | strat Sh 0.763 CAGR 10.29 DD -18.2 | const-E Sh 0.706 CAGR 11.24 DD -26.4 | edge Sh +0.057 CAGR -0.95
+  P1 (grid shift21, as i  full..end : E 0.700 | strat Sh 0.813 CAGR  9.78 DD -16.8 | const-E Sh 0.593 CAGR  8.99 DD -41.4 | edge Sh +0.220 CAGR +0.79
+  P1 (grid shift21, as i  2003..2014: E 0.648 | strat Sh 0.852 CAGR  9.11 DD -11.0 | const-E Sh 0.495 CAGR  7.08 DD -38.7 | edge Sh +0.357 CAGR +2.03
+  P1 (grid shift21, as i  2015..end : E 0.753 | strat Sh 0.784 CAGR 10.47 DD -16.8 | const-E Sh 0.706 CAGR 11.17 DD -26.2 | edge Sh +0.077 CAGR -0.70
+  DROP vix card           full..end : E 0.717 | strat Sh 0.800 CAGR  9.82 DD -16.9 | const-E Sh 0.593 CAGR  9.15 DD -42.3 | edge Sh +0.207 CAGR +0.67
+  DROP vix card           2003..2014: E 0.670 | strat Sh 0.795 CAGR  8.79 DD -13.1 | const-E Sh 0.495 CAGR  7.25 DD -39.9 | edge Sh +0.300 CAGR +1.54
+  DROP vix card           2015..end : E 0.765 | strat Sh 0.809 CAGR 10.89 DD -16.9 | const-E Sh 0.706 CAGR 11.30 DD -26.6 | edge Sh +0.103 CAGR -0.41
+  long-P1/short-BASE: mean +45 bp/yr, HAC t +1.93, ann vol 1.09%, Sharpe 0.410
+  long-P1/short-DROP: mean -6 bp/yr, HAC t -0.30, Sharpe -0.056
+
+--- (5) VIX card on dates (value used at t = close of t-1; ch = 21 trading-day change of that) ---
+  2008-10-10 (grid 2008-10-10): VIX(t-1)  63.92 VIX 21d ago  24.52 ch +39.40 | card BASE -2 P1 -2 | comp B  -79.4 P1  -79.4 | rung B 0 P1 0 | cover B 0.86 P1 0.86
+  2008-12-31 (grid 2008-12-31): VIX(t-1)  41.63 VIX 21d ago  55.84 ch -14.21 | card BASE -2 P1 +1 | comp B  -27.5 P1  -17.5 | rung B 1 P1 1 | cover B 0.86 P1 0.86
+  2009-04-01 (grid 2009-04-01): VIX(t-1)  44.14 VIX 21d ago  52.65 ch  -8.51 | card BASE -2 P1 +1 | comp B  -56.9 P1  -46.9 | rung B 0 P1 0 | cover B 0.89 P1 0.89
+  2020-03-16 (grid 2020-03-16): VIX(t-1)  57.83 VIX 21d ago  13.74 ch +44.09 | card BASE -2 P1 -2 | comp B  -49.5 P1  -49.5 | rung B 0 P1 0 | cover B 1.00 P1 1.00
+  2020-04-30 (grid 2020-04-30): VIX(t-1)  31.23 VIX 21d ago  57.08 ch -25.85 | card BASE -1 P1 +1 | comp B  -15.5 P1   -8.8 | rung B 1 P1 1 | cover B 1.00 P1 1.00
+  2022-06-15 (grid 2022-06-15): VIX(t-1)  32.69 VIX 21d ago  28.87 ch  +3.82 | card BASE -1 P1 +0 | comp B  -30.9 P1  -27.6 | rung B 1 P1 1 | cover B 1.00 P1 1.00
+  2024-08-05 (grid 2024-08-05): VIX(t-1)  23.39 VIX 21d ago  12.26 ch +11.13 | card BASE +0 P1 -2 | comp B  +15.0 P1   +8.3 | rung B 3 P1 3 | cover B 1.00 P1 1.00
+  2025-04-08 (grid 2025-04-08): VIX(t-1)  46.98 VIX 21d ago  23.37 ch +23.61 | card BASE -2 P1 -2 | comp B  -14.3 P1  -14.3 | rung B 2 P1 2 | cover B 1.00 P1 1.00
+  2025-05-15 (grid 2025-05-15): VIX(t-1)  18.62 VIX 21d ago  30.89 ch -12.27 | card BASE +1 P1 +1 | comp B  +43.5 P1  +43.5 | rung B 3 P1 3 | cover B 1.00 P1 1.00
+  2026-09-01 (grid 2026-09-01): VIX(t-1)  14.92 VIX 21d ago  15.99 ch  -1.07 | card BASE +1 P1 +0 | comp B  +25.5 P1  +22.1 | rung B 3 P1 3 | cover B 1.00 P1 1.00
+  [2020-02-14..2020-07-03] rung path, Fridays (fmt date:BASE/P1)
+   02-14:3/2 02-21:2/2 02-28:2/2 03-06:0/0 03-13:0/0 03-20:0/0 03-27:0/0 04-03:0/0 04-17:0/1 04-24:0/1 05-01:1/1 05-08:1/1 05-15:1/1 05-22:1/1 05-29:1/1 06-05:1/1 06-12:1/1 06-19:2/2 06-26:2/2 07-02:2/2 
+   days rung differs 10/97; mean E BASE 0.27 P1 0.29; cum ret BASE -3.2% P1 -2.2% BH -6.5%
+  [2022-01-03..2022-12-30] rung path, Fridays (fmt date:BASE/P1)
+   01-07:3/3 01-14:3/3 01-21:3/3 01-28:2/2 02-04:2/2 02-11:2/2 02-18:2/2 02-25:2/2 03-04:1/1 03-11:1/1 03-18:2/2 03-25:2/2 04-01:3/3 04-08:3/3 04-22:2/2 04-29:1/1 05-06:1/1 05-13:1/1 05-20:0/1 05-27:0/1 06-03:1/1 06-10:1/1 06-17:1/1 06-24:1/1 07-01:1/1 07-08:1/1 07-15:1/1 07-22:1/2 07-29:2/2 08-05:2/2 08-12:2/2 08-19:2/2 08-26:2/2 09-02:1/2 09-09:1/1 09-16:1/1 09-23:1/1 09-30:1/1 10-07:1/1 10-14:0/0 10-21:0/0 10-28:1/1 11-04:1/1 11-11:1/1 11-18:2/2 11-25:2/2 12-02:2/3 12-09:2/3 12-16:3/3 12-23:2/2 12-30:2/2 
+   days rung differs 29/251; mean E BASE 0.50 P1 0.53; cum ret BASE -16.8% P1 -15.5% BH -18.1%
+  [2008-09-01..2009-06-30] rung path, Fridays (fmt date:BASE/P1)
+   09-05:0/0 09-12:0/0 09-19:0/0 09-26:0/0 10-03:0/0 10-10:0/0 10-17:0/0 10-24:0/0 10-31:0/0 11-07:0/0 11-14:0/0 11-21:0/0 11-28:0/0 12-05:0/0 12-12:0/0 12-19:0/0 12-26:0/0 01-02:1/1 01-09:1/1 01-16:1/1 01-23:0/0 01-30:1/1 02-06:0/0 02-13:0/0 02-20:0/0 02-27:0/0 03-06:0/0 03-13:0/0 03-20:0/0 03-27:0/0 04-03:0/0 04-17:0/0 04-24:1/1 05-01:1/1 05-08:1/1 05-15:1/1 05-22:1/1 05-29:0/0 06-05:1/1 06-12:1/1 06-19:1/1 06-26:1/1 06-30:1/1 
+   days rung differs 1/209; mean E BASE 0.11 P1 0.11; cum ret BASE -1.2% P1 -0.3% BH -26.6%
+
+--- (6) mechanics / artifacts ---
+  P1 card NaN days inside grid: 21 (BASE NaN: 0); first non-NaN P1 date 2003-02-03
+  coverage differs on 21 days; min cover BASE 0.57 P1 0.54; cover<0.6 days BASE 11 P1 21
+  rung differs on 515/5954 days (8.6%); mean |composite diff| 2.48 pts; max 10.0
+  crosstab BASE card (rows) x P1 card (cols), 9=NaN:
+col_0  -2   -1     0    1   9
+vix                          
+-2     96   25    62   70   0
+-1     85  128   254   81   9
+ 0     21  153  1749  250  12
+ 1      0   91  2577  291   0
+  card score distribution: BASE mean +0.318  P1 mean -0.018
+  rung share BASE                  : {0: 6.9, 1: 10.8, 2: 21.4, 3: 52.8, 4: 8.1}
+  rung share P1 (grid shift21, as i: {0: 6.6, 1: 10.7, 2: 25.1, 3: 51.2, 4: 6.4}
+  rung share DROP vix card         : {0: 6.7, 1: 9.5, 2: 22.0, 3: 51.7, 4: 10.1}
+  corr(P1 card, BASE card) +0.274; corr(P1 card, past 21d SPX ret) +0.604; corr(BASE card, past 21d SPX ret) +0.307
+  IC (Spearman) with fwd 21d SPX log-ret: BASE card -0.0908  P1 card -0.0130  spx_mom card -0.0394

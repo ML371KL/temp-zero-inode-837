@@ -1,0 +1,42 @@
+=== A3.1 Benchmarks vs dashboard, 2003-2026 (cols: full | 2003-14 | 2015-26) ===
+DASH ladder (as built)                   | Sh 0.76 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.77 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.76 DD -18.2 CAGR 10.29 E 0.76
+Buy&Hold                                 | Sh 0.59 DD -55.3 CAGR 11.61 E 1.00 | Sh 0.49 DD -55.3 CAGR  9.46 E 1.00 | Sh 0.71 DD -33.8 CAGR 13.87 E 1.00
+Const matched exposure                   | Sh 0.59 DD -41.8 CAGR  9.04 E 0.71 | Sh 0.49 DD -41.8 CAGR  7.51 E 0.71 | Sh 0.71 DD -24.8 CAGR 10.65 E 0.71
+200DMA binary (1/0)                      | Sh 0.56 DD -21.0 CAGR  7.73 E 0.78 | Sh 0.54 DD -21.0 CAGR  6.98 E 0.75 | Sh 0.58 DD -19.7 CAGR  8.51 E 0.81
+200DMA 1/0.35 (floor 35%)                | Sh 0.64 DD -29.7 CAGR  9.35 E 0.86 | Sh 0.58 DD -29.7 CAGR  8.16 E 0.84 | Sh 0.70 DD -23.3 CAGR 10.58 E 0.88
+12m momentum binary                      | Sh 0.60 DD -25.0 CAGR  9.08 E 0.82 | Sh 0.59 DD -25.0 CAGR  8.40 E 0.80 | Sh 0.62 DD -21.9 CAGR  9.78 E 0.83
+HY < 6m mean binary                      | Sh 0.68 DD -18.5 CAGR  8.68 E 0.65 | Sh 0.81 DD -15.1 CAGR 10.09 E 0.64 | Sh 0.54 DD -18.5 CAGR  7.24 E 0.65
+HY 30d momentum < +25bp binary           | Sh 0.55 DD -29.4 CAGR  8.03 E 0.78 | Sh 0.57 DD -25.2 CAGR  8.00 E 0.76 | Sh 0.53 DD -29.4 CAGR  8.06 E 0.80
+VIX < 25 binary                          | Sh 0.51 DD -34.0 CAGR  7.49 E 0.84 | Sh 0.51 DD -34.0 CAGR  6.93 E 0.81 | Sh 0.52 DD -28.2 CAGR  8.07 E 0.87
+Ensemble3 (trend,credit,vix) linear      | Sh 0.65 DD -19.3 CAGR  8.14 E 0.76 | Sh 0.69 DD -19.3 CAGR  8.15 E 0.74 | Sh 0.61 DD -18.2 CAGR  8.12 E 0.78
+Ensemble3 floor 35%                      | Sh 0.68 DD -31.7 CAGR  9.58 E 0.84 | Sh 0.65 DD -31.7 CAGR  8.89 E 0.83 | Sh 0.71 DD -19.3 CAGR 10.30 E 0.86
+Ensemble2 (trend,credit) 1/.5/0          | Sh 0.67 DD -16.4 CAGR  8.30 E 0.71 | Sh 0.73 DD -13.9 CAGR  8.62 E 0.70 | Sh 0.60 DD -16.4 CAGR  7.98 E 0.73
+Vol-target 12% cap 1                     | Sh 0.71 DD -28.1 CAGR  9.68 E 0.82 | Sh 0.66 DD -28.1 CAGR  8.66 E 0.81 | Sh 0.77 DD -14.8 CAGR 10.74 E 0.83
+Trend x Vol-target                       | Sh 0.58 DD -14.1 CAGR  7.07 E 0.70 | Sh 0.56 DD -14.1 CAGR  6.46 E 0.68 | Sh 0.59 DD -13.3 CAGR  7.71 E 0.73
+DASH x Vol-target (min)                  | Sh 0.76 DD -16.4 CAGR  8.75 E 0.68 | Sh 0.79 DD -11.4 CAGR  8.38 E 0.65 | Sh 0.72 DD -16.4 CAGR  9.12 E 0.72
+DASH ensemble w/ trend (avg)             | Sh 0.68 DD -17.4 CAGR  8.56 E 0.74 | Sh 0.67 DD -14.5 CAGR  7.69 E 0.70 | Sh 0.70 DD -17.4 CAGR  9.47 E 0.79
+
+=== A3.2 Structural alternatives using the dashboard composite ===
+Binary: 100% / 0% at composite<-30       | Sh 0.78 DD -29.2 CAGR 12.68 E 0.92 | Sh 0.79 DD -21.6 CAGR 11.92 E 0.87 | Sh 0.77 DD -29.2 CAGR 13.46 E 0.98
+Binary: 100% / 35% at composite<-10      | Sh 0.73 DD -26.0 CAGR 10.90 E 0.89 | Sh 0.74 DD -26.0 CAGR 10.15 E 0.84 | Sh 0.72 DD -20.3 CAGR 11.67 E 0.94
+3-step: 1 / .5 (<-10) / 0 (<-30)         | Sh 0.78 DD -20.8 CAGR 11.48 E 0.87 | Sh 0.84 DD -15.7 CAGR 11.06 E 0.81 | Sh 0.74 DD -20.8 CAGR 11.92 E 0.94
+Linear: expo=(comp+30)/60 clipped        | Sh 0.69 DD -17.7 CAGR  7.96 E 0.67 | Sh 0.77 DD  -8.9 CAGR  7.62 E 0.61 | Sh 0.63 DD -17.7 CAGR  8.31 E 0.74
+DASH ladder + lead modulation            | Sh 0.71 DD -19.1 CAGR  8.75 E 0.72 | Sh 0.74 DD -14.7 CAGR  8.40 E 0.69 | Sh 0.68 DD -19.1 CAGR  9.10 E 0.74
+Two-layer slow(credit+macro)/fast(market) | Sh 0.70 DD -23.3 CAGR 10.17 E 0.85 | Sh 0.77 DD -18.1 CAGR 10.38 E 0.83 | Sh 0.64 DD -23.3 CAGR  9.95 E 0.88
+
+=== A3.3 Long-history core dashboard 1990-2026 (HY/IG proxy from BAA10Y pre-2000; DXY spliced with DTWEXM) ===
+proxy fits on 6656 days: HY%=3.26*BAA10Y-2.69  IG%=nan*BAA10Y+nan  corr HY 0.93
+cols: full 1990-2026 | 1990-2002 | 2003-2014 | 2015-2026 ; core cover>=0.6 share: 1.0
+CORE ladder 1990-2026                    | Sh 0.62 DD -20.8 CAGR  8.56 E 0.65 | Sh 0.42 DD -17.3 CAGR  8.21 E 0.56 | Sh 0.80 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.66 DD -16.3 CAGR  8.91 E 0.75
+Buy&Hold                                 | Sh 0.52 DD -55.3 CAGR 10.93 E 1.00 | Sh 0.36 DD -47.4 CAGR  9.62 E 1.00 | Sh 0.49 DD -55.3 CAGR  9.56 E 1.00 | Sh 0.71 DD -33.8 CAGR 13.87 E 1.00
+Const matched                            | Sh 0.52 DD -38.8 CAGR  8.41 E 0.65 | Sh 0.36 DD -31.7 CAGR  8.23 E 0.65 | Sh 0.49 DD -38.8 CAGR  7.09 E 0.65 | Sh 0.71 DD -22.9 CAGR  9.99 E 0.65
+200DMA binary                            | Sh 0.51 DD -24.7 CAGR  8.18 E 0.75 | Sh 0.42 DD -22.1 CAGR  9.17 E 0.71 | Sh 0.53 DD -21.0 CAGR  6.79 E 0.75 | Sh 0.58 DD -19.7 CAGR  8.51 E 0.81
+Ensemble3 floor 35%                      | Sh 0.54 DD -39.5 CAGR  8.76 E 0.82 | Sh 0.27 DD -38.3 CAGR  7.29 E 0.78 | Sh 0.65 DD -31.7 CAGR  8.87 E 0.83 | Sh 0.71 DD -19.3 CAGR 10.30 E 0.86
+Ensemble2 (trend,credit)                 | Sh 0.51 DD -31.8 CAGR  7.57 E 0.67 | Sh 0.21 DD -29.0 CAGR  6.30 E 0.59 | Sh 0.73 DD -13.9 CAGR  8.58 E 0.70 | Sh 0.60 DD -16.4 CAGR  7.98 E 0.73
+verdict share 1990-2026: {'HOLD+': 44.6, 'HOLD': 21.6, 'REDUCE': 12.8, 'PROTECT': 12.5, 'BUY': 8.5}
+  PROTECT  fwd3m +1.3%/yr (hit 55%)  fwd12m -0.1% (hit 56%)  n=1152
+  REDUCE   fwd3m +5.7%/yr (hit 63%)  fwd12m +5.8% (hit 74%)  n=1179
+  HOLD     fwd3m +7.4%/yr (hit 69%)  fwd12m +8.9% (hit 87%)  n=1999
+  HOLD+    fwd3m +10.9%/yr (hit 76%)  fwd12m +11.0% (hit 88%)  n=4058
+  BUY      fwd3m +6.2%/yr (hit 67%)  fwd12m +4.5% (hit 78%)  n=783
+saved out/core_1990.csv out/dash_2003.csv

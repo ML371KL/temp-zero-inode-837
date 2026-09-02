@@ -1,0 +1,58 @@
+
+=== 2003-2026 full panel: 2003-01-02..2026-09-01 | start..end | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE                                     | Sh 0.76 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.77 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.76 DD -18.2 CAGR 10.29 E 0.76 | sw/yr 8.5
+--- (a) VIX handling ---
+VIX cap35_-1                                 | Sh 0.77 DD -18.2 CAGR  9.35 E 0.71 | Sh 0.78 DD -11.1 CAGR  8.44 E 0.66 | Sh 0.76 DD -18.2 CAGR 10.29 E 0.76 | sw/yr 8.3
+VIX cap35_0                                  | Sh 0.76 DD -18.2 CAGR  9.29 E 0.71 | Sh 0.78 DD -11.1 CAGR  8.44 E 0.66 | Sh 0.75 DD -18.2 CAGR 10.18 E 0.76 | sw/yr 8.3
+VIX mom                                      | Sh 0.82 DD -16.8 CAGR  9.83 E 0.70 | Sh 0.86 DD -11.0 CAGR  9.21 E 0.65 | Sh 0.78 DD -16.8 CAGR 10.47 E 0.75 | sw/yr 8.8
+VIX drop                                     | Sh 0.80 DD -16.9 CAGR  9.82 E 0.72 | Sh 0.80 DD -13.1 CAGR  8.79 E 0.67 | Sh 0.81 DD -16.9 CAGR 10.89 E 0.77 | sw/yr 9.0
+--- (b) new indicators, each added alone (own family unless noted) ---
++ rateshock (macro)                          | Sh 0.81 DD -18.4 CAGR  9.78 E 0.70 | Sh 0.84 DD -11.5 CAGR  8.97 E 0.65 | Sh 0.80 DD -18.4 CAGR 10.62 E 0.75 | sw/yr 8.3
++ nfci_lev (credit)                          | Sh 0.82 DD -15.8 CAGR 10.23 E 0.72 | Sh 0.84 DD -13.9 CAGR  9.14 E 0.65 | Sh 0.82 DD -15.8 CAGR 11.36 E 0.79 | sw/yr 7.7
++ breadth_rsp (market)                       | Sh 0.82 DD -15.8 CAGR  9.88 E 0.70 | Sh 0.83 DD -11.3 CAGR  8.95 E 0.65 | Sh 0.81 DD -15.8 CAGR 10.85 E 0.75 | sw/yr 7.3
++ smh_rel (market)                           | Sh 0.82 DD -15.9 CAGR  9.91 E 0.70 | Sh 0.85 DD -11.9 CAGR  8.99 E 0.64 | Sh 0.81 DD -15.9 CAGR 10.86 E 0.76 | sw/yr 7.6
++ cu_au (regime)                             | Sh 0.82 DD -16.5 CAGR  9.86 E 0.71 | Sh 0.87 DD -10.3 CAGR  9.27 E 0.66 | Sh 0.78 DD -16.5 CAGR 10.48 E 0.76 | sw/yr 8.4
++ ig_mom (credit, fam ig)                    | Sh 0.79 DD -17.5 CAGR  9.72 E 0.72 | Sh 0.82 DD -15.1 CAGR  9.10 E 0.67 | Sh 0.77 DD -17.5 CAGR 10.36 E 0.76 | sw/yr 8.7
+--- (c) candidate packages ---
+V5a = reentry floor 65% (>200DMA)            | Sh 0.77 DD -18.2 CAGR  9.52 E 0.72 | Sh 0.77 DD -13.2 CAGR  8.54 E 0.67 | Sh 0.78 DD -18.2 CAGR 10.54 E 0.76 | sw/yr 9.1
+V5b = V5a + VIX>35 -> 0                      | Sh 0.77 DD -18.2 CAGR  9.53 E 0.72 | Sh 0.78 DD -13.2 CAGR  8.66 E 0.67 | Sh 0.77 DD -18.2 CAGR 10.44 E 0.77 | sw/yr 8.9
+V5c = V5b + rungs 100/100/85/50/0            | Sh 0.79 DD -22.5 CAGR 11.29 E 0.85 | Sh 0.83 DD -14.1 CAGR 10.75 E 0.80 | Sh 0.75 DD -22.5 CAGR 11.85 E 0.91 | sw/yr 8.3
+V5d = V5b + rungs 100/100/100/50/0 (3-state) | Sh 0.80 DD -23.2 CAGR 11.93 E 0.88 | Sh 0.85 DD -14.3 CAGR 11.41 E 0.83 | Sh 0.76 DD -23.2 CAGR 12.47 E 0.94 | sw/yr 4.7
+V5e = V5b + rateshock ind                    | Sh 0.80 DD -18.4 CAGR  9.87 E 0.71 | Sh 0.82 DD -13.2 CAGR  9.09 E 0.67 | Sh 0.79 DD -18.4 CAGR 10.68 E 0.76 | sw/yr 8.7
+--- significance (paired block bootstrap 63d, Sharpe diff vs BASELINE, full window) ---
+  V5a: dSharpe +0.007  P(<=0)=0.407  95%CI [-0.043,+0.060]
+  V5b: dSharpe +0.006  P(<=0)=0.428  95%CI [-0.045,+0.063]
+  V5c: dSharpe +0.023  P(<=0)=0.155  95%CI [-0.022,+0.074]
+  V5d: dSharpe +0.036  P(<=0)=0.117  95%CI [-0.023,+0.097]
+  V5e: dSharpe +0.040  P(<=0)=0.104  95%CI [-0.021,+0.106]
+  ex-GFC/COVID Sharpe: BASELINE 0.817  V5b 0.831  V5d 0.868  BH 0.834
+  avg exposure while >20% below 1y high: BASELINE 0.16  V5b 0.23  V5d 0.27
+
+=== 1990-2026 CORE: 1990-01-02..2026-09-01 | start..end | 1990-01-01..2002-12-31 | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE                                     | Sh 0.63 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.45 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.80 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.66 DD -16.3 CAGR  8.91 E 0.75 | sw/yr 8.1
+--- (a) VIX handling ---
+VIX cap35_-1                                 | Sh 0.63 DD -20.8 CAGR  8.79 E 0.67 | Sh 0.46 DD -17.3 CAGR  8.89 E 0.62 | Sh 0.79 DD -15.9 CAGR  8.51 E 0.65 | Sh 0.67 DD -16.3 CAGR  8.97 E 0.75 | sw/yr 8.1
+VIX cap35_0                                  | Sh 0.64 DD -21.2 CAGR  8.94 E 0.67 | Sh 0.45 DD -17.7 CAGR  8.88 E 0.62 | Sh 0.82 DD -14.3 CAGR  8.77 E 0.65 | Sh 0.68 DD -16.3 CAGR  9.19 E 0.75 | sw/yr 8.1
+VIX mom                                      | Sh 0.67 DD -17.4 CAGR  9.17 E 0.66 | Sh 0.52 DD -16.3 CAGR  9.50 E 0.61 | Sh 0.84 DD -11.4 CAGR  8.93 E 0.64 | Sh 0.69 DD -16.1 CAGR  9.06 E 0.73 | sw/yr 8.2
+VIX drop                                     | Sh 0.64 DD -19.0 CAGR  8.94 E 0.67 | Sh 0.46 DD -16.4 CAGR  8.99 E 0.62 | Sh 0.77 DD -13.3 CAGR  8.35 E 0.66 | Sh 0.71 DD -14.3 CAGR  9.49 E 0.75 | sw/yr 9.2
+--- (b) new indicators, each added alone (own family unless noted) ---
++ rateshock (macro)                          | Sh 0.62 DD -23.0 CAGR  8.66 E 0.66 | Sh 0.38 DD -19.9 CAGR  8.09 E 0.62 | Sh 0.79 DD -14.8 CAGR  8.49 E 0.64 | Sh 0.72 DD -16.3 CAGR  9.49 E 0.74 | sw/yr 8.4
++ nfci_lev (credit)                          | Sh 0.64 DD -21.7 CAGR  9.02 E 0.68 | Sh 0.45 DD -18.1 CAGR  8.84 E 0.62 | Sh 0.82 DD -13.9 CAGR  8.99 E 0.66 | Sh 0.67 DD -17.9 CAGR  9.24 E 0.77 | sw/yr 7.7
++ breadth_rsp (market)                       | Sh 0.62 DD -20.8 CAGR  8.70 E 0.66 | Sh 0.45 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.75 DD -12.8 CAGR  8.04 E 0.64 | Sh 0.68 DD -16.6 CAGR  9.27 E 0.74 | sw/yr 8.1
++ smh_rel (market)                           | Sh 0.66 DD -20.7 CAGR  9.07 E 0.67 | Sh 0.45 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.83 DD -12.1 CAGR  8.89 E 0.64 | Sh 0.72 DD -16.0 CAGR  9.57 E 0.75 | sw/yr 7.7
++ cu_au (regime)                             | Sh 0.62 DD -19.6 CAGR  8.73 E 0.67 | Sh 0.46 DD -16.4 CAGR  8.92 E 0.62 | Sh 0.77 DD -15.3 CAGR  8.30 E 0.65 | Sh 0.66 DD -17.6 CAGR  8.97 E 0.75 | sw/yr 8.2
++ ig_mom (credit, fam ig)                    | Sh 0.63 DD -23.8 CAGR  8.86 E 0.68 | Sh 0.43 DD -19.5 CAGR  8.59 E 0.63 | Sh 0.76 DD -14.6 CAGR  8.42 E 0.66 | Sh 0.72 DD -16.9 CAGR  9.61 E 0.75 | sw/yr 8.8
+--- (c) candidate packages ---
+V5a = reentry floor 65% (>200DMA)            | Sh 0.64 DD -21.4 CAGR  9.11 E 0.69 | Sh 0.50 DD -17.9 CAGR  9.49 E 0.64 | Sh 0.73 DD -16.2 CAGR  8.19 E 0.67 | Sh 0.71 DD -16.3 CAGR  9.62 E 0.76 | sw/yr 9.0
+V5b = V5a + VIX>35 -> 0                      | Sh 0.65 DD -21.8 CAGR  9.26 E 0.69 | Sh 0.51 DD -18.3 CAGR  9.58 E 0.64 | Sh 0.74 DD -14.7 CAGR  8.35 E 0.67 | Sh 0.72 DD -16.3 CAGR  9.85 E 0.76 | sw/yr 9.0
+V5c = V5b + rungs 100/100/85/50/0            | Sh 0.66 DD -30.9 CAGR 10.53 E 0.81 | Sh 0.48 DD -26.6 CAGR 10.05 E 0.77 | Sh 0.79 DD -17.4 CAGR 10.23 E 0.79 | Sh 0.73 DD -18.9 CAGR 11.36 E 0.88 | sw/yr 8.1
+V5d = V5b + rungs 100/100/100/50/0 (3-state) | Sh 0.65 DD -33.5 CAGR 10.74 E 0.84 | Sh 0.46 DD -28.7 CAGR 10.11 E 0.80 | Sh 0.80 DD -18.3 CAGR 10.69 E 0.82 | Sh 0.72 DD -20.1 CAGR 11.51 E 0.91 | sw/yr 4.9
+V5e = V5b + rateshock ind                    | Sh 0.68 DD -20.9 CAGR  9.51 E 0.68 | Sh 0.51 DD -20.4 CAGR  9.54 E 0.64 | Sh 0.77 DD -14.3 CAGR  8.63 E 0.67 | Sh 0.78 DD -16.3 CAGR 10.38 E 0.75 | sw/yr 9.1
+--- significance (paired block bootstrap 63d, Sharpe diff vs BASELINE, full window) ---
+  V5a: dSharpe +0.016  P(<=0)=0.269  95%CI [-0.039,+0.068]
+  V5b: dSharpe +0.026  P(<=0)=0.175  95%CI [-0.031,+0.080]
+  V5c: dSharpe +0.034  P(<=0)=0.088  95%CI [-0.016,+0.084]
+  V5d: dSharpe +0.024  P(<=0)=0.214  95%CI [-0.038,+0.082]
+  V5e: dSharpe +0.051  P(<=0)=0.072  95%CI [-0.019,+0.122]
+  ex-GFC/COVID Sharpe: BASELINE 0.662  V5b 0.691  V5d 0.690  BH 0.650
+  avg exposure while >20% below 1y high: BASELINE 0.12  V5b 0.16  V5d 0.21

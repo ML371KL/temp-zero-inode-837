@@ -1,0 +1,109 @@
+
+=== 2003-2026 full panel: 2003-01-02..2026-09-01 | start..end | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE (live logic)                    | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76 | sw/yr 8.5
+--- (1) VIX change: parameter jitter (a-priori choice = win 21, thresholds +10/+5/-5) ---
+VIXchg win15 thr 10/5/-5                 | Sh 0.827 DD -15.9 CAGR  9.92 E 0.70 | Sh 0.865 DD -11.1 CAGR  9.22 E 0.65 | Sh 0.800 DD -15.9 CAGR 10.64 E 0.75 | sw/yr 8.8
+VIXchg win15 thr 8/4/-4                  | Sh 0.822 DD -16.0 CAGR  9.85 E 0.70 | Sh 0.855 DD -11.1 CAGR  9.12 E 0.65 | Sh 0.799 DD -16.0 CAGR 10.61 E 0.75 | sw/yr 9.4
+VIXchg win15 thr 12/6/-6                 | Sh 0.827 DD -15.8 CAGR  9.94 E 0.70 | Sh 0.857 DD -11.1 CAGR  9.17 E 0.65 | Sh 0.807 DD -15.8 CAGR 10.74 E 0.75 | sw/yr 8.3
+VIXchg win15 thr 10/5/-3                 | Sh 0.832 DD -16.6 CAGR 10.00 E 0.70 | Sh 0.881 DD -11.1 CAGR  9.43 E 0.65 | Sh 0.794 DD -16.6 CAGR 10.59 E 0.75 | sw/yr 9.2
+VIXchg win15 thr 10/3/-5                 | Sh 0.828 DD -15.9 CAGR  9.89 E 0.70 | Sh 0.856 DD -11.1 CAGR  9.08 E 0.65 | Sh 0.810 DD -15.9 CAGR 10.72 E 0.75 | sw/yr 8.9
+VIXchg win21 thr 10/5/-5                 | Sh 0.813 DD -16.8 CAGR  9.78 E 0.70 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.65 | Sh 0.784 DD -16.8 CAGR 10.47 E 0.75 | sw/yr 8.8
+VIXchg win21 thr 8/4/-4                  | Sh 0.809 DD -18.4 CAGR  9.72 E 0.70 | Sh 0.862 DD -11.1 CAGR  9.20 E 0.65 | Sh 0.767 DD -18.4 CAGR 10.24 E 0.75 | sw/yr 9.6
+VIXchg win21 thr 12/6/-6                 | Sh 0.815 DD -16.1 CAGR  9.80 E 0.70 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.65 | Sh 0.788 DD -16.1 CAGR 10.52 E 0.75 | sw/yr 8.3
+VIXchg win21 thr 10/5/-3                 | Sh 0.813 DD -16.5 CAGR  9.82 E 0.70 | Sh 0.846 DD -11.1 CAGR  9.10 E 0.65 | Sh 0.790 DD -16.5 CAGR 10.56 E 0.76 | sw/yr 9.5
+VIXchg win21 thr 10/3/-5                 | Sh 0.803 DD -18.5 CAGR  9.63 E 0.70 | Sh 0.827 DD -11.0 CAGR  8.82 E 0.65 | Sh 0.788 DD -18.5 CAGR 10.47 E 0.75 | sw/yr 9.4
+VIXchg win30 thr 10/5/-5                 | Sh 0.816 DD -18.4 CAGR  9.82 E 0.70 | Sh 0.868 DD -10.6 CAGR  9.31 E 0.65 | Sh 0.776 DD -18.4 CAGR 10.34 E 0.75 | sw/yr 9.1
+VIXchg win30 thr 8/4/-4                  | Sh 0.807 DD -18.9 CAGR  9.71 E 0.70 | Sh 0.861 DD -10.6 CAGR  9.24 E 0.65 | Sh 0.765 DD -18.9 CAGR 10.21 E 0.75 | sw/yr 9.4
+VIXchg win30 thr 12/6/-6                 | Sh 0.812 DD -19.1 CAGR  9.76 E 0.70 | Sh 0.865 DD -10.6 CAGR  9.24 E 0.65 | Sh 0.770 DD -19.1 CAGR 10.30 E 0.75 | sw/yr 8.9
+VIXchg win30 thr 10/5/-3                 | Sh 0.816 DD -17.8 CAGR  9.83 E 0.70 | Sh 0.866 DD -10.6 CAGR  9.30 E 0.65 | Sh 0.777 DD -17.8 CAGR 10.38 E 0.75 | sw/yr 9.3
+VIXchg win30 thr 10/3/-5                 | Sh 0.801 DD -18.9 CAGR  9.63 E 0.70 | Sh 0.843 DD -11.1 CAGR  9.04 E 0.65 | Sh 0.768 DD -18.9 CAGR 10.25 E 0.75 | sw/yr 9.4
+VIX hybrid (calm zones by level, stress by change) | Sh 0.790 DD -16.3 CAGR  9.63 E 0.71 | Sh 0.804 DD -11.7 CAGR  8.75 E 0.66 | Sh 0.783 DD -16.3 CAGR 10.54 E 0.76 | sw/yr 8.3
+--- (2) packages ---
+P1 = VIX change (21/10/5/-5)             | Sh 0.813 DD -16.8 CAGR  9.78 E 0.70 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.65 | Sh 0.784 DD -16.8 CAGR 10.47 E 0.75 | sw/yr 8.8
+P2 = P1 + re-entry floor 65% (>200DMA)   | Sh 0.817 DD -16.8 CAGR 10.01 E 0.71 | Sh 0.840 DD -12.7 CAGR  9.28 E 0.67 | Sh 0.801 DD -16.8 CAGR 10.78 E 0.76 | sw/yr 9.1
+re-entry floor only                      | Sh 0.769 DD -18.2 CAGR  9.52 E 0.72 | Sh 0.765 DD -13.2 CAGR  8.54 E 0.67 | Sh 0.777 DD -18.2 CAGR 10.54 E 0.76 | sw/yr 9.1
+--- (3) paired block-bootstrap (63d blocks, 3000 draws): Sharpe diff vs BASELINE ---
+  P1              full..end : dSh +0.050  P(<=0)=0.004  CI [+0.012,+0.106]
+  P1              2003..2014: dSh +0.085  P(<=0)=0.001  CI [+0.038,+0.169]
+  P1              2015..end : dSh +0.020  P(<=0)=0.276  CI [-0.035,+0.088]
+  P2              full..end : dSh +0.055  P(<=0)=0.042  CI [-0.006,+0.131]
+  P2              2003..2014: dSh +0.073  P(<=0)=0.083  CI [-0.030,+0.213]
+  P2              2015..end : dSh +0.038  P(<=0)=0.143  CI [-0.024,+0.115]
+  re-entry only   full..end : dSh +0.007  P(<=0)=0.409  CI [-0.041,+0.062]
+  re-entry only   2003..2014: dSh -0.002  P(<=0)=0.551  CI [-0.099,+0.110]
+  re-entry only   2015..end : dSh +0.014  P(<=0)=0.138  CI [-0.009,+0.045]
+  VIX hybrid      full..end : dSh +0.028  P(<=0)=0.014  CI [+0.002,+0.071]
+  VIX hybrid      2003..2014: dSh +0.037  P(<=0)=0.027  CI [-0.000,+0.110]
+  VIX hybrid      2015..end : dSh +0.020  P(<=0)=0.149  CI [-0.011,+0.064]
+--- (4) crisis attribution & deep-drawdown exposure ---
+  ex-bear-markets Sharpe: BASELINE 0.939  P1 0.977  P2 0.984  BH 0.968
+  bear-market days only:  BASELINE -1.252  P1 -1.007  P2 -0.923  BH -0.607
+  avg exposure while >20% below 1y high: BASELINE 0.16  P1 0.16  P2 0.23
+  2007-10-09..2009-03-09: BH -54.9%  BASELINE -6.7% (E 0.08)  P1 -6.0% (E 0.08)  P2 -8.3% (E 0.09)
+  2020-02-19..2020-03-23: BH -33.5%  BASELINE -6.3% (E 0.27)  P1 -6.3% (E 0.26)  P2 -5.0% (E 0.31)
+  2022-01-03..2022-10-12: BH -24.0%  BASELINE -16.7% (E 0.51)  P1 -14.8% (E 0.54)  P2 -14.8% (E 0.54)
+  2025-02-19..2025-04-08: BH -18.6%  BASELINE -15.6% (E 0.84)  P1 -15.8% (E 0.83)  P2 -15.8% (E 0.83)
+--- (5) rolling 3y windows: share where variant beats BASELINE on Sharpe / on return ---
+  P1: beats on return 85% of 3y windows | on Sharpe 87%
+  P2: beats on return 78% of 3y windows | on Sharpe 80%
+--- (6) rung share BASELINE vs P1 ---
+  BASELINE  {0: 6.9, 1: 10.8, 2: 21.4, 3: 52.8, 4: 8.1}
+  P1        {0: 6.6, 1: 10.7, 2: 25.1, 3: 51.2, 4: 6.4}
+  P2        {0: 6.6, 1: 10.7, 2: 25.1, 3: 51.2, 4: 6.4}
+
+=== 1990-2026 CORE: 1990-01-02..2026-09-01 | start..end | 1990-01-01..2002-12-31 | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE (live logic)                    | Sh 0.629 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.804 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.661 DD -16.3 CAGR  8.91 E 0.75 | sw/yr 8.1
+--- (1) VIX change: parameter jitter (a-priori choice = win 21, thresholds +10/+5/-5) ---
+VIXchg win15 thr 10/5/-5                 | Sh 0.687 DD -19.1 CAGR  9.31 E 0.66 | Sh 0.478 DD -16.6 CAGR  9.10 E 0.61 | Sh 0.936 DD -10.4 CAGR  9.81 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.01 E 0.72 | sw/yr 7.9
+VIXchg win15 thr 8/4/-4                  | Sh 0.688 DD -17.8 CAGR  9.28 E 0.65 | Sh 0.478 DD -16.5 CAGR  9.06 E 0.61 | Sh 0.897 DD -11.3 CAGR  9.40 E 0.64 | Sh 0.723 DD -16.2 CAGR  9.42 E 0.73 | sw/yr 8.4
+VIXchg win15 thr 12/6/-6                 | Sh 0.660 DD -19.6 CAGR  9.06 E 0.66 | Sh 0.474 DD -16.4 CAGR  9.06 E 0.61 | Sh 0.882 DD -13.4 CAGR  9.38 E 0.64 | Sh 0.657 DD -17.3 CAGR  8.72 E 0.73 | sw/yr 7.5
+VIXchg win15 thr 10/5/-3                 | Sh 0.690 DD -19.4 CAGR  9.39 E 0.66 | Sh 0.495 DD -16.6 CAGR  9.30 E 0.62 | Sh 0.899 DD -11.3 CAGR  9.57 E 0.64 | Sh 0.707 DD -16.1 CAGR  9.30 E 0.73 | sw/yr 8.3
+VIXchg win15 thr 10/3/-5                 | Sh 0.689 DD -16.3 CAGR  9.29 E 0.65 | Sh 0.499 DD -16.3 CAGR  9.29 E 0.60 | Sh 0.893 DD -12.0 CAGR  9.35 E 0.64 | Sh 0.708 DD -16.1 CAGR  9.22 E 0.72 | sw/yr 8.1
+VIXchg win21 thr 10/5/-5                 | Sh 0.673 DD -17.4 CAGR  9.17 E 0.66 | Sh 0.518 DD -16.3 CAGR  9.50 E 0.61 | Sh 0.843 DD -11.4 CAGR  8.93 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.06 E 0.73 | sw/yr 8.2
+VIXchg win21 thr 8/4/-4                  | Sh 0.692 DD -17.0 CAGR  9.33 E 0.66 | Sh 0.540 DD -14.2 CAGR  9.69 E 0.61 | Sh 0.874 DD -11.2 CAGR  9.19 E 0.64 | Sh 0.689 DD -16.1 CAGR  9.06 E 0.72 | sw/yr 8.6
+VIXchg win21 thr 12/6/-6                 | Sh 0.659 DD -18.9 CAGR  9.04 E 0.66 | Sh 0.494 DD -16.5 CAGR  9.26 E 0.61 | Sh 0.839 DD -11.5 CAGR  8.88 E 0.64 | Sh 0.673 DD -17.5 CAGR  8.96 E 0.73 | sw/yr 7.9
+VIXchg win21 thr 10/5/-3                 | Sh 0.680 DD -16.3 CAGR  9.28 E 0.66 | Sh 0.538 DD -16.3 CAGR  9.73 E 0.61 | Sh 0.813 DD -11.4 CAGR  8.67 E 0.64 | Sh 0.713 DD -16.1 CAGR  9.40 E 0.73 | sw/yr 8.7
+VIXchg win21 thr 10/3/-5                 | Sh 0.672 DD -18.1 CAGR  9.12 E 0.65 | Sh 0.500 DD -16.3 CAGR  9.30 E 0.61 | Sh 0.861 DD -11.2 CAGR  9.05 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.00 E 0.72 | sw/yr 8.6
+VIXchg win30 thr 10/5/-5                 | Sh 0.690 DD -17.1 CAGR  9.32 E 0.66 | Sh 0.533 DD -14.4 CAGR  9.61 E 0.61 | Sh 0.858 DD -13.3 CAGR  9.16 E 0.64 | Sh 0.702 DD -14.8 CAGR  9.16 E 0.72 | sw/yr 7.9
+VIXchg win30 thr 8/4/-4                  | Sh 0.704 DD -17.2 CAGR  9.44 E 0.66 | Sh 0.533 DD -14.4 CAGR  9.61 E 0.61 | Sh 0.856 DD -10.7 CAGR  9.08 E 0.64 | Sh 0.746 DD -14.4 CAGR  9.63 E 0.72 | sw/yr 8.6
+VIXchg win30 thr 12/6/-6                 | Sh 0.677 DD -18.7 CAGR  9.20 E 0.66 | Sh 0.514 DD -15.5 CAGR  9.43 E 0.61 | Sh 0.859 DD -13.3 CAGR  9.16 E 0.64 | Sh 0.684 DD -16.4 CAGR  9.00 E 0.72 | sw/yr 7.8
+VIXchg win30 thr 10/5/-3                 | Sh 0.677 DD -16.6 CAGR  9.21 E 0.66 | Sh 0.535 DD -14.4 CAGR  9.65 E 0.62 | Sh 0.816 DD -13.3 CAGR  8.79 E 0.65 | Sh 0.699 DD -16.6 CAGR  9.16 E 0.73 | sw/yr 8.5
+VIXchg win30 thr 10/3/-5                 | Sh 0.708 DD -16.3 CAGR  9.46 E 0.65 | Sh 0.539 DD -14.4 CAGR  9.66 E 0.61 | Sh 0.884 DD -11.5 CAGR  9.33 E 0.64 | Sh 0.725 DD -14.7 CAGR  9.36 E 0.72 | sw/yr 8.2
+VIX hybrid (calm zones by level, stress by change) | Sh 0.666 DD -19.6 CAGR  9.15 E 0.67 | Sh 0.499 DD -16.3 CAGR  9.35 E 0.62 | Sh 0.846 DD -13.8 CAGR  8.98 E 0.65 | Sh 0.682 DD -16.3 CAGR  9.12 E 0.75 | sw/yr 8.2
+--- (2) packages ---
+P1 = VIX change (21/10/5/-5)             | Sh 0.673 DD -17.4 CAGR  9.17 E 0.66 | Sh 0.518 DD -16.3 CAGR  9.50 E 0.61 | Sh 0.843 DD -11.4 CAGR  8.93 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.06 E 0.73 | sw/yr 8.2
+P2 = P1 + re-entry floor 65% (>200DMA)   | Sh 0.681 DD -18.7 CAGR  9.44 E 0.68 | Sh 0.557 DD -16.3 CAGR 10.04 E 0.63 | Sh 0.778 DD -12.9 CAGR  8.61 E 0.66 | Sh 0.723 DD -16.1 CAGR  9.62 E 0.74 | sw/yr 9.0
+re-entry floor only                      | Sh 0.645 DD -21.4 CAGR  9.11 E 0.69 | Sh 0.505 DD -17.9 CAGR  9.49 E 0.64 | Sh 0.732 DD -16.2 CAGR  8.19 E 0.67 | Sh 0.712 DD -16.3 CAGR  9.62 E 0.76 | sw/yr 9.0
+--- (3) paired block-bootstrap (63d blocks, 3000 draws): Sharpe diff vs BASELINE ---
+  P1              full..end : dSh +0.045  P(<=0)=0.039  CI [-0.004,+0.106]
+  P1              1990..2002: dSh +0.069  P(<=0)=0.055  CI [-0.015,+0.170]
+  P1              2003..2014: dSh +0.039  P(<=0)=0.240  CI [-0.062,+0.161]
+  P1              2015..end : dSh +0.026  P(<=0)=0.324  CI [-0.063,+0.118]
+  P2              full..end : dSh +0.052  P(<=0)=0.073  CI [-0.021,+0.131]
+  P2              1990..2002: dSh +0.108  P(<=0)=0.027  CI [-0.003,+0.237]
+  P2              2003..2014: dSh -0.026  P(<=0)=0.613  CI [-0.205,+0.146]
+  P2              2015..end : dSh +0.062  P(<=0)=0.147  CI [-0.043,+0.180]
+  re-entry only   full..end : dSh +0.016  P(<=0)=0.268  CI [-0.038,+0.068]
+  re-entry only   1990..2002: dSh +0.056  P(<=0)=0.087  CI [-0.017,+0.154]
+  re-entry only   2003..2014: dSh -0.072  P(<=0)=0.896  CI [-0.203,+0.041]
+  re-entry only   2015..end : dSh +0.052  P(<=0)=0.027  CI [-0.000,+0.126]
+  VIX hybrid      full..end : dSh +0.037  P(<=0)=0.015  CI [+0.005,+0.079]
+  VIX hybrid      1990..2002: dSh +0.050  P(<=0)=0.025  CI [+0.000,+0.126]
+  VIX hybrid      2003..2014: dSh +0.042  P(<=0)=0.107  CI [-0.024,+0.122]
+  VIX hybrid      2015..end : dSh +0.022  P(<=0)=0.235  CI [-0.028,+0.084]
+--- (4) crisis attribution & deep-drawdown exposure ---
+  ex-bear-markets Sharpe: BASELINE 0.839  P1 0.875  P2 0.894  BH 0.960
+  bear-market days only:  BASELINE -1.534  P1 -1.332  P2 -1.213  BH -0.796
+  avg exposure while >20% below 1y high: BASELINE 0.12  P1 0.14  P2 0.19
+  2000-03-24..2002-10-09: BH -47.4%  BASELINE -15.6% (E 0.21)  P1 -12.9% (E 0.22)  P2 -14.5% (E 0.27)
+  2007-10-09..2009-03-09: BH -54.9%  BASELINE -0.6% (E 0.05)  P1 -1.0% (E 0.05)  P2 -5.6% (E 0.06)
+  2020-02-19..2020-03-23: BH -33.5%  BASELINE -7.3% (E 0.30)  P1 -7.1% (E 0.27)  P2 -5.8% (E 0.33)
+  2022-01-03..2022-10-12: BH -24.0%  BASELINE -13.3% (E 0.36)  P1 -12.7% (E 0.37)  P2 -12.3% (E 0.37)
+  2025-02-19..2025-04-08: BH -18.6%  BASELINE -16.1% (E 0.80)  P1 -16.0% (E 0.79)  P2 -16.0% (E 0.79)
+--- (5) rolling 3y windows: share where variant beats BASELINE on Sharpe / on return ---
+  P1: beats on return 54% of 3y windows | on Sharpe 74%
+  P2: beats on return 67% of 3y windows | on Sharpe 72%
+--- (6) rung share BASELINE vs P1 ---
+  BASELINE  {0: 11.8, 1: 11.0, 2: 19.0, 3: 50.2, 4: 8.0}
+  P1        {0: 10.8, 1: 13.3, 2: 22.5, 3: 46.7, 4: 6.7}
+  P2        {0: 10.8, 1: 13.3, 2: 22.5, 3: 46.7, 4: 6.7}

@@ -1,0 +1,65 @@
+window 2003-01-02 2026-09-01  avg expo 0.707
+BASELINE (as built)                | Sh 0.762 DD -18.2 CAGR 9.28 | Sh 0.767 DD -11.7 CAGR 8.32 | Sh 0.763 DD -18.2 CAGR 10.29
+const matched exposure             | Sh 0.592 DD -41.8 CAGR 9.04 | Sh 0.494 DD -41.8 CAGR 7.51 | Sh 0.706 DD -24.8 CAGR 10.65
+buy&hold                           | Sh 0.591 DD -55.3 CAGR 11.61 | Sh 0.490 DD -55.3 CAGR 9.46 | Sh 0.706 DD -33.8 CAGR 13.87
+
+=== A2.1 Leave-one-INDICATOR-out (deltas vs baseline; positive ΔSh = indicator was HURTING) ===
+- dxy                              | ΔSh +0.054 ΔDD -0.1 ΔCAGR +0.52 | ΔSh +0.101 ΔDD +0.8 ΔCAGR +0.88 | ΔSh +0.014 ΔDD -0.1 ΔCAGR +0.15
+- netliq                           | ΔSh +0.053 ΔDD +2.1 ΔCAGR +0.53 | ΔSh +0.095 ΔDD +1.5 ΔCAGR +0.74 | ΔSh +0.021 ΔDD +2.1 ΔCAGR +0.30
+- stagf                            | ΔSh +0.052 ΔDD +0.8 ΔCAGR +0.49 | ΔSh +0.082 ΔDD +1.7 ΔCAGR +0.67 | ΔSh +0.028 ΔDD +0.8 ΔCAGR +0.29
+- oil                              | ΔSh +0.049 ΔDD +2.2 ΔCAGR +0.54 | ΔSh +0.066 ΔDD +0.3 ΔCAGR +0.68 | ΔSh +0.034 ΔDD +2.2 ΔCAGR +0.39
+- real10                           | ΔSh +0.046 ΔDD +2.3 ΔCAGR +0.56 | ΔSh +0.063 ΔDD -0.0 ΔCAGR +0.68 | ΔSh +0.032 ΔDD +2.3 ΔCAGR +0.44
+- nfci                             | ΔSh +0.045 ΔDD +1.2 ΔCAGR +0.40 | ΔSh +0.035 ΔDD +1.7 ΔCAGR +0.20 | ΔSh +0.056 ΔDD +1.2 ΔCAGR +0.60
+- goldreal                         | ΔSh +0.043 ΔDD +0.8 ΔCAGR +0.35 | ΔSh +0.061 ΔDD +1.9 ΔCAGR +0.44 | ΔSh +0.028 ΔDD +0.8 ΔCAGR +0.26
+- ratevol                          | ΔSh +0.042 ΔDD +2.4 ΔCAGR +0.61 | ΔSh +0.026 ΔDD -1.5 ΔCAGR +0.41 | ΔSh +0.056 ΔDD +2.4 ΔCAGR +0.82
+- spx                              | ΔSh +0.039 ΔDD +0.3 ΔCAGR +0.31 | ΔSh +0.075 ΔDD +0.9 ΔCAGR +0.61 | ΔSh +0.008 ΔDD +0.3 ΔCAGR -0.00
+- vix                              | ΔSh +0.038 ΔDD +1.3 ΔCAGR +0.53 | ΔSh +0.028 ΔDD -1.4 ΔCAGR +0.47 | ΔSh +0.046 ΔDD +1.3 ΔCAGR +0.60
+- hy_mom                           | ΔSh +0.027 ΔDD +1.6 ΔCAGR -0.13 | ΔSh +0.117 ΔDD +2.6 ΔCAGR +0.50 | ΔSh -0.043 ΔDD +1.6 ΔCAGR -0.78
+- tga                              | ΔSh +0.024 ΔDD +1.2 ΔCAGR +0.33 | ΔSh +0.030 ΔDD +0.6 ΔCAGR +0.38 | ΔSh +0.019 ΔDD +1.2 ΔCAGR +0.29
+- curve                            | ΔSh +0.023 ΔDD -0.7 ΔCAGR +0.22 | ΔSh +0.090 ΔDD +1.0 ΔCAGR +0.71 | ΔSh -0.030 ΔDD -0.7 ΔCAGR -0.29
+- cny                              | ΔSh +0.020 ΔDD +1.4 ΔCAGR +0.15 | ΔSh +0.038 ΔDD +1.7 ΔCAGR +0.27 | ΔSh +0.005 ΔDD +1.4 ΔCAGR +0.03
+- btc                              | ΔSh +0.009 ΔDD +0.8 ΔCAGR +0.09 | ΔSh +0.000 ΔDD +0.0 ΔCAGR +0.00 | ΔSh +0.017 ΔDD +0.8 ΔCAGR +0.19
+- rrp                              | ΔSh +0.008 ΔDD +0.8 ΔCAGR +0.11 | ΔSh -0.004 ΔDD +0.1 ΔCAGR -0.01 | ΔSh +0.019 ΔDD +0.8 ΔCAGR +0.24
+- reserves                         | ΔSh +0.004 ΔDD +0.3 ΔCAGR +0.01 | ΔSh +0.012 ΔDD -0.5 ΔCAGR +0.12 | ΔSh -0.004 ΔDD +0.3 ΔCAGR -0.10
+- sloos                            | ΔSh +0.003 ΔDD +1.9 ΔCAGR -0.24 | ΔSh -0.046 ΔDD -0.8 ΔCAGR -0.88 | ΔSh +0.048 ΔDD +1.9 ΔCAGR +0.44
+- claims                           | ΔSh +0.003 ΔDD -0.9 ΔCAGR +0.08 | ΔSh +0.034 ΔDD +0.0 ΔCAGR +0.34 | ΔSh -0.022 ΔDD -0.9 ΔCAGR -0.19
+- hy                               | ΔSh +0.003 ΔDD -0.7 ΔCAGR +0.28 | ΔSh +0.060 ΔDD -0.4 ΔCAGR +0.96 | ΔSh -0.049 ΔDD -0.7 ΔCAGR -0.44
+- payrolls                         | ΔSh +0.001 ΔDD +0.0 ΔCAGR +0.02 | ΔSh +0.007 ΔDD +1.0 ΔCAGR +0.14 | ΔSh -0.006 ΔDD +0.0 ΔCAGR -0.10
+- srf                              | ΔSh -0.003 ΔDD +0.0 ΔCAGR -0.03 | ΔSh +0.000 ΔDD +0.0 ΔCAGR +0.00 | ΔSh -0.006 ΔDD +0.0 ΔCAGR -0.06
+- sofr_iorb                        | ΔSh -0.003 ΔDD +0.6 ΔCAGR -0.11 | ΔSh +0.000 ΔDD +0.0 ΔCAGR +0.00 | ΔSh -0.007 ΔDD +0.6 ΔCAGR -0.23
+- vixterm                          | ΔSh -0.003 ΔDD -0.9 ΔCAGR -0.09 | ΔSh +0.011 ΔDD -3.8 ΔCAGR +0.05 | ΔSh -0.015 ΔDD -0.9 ΔCAGR -0.23
+- ig                               | ΔSh -0.006 ΔDD +2.2 ΔCAGR +0.05 | ΔSh -0.017 ΔDD -2.4 ΔCAGR +0.12 | ΔSh +0.001 ΔDD +2.2 ΔCAGR -0.04
+- jpy                              | ΔSh -0.009 ΔDD +0.5 ΔCAGR +0.22 | ΔSh -0.004 ΔDD -2.3 ΔCAGR +0.34 | ΔSh -0.014 ΔDD +0.5 ΔCAGR +0.10
+- spx_mom                          | ΔSh -0.013 ΔDD +0.1 ΔCAGR -0.03 | ΔSh -0.010 ΔDD -2.9 ΔCAGR +0.08 | ΔSh -0.016 ΔDD +0.1 ΔCAGR -0.14
+- sahm                             | ΔSh -0.021 ΔDD +0.8 ΔCAGR -0.33 | ΔSh -0.056 ΔDD -0.9 ΔCAGR -0.59 | ΔSh +0.008 ΔDD +0.8 ΔCAGR -0.06
+
+Indicators whose REMOVAL improves Sharpe in BOTH halves: ['dxy', 'netliq', 'stagf', 'oil', 'real10', 'nfci', 'goldreal', 'ratevol', 'spx', 'vix', 'tga', 'cny']
+Indicators whose removal hurts in BOTH halves (i.e. valuable): ['jpy', 'spx_mom']
+
+=== A2.2 Leave-one-BLOCK-out ===
+- block plumb (8 ind)              | ΔSh -0.033 ΔDD +3.5 ΔCAGR -0.91 | ΔSh -0.007 ΔDD +0.5 ΔCAGR -0.39 | ΔSh -0.060 ΔDD +3.5 ΔCAGR -1.45
+- block credit (4 ind)             | ΔSh +0.055 ΔDD +2.3 ΔCAGR +1.13 | ΔSh +0.037 ΔDD -3.4 ΔCAGR +0.91 | ΔSh +0.071 ΔDD +2.3 ΔCAGR +1.36
+- block market (4 ind)             | ΔSh +0.037 ΔDD +2.1 ΔCAGR +0.29 | ΔSh +0.105 ΔDD -0.6 ΔCAGR +0.70 | ΔSh -0.015 ΔDD +2.1 ΔCAGR -0.13
+- block macro (5 ind)              | ΔSh +0.036 ΔDD +0.8 ΔCAGR +0.14 | ΔSh +0.040 ΔDD +0.2 ΔCAGR +0.03 | ΔSh +0.035 ΔDD +0.8 ΔCAGR +0.27
+- block regime (7 ind)             | ΔSh +0.040 ΔDD +0.3 ΔCAGR +0.92 | ΔSh +0.109 ΔDD +0.2 ΔCAGR +1.56 | ΔSh -0.019 ΔDD +0.3 ΔCAGR +0.26
+
+=== A2.3 Only-one-block (block alone drives composite) ===
+only block plumb                   | ΔSh +0.046 ΔDD -3.5 ΔCAGR +2.37 | ΔSh +0.009 ΔDD -6.1 ΔCAGR +1.38 | ΔSh +0.082 ΔDD -3.5 ΔCAGR +3.41
+only block credit                  | ΔSh -0.108 ΔDD +0.9 ΔCAGR -1.74 | ΔSh -0.134 ΔDD +0.7 ΔCAGR -1.94 | ΔSh -0.085 ΔDD +0.9 ΔCAGR -1.52
+only block market                  | ΔSh -0.089 ΔDD -3.4 ΔCAGR -0.19 | ΔSh -0.075 ΔDD -9.9 ΔCAGR +0.35 | ΔSh -0.107 ΔDD +0.5 ΔCAGR -0.75
+only block macro                   | ΔSh -0.000 ΔDD -3.9 ΔCAGR +1.36 | ΔSh +0.102 ΔDD -5.6 ΔCAGR +2.98 | ΔSh -0.103 ΔDD -3.9 ΔCAGR -0.33
+only block regime                  | ΔSh -0.139 ΔDD +6.4 ΔCAGR -3.59 | ΔSh -0.350 ΔDD -0.1 ΔCAGR -4.47 | ΔSh +0.057 ΔDD +8.0 ΔCAGR -2.66
+
+=== A2.4 Detectors ablation (zero out detector points) ===
+- detector fund (active 5% days)   | ΔSh -0.014 ΔDD -0.0 ΔCAGR -0.09 | ΔSh +0.000 ΔDD +0.0 ΔCAGR +0.00 | ΔSh -0.026 ΔDD +0.0 ΔCAGR -0.19
+- detector oil (active 30% days)   | ΔSh -0.002 ΔDD +1.6 ΔCAGR +0.19 | ΔSh -0.017 ΔDD -3.9 ΔCAGR +0.08 | ΔSh +0.010 ΔDD +1.6 ΔCAGR +0.31
+- detector infl (active 9% days)   | ΔSh -0.007 ΔDD -0.4 ΔCAGR -0.00 | ΔSh +0.000 ΔDD +0.0 ΔCAGR +0.00 | ΔSh -0.012 ΔDD -0.4 ΔCAGR -0.01
+- detector pivot (active 4% days)  | ΔSh -0.001 ΔDD -0.0 ΔCAGR -0.02 | ΔSh +0.009 ΔDD -0.0 ΔCAGR +0.07 | ΔSh -0.009 ΔDD +0.0 ΔCAGR -0.12
+- ALL detectors                    | ΔSh -0.036 ΔDD -1.5 ΔCAGR -0.06 | ΔSh -0.010 ΔDD -3.9 ΔCAGR +0.13 | ΔSh -0.056 ΔDD -1.5 ΔCAGR -0.24
++ turn detector (V7, as in page)   | ΔSh +0.010 ΔDD -0.6 ΔCAGR -0.15 | ΔSh +0.060 ΔDD +1.1 ΔCAGR +0.19 | ΔSh -0.029 ΔDD -0.6 ΔCAGR -0.49
+
+=== A2.5 Gate ablation & lead/coin only ===
+no lead gate                       | ΔSh +0.017 ΔDD -0.0 ΔCAGR +0.27 | ΔSh +0.039 ΔDD -0.0 ΔCAGR +0.38 | ΔSh -0.001 ΔDD -0.0 ΔCAGR +0.16
+composite := lead only             | ΔSh +0.030 ΔDD +4.3 ΔCAGR -0.37 | ΔSh +0.055 ΔDD -0.8 ΔCAGR +0.91 | ΔSh -0.002 ΔDD +4.3 ΔCAGR -1.69
+composite := coin only             | ΔSh +0.007 ΔDD -0.8 ΔCAGR +0.46 | ΔSh +0.089 ΔDD -1.8 ΔCAGR +0.67 | ΔSh -0.045 ΔDD -0.8 ΔCAGR +0.23
+composite without detectors        | ΔSh +0.005 ΔDD -1.5 ΔCAGR +0.22 | ΔSh +0.043 ΔDD -2.2 ΔCAGR +0.45 | ΔSh -0.024 ΔDD -1.5 ΔCAGR -0.01

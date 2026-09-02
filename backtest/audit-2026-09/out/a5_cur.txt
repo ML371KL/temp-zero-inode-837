@@ -1,0 +1,59 @@
+
+=== 2003-2026 full panel: 2003-01-02..2026-09-01 | cols: start..end | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE as built                              | Sh 0.76 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.77 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.76 DD -18.2 CAGR 10.29 E 0.76 | sw/yr 8.5
+Buy&Hold                                       | Sh 0.59 DD -55.3 CAGR 11.61 E 1.00 | Sh 0.49 DD -55.3 CAGR  9.46 E 1.00 | Sh 0.71 DD -33.8 CAGR 13.87 E 1.00
+H2 duration cap 63d on level inds -> 0         | Sh 0.76 DD -23.1 CAGR 10.29 E 0.78 | Sh 0.75 DD -23.1 CAGR  9.53 E 0.75 | Sh 0.78 DD -18.7 CAGR 11.07 E 0.80 | sw/yr 8.5
+H2 duration cap 126d on level inds -> 0        | Sh 0.79 DD -17.3 CAGR 10.43 E 0.77 | Sh 0.80 DD -15.6 CAGR 10.01 E 0.74 | Sh 0.78 DD -17.3 CAGR 10.85 E 0.80 | sw/yr 9.0
+H2b duration cap 126d -> -1 (soft)             | Sh 0.81 DD -17.3 CAGR 10.10 E 0.73 | Sh 0.84 DD -13.9 CAGR  9.53 E 0.68 | Sh 0.78 DD -17.3 CAGR 10.69 E 0.77 | sw/yr 8.4
+H1 HY level -> regime-aware relative           | Sh 0.75 DD -18.9 CAGR  9.31 E 0.73 | Sh 0.75 DD -15.1 CAGR  8.47 E 0.68 | Sh 0.75 DD -18.9 CAGR 10.18 E 0.78 | sw/yr 8.7
+H1+H2 (relative HY + cap126)                   | Sh 0.78 DD -17.8 CAGR 10.26 E 0.77 | Sh 0.81 DD -15.4 CAGR 10.12 E 0.74 | Sh 0.74 DD -17.8 CAGR 10.41 E 0.80 | sw/yr 9.3
+H3 drop plumbing quantity/srf inds             | Sh 0.79 DD -17.1 CAGR  9.51 E 0.70 | Sh 0.87 DD -10.4 CAGR  9.14 E 0.64 | Sh 0.73 DD -17.1 CAGR  9.90 E 0.76 | sw/yr 7.8
+H4 weights plumb15 credit20 market20 macro20 regime25 | Sh 0.76 DD -17.4 CAGR  8.99 E 0.69 | Sh 0.80 DD -11.5 CAGR  8.54 E 0.64 | Sh 0.72 DD -17.4 CAGR  9.44 E 0.73 | sw/yr 8.8
+H4b equal block weights                        | Sh 0.78 DD -17.3 CAGR  9.43 E 0.70 | Sh 0.83 DD -11.5 CAGR  8.89 E 0.65 | Sh 0.74 DD -17.3 CAGR  9.99 E 0.76 | sw/yr 8.3
+H5 re-entry floor 65% when >50DMA & rising     | Sh 0.75 DD -19.2 CAGR  9.43 E 0.73 | Sh 0.74 DD -18.4 CAGR  8.52 E 0.69 | Sh 0.76 DD -19.2 CAGR 10.37 E 0.77 | sw/yr 10.7
+H5b re-entry floor 65% when >200DMA            | Sh 0.77 DD -18.2 CAGR  9.52 E 0.72 | Sh 0.77 DD -13.2 CAGR  8.54 E 0.67 | Sh 0.78 DD -18.2 CAGR 10.54 E 0.76 | sw/yr 9.1
+H5c floor 85% when >200DMA                     | Sh 0.77 DD -19.3 CAGR  9.95 E 0.76 | Sh 0.76 DD -16.1 CAGR  9.04 E 0.72 | Sh 0.78 DD -19.3 CAGR 10.90 E 0.80 | sw/yr 8.6
+H6 cap 65% when <200DMA                        | Sh 0.76 DD -17.8 CAGR  9.13 E 0.70 | Sh 0.75 DD -11.7 CAGR  8.08 E 0.65 | Sh 0.77 DD -17.8 CAGR 10.23 E 0.75 | sw/yr 10.5
+H5b+H6 trend floor & cap                       | Sh 0.77 DD -17.8 CAGR  9.37 E 0.71 | Sh 0.75 DD -13.2 CAGR  8.30 E 0.67 | Sh 0.78 DD -17.8 CAGR 10.48 E 0.76 | sw/yr 11.1
+COMBO H2(126)+H5b                              | Sh 0.79 DD -17.4 CAGR 10.53 E 0.77 | Sh 0.80 DD -17.4 CAGR  9.98 E 0.74 | Sh 0.79 DD -17.3 CAGR 11.10 E 0.80 | sw/yr 9.7
+COMBO H1+H2(126)+H5b+H6                        | Sh 0.76 DD -17.2 CAGR  9.93 E 0.76 | Sh 0.77 DD -17.2 CAGR  9.47 E 0.73 | Sh 0.75 DD -17.0 CAGR 10.40 E 0.79 | sw/yr 11.9
+H7 floor 65% when drawdown >20% (late phase)   | Sh 0.65 DD -32.8 CAGR  9.30 E 0.73 | Sh 0.56 DD -32.8 CAGR  7.82 E 0.70 | Sh 0.76 DD -20.7 CAGR 10.84 E 0.77 | sw/yr 9.5
+H7b floor 65% when dd>25%                      | Sh 0.64 DD -30.0 CAGR  8.98 E 0.73 | Sh 0.59 DD -30.0 CAGR  8.00 E 0.69 | Sh 0.70 DD -20.7 CAGR  9.99 E 0.76 | sw/yr 8.9
+H8 rungs 100/100/85/50/0                       | Sh 0.77 DD -22.5 CAGR 11.01 E 0.85 | Sh 0.80 DD -14.8 CAGR 10.24 E 0.79 | Sh 0.75 DD -22.5 CAGR 11.80 E 0.90 | sw/yr 6.8
+H8b rungs 100/100/65/35/0                      | Sh 0.75 DD -19.8 CAGR  9.87 E 0.79 | Sh 0.77 DD -12.9 CAGR  9.06 E 0.73 | Sh 0.73 DD -19.8 CAGR 10.72 E 0.85 | sw/yr 6.8
+H8c rungs 100/85/65/50/0                       | Sh 0.75 DD -20.5 CAGR  9.46 E 0.72 | Sh 0.76 DD -13.8 CAGR  8.61 E 0.68 | Sh 0.75 DD -20.5 CAGR 10.34 E 0.77 | sw/yr 8.5
+H8d rungs 100/100/100/50/0                     | Sh 0.79 DD -23.2 CAGR 11.72 E 0.88 | Sh 0.82 DD -14.7 CAGR 10.90 E 0.82 | Sh 0.77 DD -23.2 CAGR 12.56 E 0.94 | sw/yr 3.3
+H9 drop VIX level                              | Sh 0.80 DD -16.9 CAGR  9.82 E 0.72 | Sh 0.80 DD -13.1 CAGR  8.79 E 0.67 | Sh 0.81 DD -16.9 CAGR 10.89 E 0.77 | sw/yr 9.0
+COMBO H8+H5b+H7                                | Sh 0.69 DD -34.8 CAGR 10.99 E 0.87 | Sh 0.63 DD -34.8 CAGR  9.63 E 0.83 | Sh 0.76 DD -21.3 CAGR 12.41 E 0.91 | sw/yr 9.1
+COMBO H8+H5b+H7+H9                             | Sh 0.72 DD -34.0 CAGR 11.53 E 0.88 | Sh 0.65 DD -34.0 CAGR 10.08 E 0.84 | Sh 0.80 DD -21.3 CAGR 13.04 E 0.92 | sw/yr 8.6
+COMBO H8+H7                                    | Sh 0.69 DD -34.0 CAGR 10.95 E 0.87 | Sh 0.64 DD -34.0 CAGR  9.74 E 0.83 | Sh 0.75 DD -22.4 CAGR 12.21 E 0.91 | sw/yr 7.8
+no lead gate                                   | Sh 0.78 DD -18.2 CAGR  9.56 E 0.72 | Sh 0.81 DD -11.7 CAGR  8.69 E 0.66 | Sh 0.76 DD -18.2 CAGR 10.45 E 0.78 | sw/yr 9.7
+
+=== 1990-2026 CORE (proxy credit): 1990-01-02..2026-09-01 | cols: start..end | 1990-01-01..2002-12-31 | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE as built                              | Sh 0.62 DD -20.8 CAGR  8.56 E 0.65 | Sh 0.42 DD -17.3 CAGR  8.21 E 0.56 | Sh 0.80 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.66 DD -16.3 CAGR  8.91 E 0.75 | sw/yr 8.1
+Buy&Hold                                       | Sh 0.52 DD -55.3 CAGR 10.93 E 1.00 | Sh 0.36 DD -47.4 CAGR  9.62 E 1.00 | Sh 0.49 DD -55.3 CAGR  9.56 E 1.00 | Sh 0.71 DD -33.8 CAGR 13.87 E 1.00
+H2 duration cap 63d on level inds -> 0         | Sh 0.61 DD -34.7 CAGR  9.29 E 0.75 | Sh 0.36 DD -34.7 CAGR  8.24 E 0.71 | Sh 0.77 DD -19.9 CAGR  9.72 E 0.75 | Sh 0.72 DD -18.1 CAGR 10.04 E 0.78 | sw/yr 8.2
+H2 duration cap 126d on level inds -> 0        | Sh 0.63 DD -33.1 CAGR  9.32 E 0.73 | Sh 0.35 DD -31.1 CAGR  8.04 E 0.69 | Sh 0.84 DD -13.4 CAGR 10.36 E 0.73 | Sh 0.71 DD -16.3 CAGR  9.70 E 0.77 | sw/yr 8.3
+H2b duration cap 126d -> -1 (soft)             | Sh 0.65 DD -27.1 CAGR  9.12 E 0.69 | Sh 0.44 DD -25.3 CAGR  8.69 E 0.63 | Sh 0.80 DD -14.2 CAGR  9.08 E 0.68 | Sh 0.71 DD -16.3 CAGR  9.64 E 0.76 | sw/yr 7.5
+H1 HY level -> regime-aware relative           | Sh 0.60 DD -22.7 CAGR  8.43 E 0.66 | Sh 0.38 DD -19.3 CAGR  7.82 E 0.57 | Sh 0.77 DD -15.5 CAGR  8.65 E 0.67 | Sh 0.65 DD -15.8 CAGR  8.88 E 0.75 | sw/yr 8.5
+H1+H2 (relative HY + cap126)                   | Sh 0.63 DD -34.0 CAGR  9.30 E 0.73 | Sh 0.36 DD -31.5 CAGR  8.12 E 0.69 | Sh 0.86 DD -13.9 CAGR 10.62 E 0.74 | Sh 0.68 DD -15.8 CAGR  9.28 E 0.77 | sw/yr 8.8
+H4 weights plumb15 credit20 market20 macro20 regime25 | Sh 0.66 DD -15.8 CAGR  8.79 E 0.63 | Sh 0.48 DD -13.4 CAGR  8.74 E 0.55 | Sh 0.78 DD -11.9 CAGR  8.26 E 0.64 | Sh 0.73 DD -15.6 CAGR  9.40 E 0.72 | sw/yr 7.9
+H4b equal block weights                        | Sh 0.65 DD -19.1 CAGR  8.87 E 0.65 | Sh 0.46 DD -15.4 CAGR  8.61 E 0.57 | Sh 0.81 DD -13.7 CAGR  8.73 E 0.65 | Sh 0.70 DD -17.8 CAGR  9.32 E 0.74 | sw/yr 7.6
+H5 re-entry floor 65% when >50DMA & rising     | Sh 0.64 DD -24.1 CAGR  9.02 E 0.69 | Sh 0.47 DD -22.2 CAGR  8.94 E 0.62 | Sh 0.74 DD -16.2 CAGR  8.56 E 0.69 | Sh 0.70 DD -16.3 CAGR  9.57 E 0.76 | sw/yr 11.1
+H5b re-entry floor 65% when >200DMA            | Sh 0.65 DD -21.4 CAGR  9.05 E 0.67 | Sh 0.52 DD -17.9 CAGR  9.34 E 0.59 | Sh 0.73 DD -16.2 CAGR  8.19 E 0.67 | Sh 0.71 DD -16.3 CAGR  9.62 E 0.76 | sw/yr 8.8
+H5c floor 85% when >200DMA                     | Sh 0.64 DD -24.4 CAGR  9.37 E 0.72 | Sh 0.48 DD -21.0 CAGR  9.49 E 0.66 | Sh 0.75 DD -16.2 CAGR  8.99 E 0.71 | Sh 0.69 DD -18.0 CAGR  9.64 E 0.79 | sw/yr 8.5
+H6 cap 65% when <200DMA                        | Sh 0.62 DD -20.8 CAGR  8.44 E 0.64 | Sh 0.41 DD -17.3 CAGR  8.09 E 0.56 | Sh 0.78 DD -14.9 CAGR  8.31 E 0.64 | Sh 0.68 DD -15.8 CAGR  8.98 E 0.74 | sw/yr 9.7
+H5b+H6 trend floor & cap                       | Sh 0.65 DD -21.4 CAGR  8.93 E 0.67 | Sh 0.51 DD -17.9 CAGR  9.21 E 0.59 | Sh 0.71 DD -16.2 CAGR  7.89 E 0.66 | Sh 0.73 DD -15.3 CAGR  9.70 E 0.75 | sw/yr 10.3
+COMBO H2(126)+H5b                              | Sh 0.64 DD -33.2 CAGR  9.59 E 0.74 | Sh 0.38 DD -31.2 CAGR  8.42 E 0.70 | Sh 0.81 DD -15.5 CAGR 10.13 E 0.74 | Sh 0.75 DD -16.3 CAGR 10.34 E 0.78 | sw/yr 9.1
+COMBO H1+H2(126)+H5b+H6                        | Sh 0.63 DD -31.8 CAGR  9.34 E 0.73 | Sh 0.38 DD -30.4 CAGR  8.37 E 0.68 | Sh 0.83 DD -13.8 CAGR 10.18 E 0.73 | Sh 0.70 DD -15.1 CAGR  9.56 E 0.77 | sw/yr 11.2
+H7 floor 65% when drawdown >20% (late phase)   | Sh 0.55 DD -32.2 CAGR  8.76 E 0.69 | Sh 0.43 DD -18.4 CAGR  8.78 E 0.61 | Sh 0.55 DD -32.2 CAGR  7.80 E 0.70 | Sh 0.68 DD -21.5 CAGR  9.73 E 0.76 | sw/yr 9.6
+H7b floor 65% when dd>25%                      | Sh 0.56 DD -29.4 CAGR  8.61 E 0.67 | Sh 0.49 DD -15.5 CAGR  9.14 E 0.58 | Sh 0.58 DD -29.4 CAGR  7.94 E 0.69 | Sh 0.61 DD -21.5 CAGR  8.71 E 0.75 | sw/yr 9.3
+H8 rungs 100/100/85/50/0                       | Sh 0.63 DD -29.9 CAGR  9.79 E 0.78 | Sh 0.38 DD -25.6 CAGR  8.52 E 0.71 | Sh 0.83 DD -18.3 CAGR 10.48 E 0.77 | Sh 0.69 DD -18.9 CAGR 10.51 E 0.88 | sw/yr 6.7
+H8b rungs 100/100/65/35/0                      | Sh 0.65 DD -20.8 CAGR  9.38 E 0.72 | Sh 0.47 DD -17.3 CAGR  9.01 E 0.62 | Sh 0.80 DD -16.5 CAGR  9.34 E 0.72 | Sh 0.68 DD -19.2 CAGR  9.86 E 0.83 | sw/yr 6.7
+H8c rungs 100/85/65/50/0                       | Sh 0.63 DD -26.6 CAGR  8.85 E 0.67 | Sh 0.39 DD -23.0 CAGR  8.03 E 0.59 | Sh 0.82 DD -15.5 CAGR  9.13 E 0.66 | Sh 0.70 DD -16.3 CAGR  9.49 E 0.76 | sw/yr 8.1
+H8d rungs 100/100/100/50/0                     | Sh 0.61 DD -32.6 CAGR  9.86 E 0.81 | Sh 0.34 DD -27.7 CAGR  8.27 E 0.75 | Sh 0.84 DD -19.2 CAGR 10.94 E 0.80 | Sh 0.67 DD -20.3 CAGR 10.55 E 0.90 | sw/yr 3.7
+H9 drop VIX level                              | Sh 0.63 DD -19.0 CAGR  8.71 E 0.66 | Sh 0.42 DD -15.3 CAGR  8.35 E 0.58 | Sh 0.77 DD -13.3 CAGR  8.35 E 0.66 | Sh 0.71 DD -14.3 CAGR  9.49 E 0.75 | sw/yr 8.6
+COMBO H8+H5b+H7                                | Sh 0.60 DD -35.9 CAGR 10.32 E 0.83 | Sh 0.48 DD -24.3 CAGR 10.17 E 0.76 | Sh 0.58 DD -35.9 CAGR  8.91 E 0.83 | Sh 0.75 DD -22.2 CAGR 11.97 E 0.90 | sw/yr 9.9
+COMBO H8+H5b+H7+H9                             | Sh 0.61 DD -35.3 CAGR 10.45 E 0.83 | Sh 0.48 DD -21.5 CAGR 10.19 E 0.76 | Sh 0.58 DD -35.3 CAGR  8.89 E 0.84 | Sh 0.78 DD -22.4 CAGR 12.37 E 0.90 | sw/yr 9.8
+COMBO H8+H7                                    | Sh 0.58 DD -33.1 CAGR 10.01 E 0.82 | Sh 0.43 DD -23.8 CAGR  9.39 E 0.74 | Sh 0.61 DD -33.1 CAGR  9.36 E 0.82 | Sh 0.71 DD -23.3 CAGR 11.37 E 0.89 | sw/yr 8.4
+no lead gate                                   | Sh 0.64 DD -16.3 CAGR  8.77 E 0.66 | Sh 0.48 DD -14.2 CAGR  8.78 E 0.56 | Sh 0.77 DD -15.3 CAGR  8.40 E 0.66 | Sh 0.67 DD -16.3 CAGR  9.14 E 0.77 | sw/yr 9.1

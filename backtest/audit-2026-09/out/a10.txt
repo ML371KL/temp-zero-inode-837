@@ -1,0 +1,30 @@
+
+=== 2003-2026 full panel ===
+BASELINE                             | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+PRUNE (8 inds -> info)               | Sh 0.781 DD -17.9 CAGR  8.98 E 0.66 | Sh 0.878 DD -11.3 CAGR  8.45 E 0.58 | Sh 0.719 DD -17.9 CAGR  9.54 E 0.74
+P1 (VIX change)                      | Sh 0.813 DD -16.8 CAGR  9.78 E 0.70 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.65 | Sh 0.784 DD -16.8 CAGR 10.47 E 0.75
+P1 + PRUNE                           | Sh 0.773 DD -17.5 CAGR  8.80 E 0.65 | Sh 0.825 DD -13.9 CAGR  7.87 E 0.57 | Sh 0.746 DD -17.5 CAGR  9.77 E 0.73
+   PRUNE             full..end : dSh +0.019 P(<=0)=0.343
+   PRUNE             2003..2014: dSh +0.110 P(<=0)=0.069
+   PRUNE             2015..end : dSh -0.044 P(<=0)=0.920
+   P1+PRUNE vs P1    full..end : dSh -0.040 P(<=0)=0.847
+   P1+PRUNE vs P1    2003..2014: dSh -0.027 P(<=0)=0.689
+   P1+PRUNE vs P1    2015..end : dSh -0.038 P(<=0)=0.837
+drop netliq,tga,reserves,rrp         | Sh 0.791 DD -16.4 CAGR  9.52 E 0.70 | Sh 0.868 DD -10.4 CAGR  9.14 E 0.64 | Sh 0.733 DD -16.4 CAGR  9.92 E 0.76
+drop goldreal,stagf,dxy,cny          | Sh 0.816 DD -18.5 CAGR  9.28 E 0.66 | Sh 0.917 DD -10.4 CAGR  8.78 E 0.58 | Sh 0.748 DD -18.5 CAGR  9.80 E 0.74
+
+=== 1990-2026 CORE ===
+BASELINE                             | Sh 0.629 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.804 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.661 DD -16.3 CAGR  8.91 E 0.75
+PRUNE (8 inds -> info)               | Sh 0.664 DD -15.4 CAGR  8.76 E 0.63 | Sh 0.514 DD -14.2 CAGR  9.32 E 0.60 | Sh 0.812 DD -10.2 CAGR  7.99 E 0.60 | Sh 0.701 DD -14.3 CAGR  8.93 E 0.70
+P1 (VIX change)                      | Sh 0.673 DD -17.4 CAGR  9.17 E 0.66 | Sh 0.518 DD -16.3 CAGR  9.50 E 0.61 | Sh 0.843 DD -11.4 CAGR  8.93 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.06 E 0.73
+P1 + PRUNE                           | Sh 0.646 DD -15.2 CAGR  8.46 E 0.61 | Sh 0.476 DD -14.2 CAGR  8.88 E 0.59 | Sh 0.738 DD -15.2 CAGR  7.23 E 0.58 | Sh 0.750 DD -14.1 CAGR  9.26 E 0.68
+   PRUNE             full..end : dSh +0.035 P(<=0)=0.145
+   PRUNE             1990..2002: dSh +0.065 P(<=0)=0.119
+   PRUNE             2003..2014: dSh +0.009 P(<=0)=0.420
+   PRUNE             2015..end : dSh +0.040 P(<=0)=0.250
+   P1+PRUNE vs P1    full..end : dSh -0.028 P(<=0)=0.811
+   P1+PRUNE vs P1    1990..2002: dSh -0.041 P(<=0)=0.764
+   P1+PRUNE vs P1    2003..2014: dSh -0.104 P(<=0)=0.977
+   P1+PRUNE vs P1    2015..end : dSh +0.064 P(<=0)=0.084
+drop netliq,tga,reserves,rrp         | Sh 0.629 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.804 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.661 DD -16.3 CAGR  8.91 E 0.75
+drop goldreal,stagf,dxy,cny          | Sh 0.664 DD -15.4 CAGR  8.76 E 0.63 | Sh 0.514 DD -14.2 CAGR  9.32 E 0.60 | Sh 0.812 DD -10.2 CAGR  7.99 E 0.60 | Sh 0.701 DD -14.3 CAGR  8.93 E 0.70
