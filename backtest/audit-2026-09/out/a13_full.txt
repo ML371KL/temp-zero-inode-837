@@ -1,0 +1,173 @@
+      date  asset  dir    source                                  note     r5    r21    r63   r126  r100   r15    r42
+2023-02-10    SPX   -1 free post                 accumulating SPY puts   3.32   5.74  -0.42    NaN   NaN   NaN    NaN
+2023-03-15    SPX    1 free post cover short; tactical long on squeeze  -0.27   4.94  12.22    NaN   NaN   NaN    NaN
+2023-03-24   GOLD    1 free post                  gold breakout to ATH   1.61   1.71  -1.97    NaN   NaN   NaN    NaN
+2023-03-28 USDJPY    1 free post                     yen to break down  -1.19   1.02   8.70    NaN   NaN   NaN    NaN
+2023-04-05    TLT   -1 free post                      bonds ST bearish   3.18   4.71   8.59    NaN   NaN   NaN    NaN
+2023-04-12    SPX   -1 free post                         ES short 4160   0.38   0.43  -9.10    NaN   NaN   NaN    NaN
+2023-04-21 DOLLAR    1 free post            bullish USD vs EUR GBP AUD   0.20   0.94  -1.13    NaN   NaN   NaN    NaN
+2023-04-21 EURUSD   -1 free post                    bullish USD vs EUR   0.52   2.32  -0.21    NaN   NaN   NaN    NaN
+2023-04-21    SPX   -1 free post    Q3 recession; short stocks into it  -0.76  -0.37 -10.85  -2.75   NaN   NaN    NaN
+2023-04-21    WTI   -1 free post                             short oil   3.80   7.34  -1.42    NaN   NaN   NaN    NaN
+2023-04-25    SPX   -1 free post                         ES short 4150  -0.87  -2.52 -12.33    NaN   NaN   NaN    NaN
+2023-05-03 EURUSD   -1 free post                   short EURUSD 1.1047   0.84   2.62  -0.25    NaN   NaN   NaN    NaN
+2023-05-18   GOLD   -1 free post       gold bearish on curve repricing   1.75   2.29   4.32    NaN   NaN   NaN    NaN
+2023-05-23  UST10    1 free post                         long 10y note   1.09   0.37  -3.33    NaN   NaN   NaN    NaN
+2023-06-26 DOLLAR    1 free post          dollar liquidity to contract   0.38  -0.84   3.01  -0.41   NaN   NaN    NaN
+2023-06-26    SPX   -1 free post                risk-off into year-end  -1.60  -3.73   2.02  -9.91   NaN   NaN    NaN
+2023-06-26    BTC   -1 free post                risk-off into year-end   0.22   2.71   9.65 -12.97   NaN   NaN    NaN
+2023-07-16    TLT    1 free post      rates peaking; bonds mean-revert   0.02  -6.67 -13.55    NaN   NaN   NaN    NaN
+2023-07-27   GOLD    1 free post               marginally bullish gold  -1.06  -2.17   1.37    NaN   NaN   NaN    NaN
+2023-07-31  UST10    1 free post          no new highs in 10y into Dec   0.32  -0.28  -5.88    NaN  2.86   NaN    NaN
+2023-07-31    BTC   -1 free post                  BTC/SOL bearish skew   2.14  12.28   7.57    NaN   NaN   NaN    NaN
+2023-08-19    SPX   -1 free post                   downside for stocks  -0.78  -0.20  -3.00    NaN   NaN   NaN    NaN
+2023-09-17    TLT   -1 free post                      short TLT spikes   4.61   8.81  -6.05    NaN   NaN   NaN    NaN
+2023-09-21    TLT   -1 free post                   10y/30y upside skew   3.00   7.86  -8.20    NaN   NaN   NaN    NaN
+2023-09-21    SPX   -1 free post                       ES down to 4200   0.71   2.29 -10.33    NaN   NaN   NaN    NaN
+2023-09-21    BTC   -1 free post                     BTC bear persists   0.85  -1.06 -41.91    NaN   NaN   NaN    NaN
+2023-10-30 USDJPY   -1 free post                  long yen on YCC leak   0.65   2.94   1.93    NaN   NaN   NaN    NaN
+2023-12-07    SPX   -1 free post       no break above 4700 by year-end  -2.53  -4.01 -12.82    NaN   NaN -3.09    NaN
+2023-12-14    TLT    1 free post                        long bond call  -0.68  -5.41  -6.28    NaN   NaN   NaN    NaN
+2023-12-14 DOLLAR   -1 free post               short DXY into year-end   0.56  -0.96  -1.00    NaN   NaN  0.06    NaN
+2023-12-16    BTC    1 free post          crypto bullish on Goldilocks   6.37   6.23  26.01    NaN   NaN   NaN    NaN
+2023-12-22 USDJPY   -1 free post                          short USDJPY  -0.75  -3.83  -6.23    NaN   NaN   NaN    NaN
+2023-12-22    WTI    1 free post                               long CL  -3.78   3.44   8.32    NaN   NaN   NaN    NaN
+2023-12-22    SPX    1 free post                               long ES  -1.43   2.54  10.34    NaN   NaN   NaN    NaN
+2024-01-10    NDX    1 free post                    NQ long; ATH in Q1   2.93   6.31   7.03    NaN   NaN   NaN    NaN
+2024-01-28    TLT    1 free post                       bonds skewed up  -0.77  -1.41  -6.20    NaN   NaN   NaN    NaN
+2024-02-14    NDX    1 free post                       very bullish NQ   0.51   0.78   3.99    NaN   NaN   NaN    NaN
+2024-02-14    BTC    1 free post                      very bullish BTC   0.67  28.86  22.28    NaN   NaN   NaN    NaN
+2024-02-24    SPX    1 free post                               melt-up   1.25   2.78   5.01    NaN   NaN   NaN    NaN
+2024-03-10    WTI   -1 free post                         crude to fall  -6.10 -10.28   0.15    NaN   NaN   NaN    NaN
+2024-03-14    TLT   -1 free post                              short UB  -1.12   4.99  -1.86    NaN   NaN   NaN    NaN
+2024-03-19    TLT    1 free post                     long ZN into FOMC   1.95  -4.03   1.15    NaN   NaN   NaN    NaN
+2024-03-19   GOLD    1 free post                     long GC into FOMC   1.52  11.15   9.08    NaN   NaN   NaN    NaN
+2024-03-19 EURUSD    1 free post                 long EURUSD into FOMC  -0.32  -1.81  -1.08    NaN   NaN   NaN    NaN
+2024-03-19    BTC    1 free post                    long BTC into FOMC   3.01   3.94   1.78    NaN   NaN   NaN    NaN
+2024-03-25    SPX    1 free post            long equities vs consensus   0.17  -2.90   5.64    NaN   NaN   NaN    NaN
+2024-04-14    WTI   -1 free post                 large move down in CL   2.77   7.64   4.98    NaN   NaN   NaN    NaN
+2024-04-14   GOLD   -1 free post                          gold to 2280   1.42   0.52  -4.08    NaN   NaN   NaN    NaN
+2024-04-14    TLT   -1 free post                      bearish duration  -0.12  -2.22  -5.94    NaN   NaN   NaN    NaN
+2024-05-05    BTC    1 free post                      BTC final leg up  -3.75   9.87 -10.22    NaN   NaN   NaN    NaN
+2024-05-05    SPX    1 free post               short vol long equities   0.83   3.51   1.50    NaN   NaN   NaN    NaN
+2024-05-14 DOLLAR   -1 free post                DXY down into year-end  -0.16  -2.32  -1.01  -4.56   NaN   NaN    NaN
+2024-05-14    BTC    1 free post              BTC higher into year-end   7.82   7.27  -3.24  -6.97   NaN   NaN    NaN
+2024-05-30    SPX    1 free post                ES long 5268 stop 5200   1.36   4.51   7.39    NaN   NaN   NaN    NaN
+2024-06-10   GOLD    1 free post          last chance to get long gold   0.99   4.62   8.87    NaN   NaN   NaN    NaN
+2024-06-28    SPX    1 free post                      buy pullbacks H2   1.89   0.94   5.60    NaN   NaN   NaN    NaN
+2024-07-09    BTC    1 free post                        BTC long 57150  12.34  11.91  -0.69    NaN   NaN   NaN    NaN
+2024-07-18    SPX   -1 free post                closed ES long; derisk   0.82  -2.00  -6.47    NaN   NaN   NaN    NaN
+2024-07-29    TLT    1 free post               bullish bonds into FOMC   2.92   4.26  -2.09    NaN   NaN   NaN    NaN
+2024-07-31    SPX    1 free post            ES long (strategy trigger)  -2.33   3.84   7.08    NaN   NaN   NaN    NaN
+2024-07-31    TLT    1 free post            ZN long (strategy trigger)   0.01   1.24  -3.16    NaN   NaN   NaN    NaN
+2024-08-06    SPX    1   podcast            bullish after VIX>60 spike   4.95   4.18  11.59    NaN   NaN   NaN    NaN
+2024-08-06    TLT   -1 free post                          ZN below 115  -2.06  -3.81   3.31    NaN   NaN   NaN    NaN
+2024-08-14    TLT   -1 free post                          TLT ST short  -0.67  -4.36   7.52    NaN   NaN   NaN    NaN
+2024-08-16    BTC    1 free post                  bullish and long BTC   1.52  -8.98  14.94    NaN   NaN   NaN    NaN
+2024-08-19    WTI   -1 free post                           short crude  -1.63   3.20   8.00    NaN   NaN   NaN    NaN
+2024-08-19 COPPER    1 free post                             copper up   1.95   3.29  -1.00    NaN   NaN   NaN    NaN
+2024-08-22 DOLLAR   -1 free post                           bearish DXY  -0.71   0.27  -4.56    NaN   NaN   NaN    NaN
+2024-08-22   GOLD    1 free post                          bullish gold  -0.58   5.69   6.53    NaN   NaN   NaN    NaN
+2024-08-22 COPPER    1 free post                               long HG  -1.18   5.60  -1.94    NaN   NaN   NaN    NaN
+2024-09-06    TLT    1 free post                               hold ZN   1.34  -5.00  -5.60    NaN   NaN   NaN    NaN
+2024-10-10    SPX    1 free post       ES long; rates down into growth   0.87   3.27   0.81    NaN   NaN   NaN    NaN
+2024-10-24    SPX    1 free post                     long ES from 5825  -1.35   3.21   4.33    NaN   NaN   NaN    NaN
+2024-10-24    TLT    1 free post                   durable bond bottom  -1.41   0.64  -4.48    NaN   NaN   NaN    NaN
+2024-11-22  UST10    1 free post         rates no new highs; move down   0.42  -2.27   0.89    NaN   NaN   NaN    NaN
+2024-11-27    TLT    1    x post                   leverage long bonds   0.45  -7.07  -3.48    NaN   NaN   NaN  -6.18
+2025-01-19    SPX   -1 free post                     short equities Q1  -0.32  -1.25  12.29    NaN   NaN   NaN    NaN
+2025-01-21 DOLLAR    1 free post                     USD up on hot PCE   0.00  -0.93  -4.61    NaN   NaN   NaN    NaN
+2025-01-21    TLT   -1 free post                          ZN below 110  -0.57  -2.40   0.22    NaN   NaN   NaN    NaN
+2025-01-21 EURUSD   -1 free post                          EURUSD lower   0.04  -0.34 -10.04    NaN   NaN   NaN    NaN
+2025-02-14    SPX    1 free post            no weekly close below 6050  -2.82  -7.29  -2.36    NaN   NaN   NaN    NaN
+2025-03-04    SPX    1 free post                ES above 5600 into NFP  -4.13  -7.52   2.55    NaN   NaN   NaN    NaN
+2025-03-04   GOLD    1 free post                             long gold   0.82   6.23  15.72    NaN   NaN   NaN    NaN
+2025-03-04    BTC    1 free post                              long BTC -13.34  -4.11   7.07    NaN   NaN   NaN    NaN
+2025-04-07    SPX   -1 free post            seller; no ATH in 2 months  -8.34 -13.75 -26.48    NaN   NaN   NaN -20.82
+2025-05-21    TLT   -1 free post                     bond market crash  -2.22  -3.54  -3.13    NaN   NaN   NaN    NaN
+2025-05-21    WTI    1 free post                            long crude  -1.74   4.64   2.45    NaN   NaN   NaN    NaN
+2025-05-30    TLT   -1 free post                         bearish bonds  -0.33  -2.84  -0.55    NaN   NaN   NaN    NaN
+2025-06-02    TLT   -1 free post                             TLT lower  -1.02  -2.31  -1.84    NaN   NaN   NaN    NaN
+2025-06-02   GOLD    1 free post                          gold melt up  -0.87  -0.56   5.95    NaN   NaN   NaN    NaN
+2025-06-02    WTI    1 free post                              crude up   2.43   6.29   0.41    NaN   NaN   NaN    NaN
+2025-06-05    RUT    1 free post                            Russell up  -1.49   5.64  12.32    NaN   NaN   NaN    NaN
+2025-06-05    WTI    1 free post                              crude up  13.08   6.60  -4.13    NaN   NaN   NaN    NaN
+2025-06-05    TLT   -1 free post                            bonds down  -1.15  -1.85  -5.14    NaN   NaN   NaN    NaN
+2025-06-08    SPX    1 free post              very bullish risk assets   0.49   4.69   8.78    NaN   NaN   NaN    NaN
+2025-06-14    SPX    1 free post                     melt up continues   1.00   4.47   9.85    NaN   NaN   NaN    NaN
+2025-06-14    TLT   -1 free post                         bonds at risk  -2.27   0.41  -5.72    NaN   NaN   NaN    NaN
+2025-07-07 DOLLAR    1 free post                        bullish dollar   0.56   0.56   0.36    NaN   NaN   NaN    NaN
+2025-08-08    TLT   -1 free post                  short ZT/ZN into CPI   1.42  -2.69  -2.49    NaN   NaN   NaN    NaN
+2025-08-14    SPX    1 free post                          rally higher   0.30   2.58   4.75    NaN   NaN   NaN    NaN
+2025-09-08    TLT   -1 free post                             ZN capped  -1.26  -0.02   1.51    NaN   NaN   NaN    NaN
+2025-09-08    SPX    1 free post       long credit-cycle beneficiaries   1.48   3.79   5.44    NaN   NaN   NaN    NaN
+2025-09-29    SPX    1 free post                          ES long 6670   0.42   3.09   3.41    NaN   NaN   NaN    NaN
+2025-09-29    TLT   -1 free post                bonds below FOMC highs   0.21  -1.92   1.69    NaN   NaN   NaN    NaN
+2025-09-29   GOLD    1 free post                        metals bullish   3.54   3.72  13.78    NaN   NaN   NaN    NaN
+2025-09-29 COPPER    1 free post                        metals bullish   5.06   8.92  19.20    NaN   NaN   NaN    NaN
+2025-10-06    SPX    1 free post                        remain bullish  -1.03   1.27   3.39    NaN   NaN   NaN    NaN
+2025-10-15    SPX    1 free post                run longs aggressively   1.66   1.67   5.01    NaN   NaN   NaN    NaN
+2025-10-29    SPX    1 free post                              buy dips  -1.48  -0.01   2.59    NaN   NaN   NaN    NaN
+2025-11-26    SPX    1 free post               currently long equities   0.35   0.80  -0.16    NaN   NaN   NaN    NaN
+2025-11-26   GOLD    1 free post                             long gold  -0.13   3.60  21.08    NaN   NaN   NaN    NaN
+2025-11-26 DOLLAR   -1 free post    structural short USD (devaluation)   0.30   1.29   1.34   1.56   NaN   NaN    NaN
+2025-11-26    SPX   -1 free post                storm within 12 months  -0.35  -0.80   0.16    NaN   NaN   NaN    NaN
+2026-01-09    SPX    1 free post              melt-up before the crash  -2.57  -0.45   0.16    NaN   NaN   NaN    NaN
+2026-01-09    WTI    1 free post                             CL higher   1.53   9.11  56.71    NaN   NaN   NaN    NaN
+2026-01-12   GOLD    1 free post                gold silver melting up   5.29   7.29   4.59    NaN   NaN   NaN    NaN
+2026-01-13 USDJPY    1 free post                       yen devaluation   0.15  -3.39   0.56    NaN   NaN   NaN    NaN
+2026-03-16    SPX    1 free post               equity buying into FOMC  -2.36   4.93  12.17    NaN   NaN   NaN    NaN
+2026-03-16 DOLLAR   -1 free post              dollar selling into FOMC  -0.25   1.23   0.43    NaN   NaN   NaN    NaN
+2026-03-18    SPX    1 free post        bullish through FOMC ~2 months  -1.94   7.69  13.86    NaN   NaN   NaN  11.49
+2026-03-18 DOLLAR   -1 free post                           bearish DXY  -0.17   1.75   0.66    NaN   NaN   NaN   0.93
+2026-03-18    WTI   -1 free post                         bearish crude  -0.07   5.25  16.40    NaN   NaN   NaN -16.63
+2026-03-18    BTC    1 free post                         BTC bottoming   0.87   2.65  10.91    NaN   NaN   NaN   9.14
+2026-03-30   GOLD    1 free post                       chase into gold   2.19  -0.71 -12.46    NaN   NaN   NaN    NaN
+2026-04-14    SPX    1 free post                         melt-up setup   1.64   6.88   7.57    NaN   NaN   NaN    NaN
+2026-04-16 EURUSD    1 free post                          EURUSD rally  -0.70  -1.29  -3.30    NaN   NaN   NaN    NaN
+2026-04-17    SPX    1 free post                           long stocks   0.92   3.53   5.92    NaN   NaN   NaN    NaN
+2026-04-17 DOLLAR   -1 free post               short USD; DXY new lows  -0.26  -1.03  -1.98    NaN   NaN   NaN    NaN
+2026-04-17    WTI   -1 free post                           crude flush  -9.70 -23.09   5.51    NaN   NaN   NaN    NaN
+2026-04-17    RUT    1 free post                          long Russell  -0.17  -1.64   6.96    NaN   NaN   NaN    NaN
+2026-05-18    SPX    1 free post                     stocks over bonds   2.30   2.12   5.11    NaN   NaN   NaN    NaN
+2026-05-18    TLT   -1 free post                     stocks over bonds  -2.75  -4.49  -0.00    NaN   NaN   NaN    NaN
+
+=== summary (signed returns, % ; positive = call was right) ===
+  h=  5d: n=132 hit 56%  mean +0.27%  median +0.22%  t=+1.02
+  h= 21d: n=132 hit 60%  mean +1.32%  median +1.23%  t=+2.74
+  h= 63d: n=132 hit 58%  mean +1.93%  median +1.02%  t=+2.25
+
+=== baseline: always long same asset/date ===
+  h=  5d: hit 62%  mean +0.53%
+  h= 21d: hit 64%  mean +1.55%
+  h= 63d: hit 65%  mean +3.55%
+
+by year: n, hit21, hit63, mean63
+       n  hit21  hit63  mean63
+year                          
+2023  34   0.62   0.38   -1.54
+2024  42   0.67   0.57    1.96
+2025  37   0.51   0.68    2.56
+2026  19   0.58   0.79    6.83
+
+by direction (h=63):
+      n  hit63  mean63
+dir                   
+-1   52    0.4   -2.06
+ 1   80    0.7    4.52
+
+by asset (h=21 and h=63):
+         n  hit21  mean21  hit63  mean63
+asset                                   
+BTC     12   0.75    5.96   0.67    3.68
+COPPER   3   1.00    5.94   0.33    5.42
+DOLLAR  11   0.55   -0.00   0.45   -0.77
+EURUSD   5   0.40    0.30   0.00   -2.97
+GOLD    13   0.77    3.34   0.77    5.60
+NDX      2   1.00    3.55   1.00    5.51
+RUT      2   0.50    2.00   1.00    9.64
+SPX     40   0.65    1.07   0.72    2.06
+TLT     26   0.31   -1.12   0.27   -2.38
+USDJPY   4   0.50   -0.81   0.75    1.24
+UST10    3   0.33   -0.73   0.33   -2.77
+WTI     11   0.82    1.83   0.82    8.85

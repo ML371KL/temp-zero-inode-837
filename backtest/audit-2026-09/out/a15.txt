@@ -1,0 +1,38 @@
+
+=== 2003-2026 full panel: 2003-01-02..2026-09-01 | start..end | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE                               | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
++ cot_es (market, cover 1.00)          | Sh 0.845 DD -17.3 CAGR 10.17 E 0.70 | Sh 0.913 DD  -9.5 CAGR  9.64 E 0.65 | Sh 0.795 DD -17.3 CAGR 10.71 E 0.75
+    dSh vs base:  +0.083 (P 0.00)  +0.146 (P 0.00)  +0.032 (P 0.12)
++ cot_dxy (regime, cover 1.00)         | Sh 0.803 DD -16.2 CAGR  9.76 E 0.71 | Sh 0.821 DD -10.5 CAGR  8.90 E 0.66 | Sh 0.792 DD -16.2 CAGR 10.66 E 0.76
+    dSh vs base:  +0.041 (P 0.00)  +0.054 (P 0.02)  +0.029 (P 0.03)
++ naaim (market, cover 0.83)           | Sh 0.840 DD -15.8 CAGR 10.13 E 0.70 | Sh 0.851 DD  -9.5 CAGR  9.08 E 0.65 | Sh 0.838 DD -15.8 CAGR 11.23 E 0.76
+    dSh vs base:  +0.078 (P 0.00)  +0.083 (P 0.00)  +0.075 (P 0.02)
++ acm_tp_chg (macro, cover 1.00)       | Sh 0.834 DD -18.2 CAGR 10.02 E 0.70 | Sh 0.881 DD  -9.7 CAGR  9.41 E 0.65 | Sh 0.799 DD -18.2 CAGR 10.65 E 0.75
+    dSh vs base:  +0.072 (P 0.00)  +0.114 (P 0.00)  +0.036 (P 0.04)
++ ism_chg (macro, cover 0.82)          | Sh 0.797 DD -18.1 CAGR  9.60 E 0.70 | Sh 0.819 DD -10.0 CAGR  8.74 E 0.65 | Sh 0.784 DD -18.1 CAGR 10.49 E 0.75
+    dSh vs base:  +0.035 (P 0.02)  +0.052 (P 0.04)  +0.021 (P 0.14)
++ cor1m (market, cover 0.85)           | Sh 0.829 DD -15.8 CAGR 10.04 E 0.70 | Sh 0.836 DD -11.9 CAGR  9.02 E 0.65 | Sh 0.828 DD -15.8 CAGR 11.10 E 0.75
+    dSh vs base:  +0.067 (P 0.00)  +0.069 (P 0.01)  +0.065 (P 0.04)
++ auction_btc (macro, cover 1.00)      | Sh 0.797 DD -18.1 CAGR  9.62 E 0.70 | Sh 0.787 DD -11.5 CAGR  8.50 E 0.65 | Sh 0.810 DD -18.1 CAGR 10.77 E 0.75
+    dSh vs base:  +0.034 (P 0.04)  +0.019 (P 0.29)  +0.047 (P 0.00)
++ positioning trio (cot_es,cot_dxy,naaim) | Sh 0.821 DD -16.0 CAGR  9.93 E 0.70 | Sh 0.845 DD -12.1 CAGR  9.04 E 0.64 | Sh 0.807 DD -16.0 CAGR 10.86 E 0.75
+    dSh vs base:  +0.059 (P 0.03)  +0.078 (P 0.05)  +0.044 (P 0.15)
+
+=== 1990-2026 CORE: 1990-01-02..2026-09-01 | start..end | 1990-01-01..2002-12-31 | 2003-01-01..2014-12-31 | 2015-01-01..end ===
+BASELINE                               | Sh 0.629 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.804 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.661 DD -16.3 CAGR  8.91 E 0.75
++ cot_es (market, cover 0.74)          | Sh 0.631 DD -24.2 CAGR  8.82 E 0.66 | Sh 0.419 DD -20.0 CAGR  8.50 E 0.62 | Sh 0.850 DD -11.9 CAGR  9.03 E 0.64 | Sh 0.660 DD -18.1 CAGR  8.96 E 0.74
+    dSh vs base:  +0.003 (P 0.44)  -0.030 (P 0.90)  +0.047 (P 0.10)  -0.001 (P 0.47)
++ cot_dxy (regime, cover 1.00)         | Sh 0.610 DD -22.4 CAGR  8.61 E 0.67 | Sh 0.413 DD -18.8 CAGR  8.45 E 0.63 | Sh 0.792 DD -14.9 CAGR  8.51 E 0.65 | Sh 0.654 DD -18.0 CAGR  8.91 E 0.75
+    dSh vs base:  -0.019 (P 0.84)  -0.036 (P 0.83)  -0.012 (P 0.92)  -0.007 (P 0.55)
++ naaim (market, cover 0.53)           | Sh 0.640 DD -20.8 CAGR  8.91 E 0.66 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.821 DD -11.9 CAGR  8.72 E 0.64 | Sh 0.681 DD -20.1 CAGR  9.23 E 0.74
+    dSh vs base:  +0.011 (P 0.32)  +0.000 (P 1.00)  +0.017 (P 0.32)  +0.020 (P 0.34)
++ acm_tp_chg (macro, cover 1.00)       | Sh 0.615 DD -22.7 CAGR  8.60 E 0.67 | Sh 0.376 DD -19.2 CAGR  8.02 E 0.62 | Sh 0.809 DD -13.7 CAGR  8.67 E 0.65 | Sh 0.690 DD -16.3 CAGR  9.19 E 0.74
+    dSh vs base:  -0.013 (P 0.79)  -0.073 (P 1.00)  +0.006 (P 0.39)  +0.029 (P 0.11)
++ ism_chg (macro, cover 0.53)          | Sh 0.623 DD -20.8 CAGR  8.69 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.727 DD -13.8 CAGR  7.83 E 0.64 | Sh 0.714 DD -16.3 CAGR  9.45 E 0.74
+    dSh vs base:  -0.005 (P 0.60)  +0.000 (P 1.00)  -0.077 (P 0.98)  +0.053 (P 0.02)
++ cor1m (market, cover 0.55)           | Sh 0.658 DD -20.8 CAGR  9.10 E 0.66 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.848 DD -11.9 CAGR  9.00 E 0.64 | Sh 0.708 DD -17.3 CAGR  9.55 E 0.73
+    dSh vs base:  +0.029 (P 0.07)  +0.000 (P 1.00)  +0.044 (P 0.12)  +0.047 (P 0.15)
++ auction_btc (macro, cover 0.68)      | Sh 0.642 DD -16.7 CAGR  8.87 E 0.67 | Sh 0.480 DD -16.4 CAGR  9.11 E 0.62 | Sh 0.774 DD -13.5 CAGR  8.26 E 0.65 | Sh 0.695 DD -16.0 CAGR  9.23 E 0.74
+    dSh vs base:  +0.013 (P 0.23)  +0.031 (P 0.24)  -0.029 (P 0.82)  +0.034 (P 0.10)
++ positioning trio (cot_es,cot_dxy,naaim) | Sh 0.641 DD -24.0 CAGR  8.95 E 0.66 | Sh 0.397 DD -19.5 CAGR  8.28 E 0.63 | Sh 0.863 DD -11.8 CAGR  9.18 E 0.63 | Sh 0.700 DD -17.4 CAGR  9.46 E 0.73
+    dSh vs base:  +0.013 (P 0.29)  -0.052 (P 0.93)  +0.060 (P 0.04)  +0.040 (P 0.23)

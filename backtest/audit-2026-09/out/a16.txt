@@ -1,0 +1,21 @@
+      date  cf_dir                                   note  composite  lead  panel_expo  panel_dir  spx_r21  spx_r63  cf_right63 panel_right63
+2023-04-25      -1                          short ES 4150       18.3  -7.1        0.65          0      2.5     12.3       False          None
+2024-03-25       1 long equities vs consensus; no recessi       26.8   3.6        0.85          1     -2.9      5.6        True          True
+2024-05-30       1                     ES long stop <5200       32.0  -1.8        0.85          1      4.5      7.4        True          True
+2024-07-18      -1               closed ES long to derisk       27.6 -10.7        0.85          1      2.0      6.5       False          True
+2024-08-06       1             bullish after VIX>60 spike       -4.3 -23.2        0.85          1      4.2     11.6        True          True
+2025-01-19      -1                 short equities Q1-2025       36.6   7.1        0.85          1     -1.1    -11.4        True         False
+2025-04-07      -1 seller on strength; no ATH in 2 months      -11.1 -17.9        0.85          1     13.8     26.5       False          True
+2025-08-14       1                for now we rally higher       29.7  -7.1        0.85          1      2.6      4.8        True          True
+2025-11-26       1                currently long equities       12.3  -8.9        0.85          1      0.8     -0.2       False         False
+2025-11-26      -1      storm: vol spike within 12 months       12.3  -8.9        0.85          1      0.8     -0.2        True         False
+2026-01-09       1               melt-up before the crash       26.0   5.4        0.85          1     -0.4      0.2        True          True
+
+CF SPX calls: n=11, right at 63d: 7 (64%)
+Panel directional (expo>=85% or <=35%) on those dates: n=10, right at 63d: 1
+Panel neutral (65%) on 1 of 11 dates
+Agreement CF vs panel direction (where panel directional): 6 of 10
+CF SPX calls: n=11, right at 63d: 7 (64%)
+Panel directional (expo>=85% or <=35%) on those dates: n=10, right at 63d: 7
+Panel neutral (65%) on 1 of 11 dates
+Agreement CF vs panel direction (where panel directional): 6 of 10

@@ -1,0 +1,21 @@
+date,asset,direction,horizon_days,source,note
+2023-04-25,SPX,-1,21,the-preponderence-of-evidence,short ES 4150
+2024-03-25,SPX,1,63,comprehensive-macro-report,long equities vs consensus; no recession
+2024-05-30,SPX,1,21,trades-long-es,ES long stop <5200
+2024-07-09,BTC,1,21,trade-bitcoin-long,BTC long 57150 stop 50600
+2024-07-18,SPX,-1,21,trade-closing-es-long,closed ES long to derisk
+2024-08-06,SPX,1,63,forward-guidance-aug-2024,bullish after VIX>60 spike
+2024-11-22,UST10,1,63,alpha-report-macro-inflection,rates unlikely to make new highs; move down
+2024-11-27,TLT,1,42,x-leverage-long-bonds,leverage long bonds and chill
+2025-01-19,SPX,-1,63,trade-short-equities,short equities Q1-2025
+2025-04-07,SPX,-1,42,alpha-report-the-unwind,seller on strength; no ATH in 2 months
+2025-05-21,TLT,-1,63,alpha-report-bond-market-crash,bond market crash; short bonds
+2025-05-21,WTI,1,63,alpha-report-bond-market-crash,long crude
+2025-08-14,SPX,1,63,credit-cycle-blow-off,for now we rally higher
+2025-11-26,SPX,1,63,macro-report-a-storm-is-coming,currently long equities
+2025-11-26,GOLD,1,63,macro-report-a-storm-is-coming,long gold
+2025-11-26,SPX,-1,252,macro-report-a-storm-is-coming,storm: vol spike within 12 months
+2026-01-09,SPX,1,63,regime-shift-in-japan,melt-up before the crash
+2026-01-09,WTI,1,63,regime-shift-in-japan,CL higher
+2026-01-09,GOLD,1,63,regime-shift-in-japan,GC higher
+2026-07-08,SPX,1,63,is-a-liquidity-event-looming,liquidity event unlikely; melt-up

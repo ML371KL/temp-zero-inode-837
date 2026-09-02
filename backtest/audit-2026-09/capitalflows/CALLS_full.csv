@@ -1,0 +1,135 @@
+date,asset,direction,horizon_days,source,note
+2023-02-10,SPX,-1,21,free post,accumulating SPY puts
+2023-03-15,SPX,1,21,free post,cover short; tactical long on squeeze
+2023-03-24,GOLD,1,63,free post,gold breakout to ATH
+2023-03-28,USDJPY,1,63,free post,yen to break down
+2023-04-05,TLT,-1,21,free post,bonds ST bearish
+2023-04-12,SPX,-1,21,free post,ES short 4160
+2023-04-21,DOLLAR,1,63,free post,bullish USD vs EUR GBP AUD
+2023-04-21,EURUSD,-1,63,free post,bullish USD vs EUR
+2023-04-21,SPX,-1,126,free post,Q3 recession; short stocks into it
+2023-04-21,WTI,-1,63,free post,short oil
+2023-04-25,SPX,-1,21,free post,ES short 4150
+2023-05-03,EURUSD,-1,21,free post,short EURUSD 1.1047
+2023-05-18,GOLD,-1,21,free post,gold bearish on curve repricing
+2023-05-23,UST10,1,21,free post,long 10y note
+2023-06-26,DOLLAR,1,126,free post,dollar liquidity to contract
+2023-06-26,SPX,-1,126,free post,risk-off into year-end
+2023-06-26,BTC,-1,126,free post,risk-off into year-end
+2023-07-16,TLT,1,63,free post,rates peaking; bonds mean-revert
+2023-07-27,GOLD,1,63,free post,marginally bullish gold
+2023-07-31,UST10,1,100,free post,no new highs in 10y into Dec
+2023-07-31,BTC,-1,63,free post,BTC/SOL bearish skew
+2023-08-19,SPX,-1,21,free post,downside for stocks
+2023-09-17,TLT,-1,63,free post,short TLT spikes
+2023-09-21,TLT,-1,63,free post,10y/30y upside skew
+2023-09-21,SPX,-1,63,free post,ES down to 4200
+2023-09-21,BTC,-1,63,free post,BTC bear persists
+2023-10-30,USDJPY,-1,5,free post,long yen on YCC leak
+2023-12-07,SPX,-1,15,free post,no break above 4700 by year-end
+2023-12-14,TLT,1,63,free post,long bond call
+2023-12-14,DOLLAR,-1,15,free post,short DXY into year-end
+2023-12-16,BTC,1,63,free post,crypto bullish on Goldilocks
+2023-12-22,USDJPY,-1,21,free post,short USDJPY
+2023-12-22,WTI,1,21,free post,long CL
+2023-12-22,SPX,1,21,free post,long ES
+2024-01-10,NDX,1,63,free post,NQ long; ATH in Q1
+2024-01-28,TLT,1,63,free post,bonds skewed up
+2024-02-14,NDX,1,63,free post,very bullish NQ
+2024-02-14,BTC,1,63,free post,very bullish BTC
+2024-02-24,SPX,1,63,free post,melt-up
+2024-03-10,WTI,-1,21,free post,crude to fall
+2024-03-14,TLT,-1,21,free post,short UB
+2024-03-19,TLT,1,5,free post,long ZN into FOMC
+2024-03-19,GOLD,1,5,free post,long GC into FOMC
+2024-03-19,EURUSD,1,5,free post,long EURUSD into FOMC
+2024-03-19,BTC,1,5,free post,long BTC into FOMC
+2024-03-25,SPX,1,63,free post,long equities vs consensus
+2024-04-14,WTI,-1,5,free post,large move down in CL
+2024-04-14,GOLD,-1,21,free post,gold to 2280
+2024-04-14,TLT,-1,21,free post,bearish duration
+2024-05-05,BTC,1,63,free post,BTC final leg up
+2024-05-05,SPX,1,21,free post,short vol long equities
+2024-05-14,DOLLAR,-1,126,free post,DXY down into year-end
+2024-05-14,BTC,1,126,free post,BTC higher into year-end
+2024-05-30,SPX,1,21,free post,ES long 5268 stop 5200
+2024-06-10,GOLD,1,63,free post,last chance to get long gold
+2024-06-28,SPX,1,63,free post,buy pullbacks H2
+2024-07-09,BTC,1,21,free post,BTC long 57150
+2024-07-18,SPX,-1,21,free post,closed ES long; derisk
+2024-07-29,TLT,1,21,free post,bullish bonds into FOMC
+2024-07-31,SPX,1,21,free post,ES long (strategy trigger)
+2024-07-31,TLT,1,21,free post,ZN long (strategy trigger)
+2024-08-06,SPX,1,63,podcast,bullish after VIX>60 spike
+2024-08-06,TLT,-1,21,free post,ZN below 115
+2024-08-14,TLT,-1,21,free post,TLT ST short
+2024-08-16,BTC,1,63,free post,bullish and long BTC
+2024-08-19,WTI,-1,21,free post,short crude
+2024-08-19,COPPER,1,21,free post,copper up
+2024-08-22,DOLLAR,-1,21,free post,bearish DXY
+2024-08-22,GOLD,1,21,free post,bullish gold
+2024-08-22,COPPER,1,21,free post,long HG
+2024-09-06,TLT,1,21,free post,hold ZN
+2024-10-10,SPX,1,63,free post,ES long; rates down into growth
+2024-10-24,SPX,1,21,free post,long ES from 5825
+2024-10-24,TLT,1,63,free post,durable bond bottom
+2024-11-22,UST10,1,63,free post,rates no new highs; move down
+2024-11-27,TLT,1,42,x post,leverage long bonds
+2025-01-19,SPX,-1,63,free post,short equities Q1
+2025-01-21,DOLLAR,1,5,free post,USD up on hot PCE
+2025-01-21,TLT,-1,5,free post,ZN below 110
+2025-01-21,EURUSD,-1,5,free post,EURUSD lower
+2025-02-14,SPX,1,21,free post,no weekly close below 6050
+2025-03-04,SPX,1,5,free post,ES above 5600 into NFP
+2025-03-04,GOLD,1,21,free post,long gold
+2025-03-04,BTC,1,21,free post,long BTC
+2025-04-07,SPX,-1,42,free post,seller; no ATH in 2 months
+2025-05-21,TLT,-1,63,free post,bond market crash
+2025-05-21,WTI,1,63,free post,long crude
+2025-05-30,TLT,-1,21,free post,bearish bonds
+2025-06-02,TLT,-1,63,free post,TLT lower
+2025-06-02,GOLD,1,63,free post,gold melt up
+2025-06-02,WTI,1,63,free post,crude up
+2025-06-05,RUT,1,21,free post,Russell up
+2025-06-05,WTI,1,21,free post,crude up
+2025-06-05,TLT,-1,21,free post,bonds down
+2025-06-08,SPX,1,63,free post,very bullish risk assets
+2025-06-14,SPX,1,21,free post,melt up continues
+2025-06-14,TLT,-1,21,free post,bonds at risk
+2025-07-07,DOLLAR,1,63,free post,bullish dollar
+2025-08-08,TLT,-1,5,free post,short ZT/ZN into CPI
+2025-08-14,SPX,1,63,free post,rally higher
+2025-09-08,TLT,-1,21,free post,ZN capped
+2025-09-08,SPX,1,63,free post,long credit-cycle beneficiaries
+2025-09-29,SPX,1,21,free post,ES long 6670
+2025-09-29,TLT,-1,21,free post,bonds below FOMC highs
+2025-09-29,GOLD,1,21,free post,metals bullish
+2025-09-29,COPPER,1,21,free post,metals bullish
+2025-10-06,SPX,1,63,free post,remain bullish
+2025-10-15,SPX,1,21,free post,run longs aggressively
+2025-10-29,SPX,1,63,free post,buy dips
+2025-11-26,SPX,1,63,free post,currently long equities
+2025-11-26,GOLD,1,63,free post,long gold
+2025-11-26,DOLLAR,-1,126,free post,structural short USD (devaluation)
+2025-11-26,SPX,-1,252,free post,storm within 12 months
+2026-01-09,SPX,1,63,free post,melt-up before the crash
+2026-01-09,WTI,1,63,free post,CL higher
+2026-01-12,GOLD,1,63,free post,gold silver melting up
+2026-01-13,USDJPY,1,63,free post,yen devaluation
+2026-03-16,SPX,1,5,free post,equity buying into FOMC
+2026-03-16,DOLLAR,-1,5,free post,dollar selling into FOMC
+2026-03-18,SPX,1,42,free post,bullish through FOMC ~2 months
+2026-03-18,DOLLAR,-1,42,free post,bearish DXY
+2026-03-18,WTI,-1,42,free post,bearish crude
+2026-03-18,BTC,1,42,free post,BTC bottoming
+2026-03-30,GOLD,1,63,free post,chase into gold
+2026-04-14,SPX,1,63,free post,melt-up setup
+2026-04-16,EURUSD,1,63,free post,EURUSD rally
+2026-04-17,SPX,1,63,free post,long stocks
+2026-04-17,DOLLAR,-1,63,free post,short USD; DXY new lows
+2026-04-17,WTI,-1,21,free post,crude flush
+2026-04-17,RUT,1,63,free post,long Russell
+2026-05-18,SPX,1,63,free post,stocks over bonds
+2026-05-18,TLT,-1,63,free post,stocks over bonds
+2026-05-31,SPX,1,42,free post,melt up further
+2026-07-08,SPX,1,63,free post,liquidity event unlikely

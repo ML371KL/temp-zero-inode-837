@@ -1,0 +1,40 @@
+      date asset  dir                         source                                        note    r5    r21    r63    r42
+2023-04-25   SPX   -1  the-preponderence-of-evidence                               short ES 4150 -0.87  -2.52 -12.33    NaN
+2024-03-25   SPX    1     comprehensive-macro-report    long equities vs consensus; no recession  0.17  -2.90   5.64    NaN
+2024-05-30   SPX    1                 trades-long-es                          ES long stop <5200  1.36   4.51   7.39    NaN
+2024-07-09   BTC    1             trade-bitcoin-long                   BTC long 57150 stop 50600 12.34  11.91  -0.69    NaN
+2024-07-18   SPX   -1          trade-closing-es-long                    closed ES long to derisk  0.82  -2.00  -6.47    NaN
+2024-08-06   SPX    1      forward-guidance-aug-2024                  bullish after VIX>60 spike  4.95   4.18  11.59    NaN
+2024-11-22 UST10    1  alpha-report-macro-inflection rates unlikely to make new highs; move down  0.42  -2.27   0.89    NaN
+2024-11-27   TLT    1          x-leverage-long-bonds               leverage long bonds and chill  0.45  -7.07  -3.48  -6.18
+2025-01-19   SPX   -1           trade-short-equities                      short equities Q1-2025 -0.32  -1.25  12.29    NaN
+2025-04-07   SPX   -1        alpha-report-the-unwind      seller on strength; no ATH in 2 months -8.34 -13.75 -26.48 -20.82
+2025-05-21   TLT   -1 alpha-report-bond-market-crash              bond market crash; short bonds -2.22  -3.54  -3.13    NaN
+2025-05-21   WTI    1 alpha-report-bond-market-crash                                  long crude -1.74   4.64   2.45    NaN
+2025-08-14   SPX    1          credit-cycle-blow-off                     for now we rally higher  0.30   2.58   4.75    NaN
+2025-11-26   SPX    1 macro-report-a-storm-is-coming                     currently long equities  0.35   0.80  -0.16    NaN
+2025-11-26  GOLD    1 macro-report-a-storm-is-coming                                   long gold -0.13   3.60  21.08    NaN
+2025-11-26   SPX   -1 macro-report-a-storm-is-coming           storm: vol spike within 12 months -0.35  -0.80   0.16    NaN
+2026-01-09   SPX    1          regime-shift-in-japan                    melt-up before the crash -2.57  -0.45   0.16    NaN
+2026-01-09   WTI    1          regime-shift-in-japan                                   CL higher  1.53   9.11  56.71    NaN
+2026-01-09  GOLD    1          regime-shift-in-japan                                   GC higher  3.37  10.15   4.79    NaN
+
+=== summary (signed returns, % ; positive = call was right) ===
+  h=  5d: n=19 hit 58%  mean +0.50%  median +0.30%  t=+0.56
+  h= 21d: n=19 hit 47%  mean +0.79%  median -0.45%  t=+0.56
+  h= 63d: n=19 hit 63%  mean +3.96%  median +0.89%  t=+1.07
+
+=== baseline: always long same asset/date ===
+  h=  5d: hit 79%  mean +1.69%
+  h= 21d: hit 79%  mean +3.30%
+  h= 63d: hit 74%  mean +7.74%
+
+by asset (h=21):
+       count   mean  <lambda_0>
+asset                          
+BTC        1  11.91        1.00
+GOLD       2   6.87        1.00
+SPX       11  -1.05        0.36
+TLT        2  -5.30        0.00
+UST10      1  -2.27        0.00
+WTI        2   6.87        1.00

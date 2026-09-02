@@ -1,0 +1,137 @@
+files: ['BAMLHE00EHYIOAS.csv', 'DEXUSEU.csv', 'DTWEXAFEGS.csv', 'DTWEXEMEGS.csv', 'GVZCLS.csv', 'IRLTLT01JPM156N.csv', 'OVXCLS.csv', 'RECPROUSM156N.csv', 'T10Y2Y.csv', 'THREEFYTP10.csv', 'acm_tp10.csv', 'acm_tp10_monthly.csv', 'auctions_bills.csv', 'auctions_bonds.csv', 'auctions_notes.csv', 'cboe_cor1m.csv', 'cboe_cor3m.csv', 'cboe_skew.csv', 'cboe_vvix.csv', 'cot_legacy_crude_wti.csv', 'cot_legacy_gold.csv', 'cot_legacy_jpy.csv', 'cot_legacy_sp500_consolidated.csv', 'cot_legacy_sp500_emini.csv', 'cot_legacy_sp500_large.csv', 'cot_legacy_usd_index.csv', 'cot_legacy_ust_10y.csv', 'cot_legacy_ust_bonds.csv', 'cot_legacy_vix.csv', 'cot_tff_jpy.csv', 'cot_tff_sp500_consolidated.csv', 'cot_tff_sp500_emini.csv', 'cot_tff_usd_index.csv', 'cot_tff_ust_10y.csv', 'cot_tff_ust_bonds.csv', 'cot_tff_vix.csv', 'fed_custody_foreign.csv', 'naaim.csv', 'tic_foreign_holdings_total.csv', 'tic_net_lt_purchases.csv']
+=== A14 positioning/flows, 1990-01-02..2026-09-01 ===
+                                             cover  icSPX_1m  icBond_1m     n  icSPX_3m  icBond_3m
+var                                                                                               
+COT ES spec net %OI z52                       0.77    -0.027     -0.049  1413    -0.053     -0.113
+COT ES spec net %OI pct156                    0.74    -0.045     -0.028  1351    -0.069     -0.099
+COT SPX cons spec net %OI z52                 0.43    -0.040     -0.073   774    -0.026     -0.174
+COT SPX cons spec net %OI pct156              0.39    -0.054     -0.060   714    -0.035     -0.165
+COT SPX asset-mgr net %OI z52                 0.42    -0.063     -0.002   769    -0.041      0.014
+COT SPX asset-mgr net %OI pct156              0.39    -0.045      0.024   709    -0.034      0.087
+COT SPX lev-funds net %OI z52                 0.42     0.098     -0.057   769     0.146     -0.128
+COT SPX lev-funds net %OI pct156              0.39     0.016      0.006   709     0.027     -0.035
+COT UST10 spec net %OI z52                    1.00     0.066     -0.003  1835     0.118     -0.013
+COT UST10 spec net %OI pct156                 1.00     0.015      0.016  1835     0.035      0.003
+COT UST10 lev-funds net %OI z52               0.42     0.055      0.006   769     0.183     -0.009
+COT UST10 lev-funds net %OI pct156            0.39     0.037     -0.116   709     0.169     -0.242
+COT VIX spec net %OI z52                      0.59     0.064      0.054  1070     0.064      0.123
+COT VIX spec net %OI pct156                   0.55     0.034      0.035  1010     0.008      0.091
+COT DXY spec net %OI z52                      1.00    -0.070      0.011  1835    -0.128      0.007
+COT DXY spec net %OI pct156                   1.00    -0.065      0.002  1835    -0.135      0.014
+COT JPY spec net %OI z52                      1.00     0.008     -0.027  1835     0.039     -0.019
+COT JPY spec net %OI pct156                   1.00     0.025     -0.018  1835     0.055     -0.019
+CBOE COR1M                                    0.56     0.147      0.055  1027     0.149      0.077
+CBOE COR1M z252                               0.55     0.143      0.049   997     0.131      0.071
+VVIX                                          0.56     0.108     -0.026  1019     0.147     -0.123
+VVIX z252                                     0.54     0.077      0.051   977     0.072      0.021
+SKEW 21d                                      1.00     0.036     -0.142  1830     0.080     -0.201
+SKEW 21d z252                                 0.98    -0.034     -0.041  1800    -0.032     -0.092
+NAAIM level                                   0.55    -0.120     -0.093  1002    -0.100     -0.134
+NAAIM z52                                     0.53    -0.063     -0.070   973    -0.018     -0.100
+ACM TP10 level                                1.00    -0.073      0.173  1835    -0.097      0.247
+ACM TP10 Δ63d                                 1.00    -0.036      0.014  1835    -0.092      0.039
+TIC net LT purchases (3m sum)                 1.00     0.016     -0.031  1835     0.051     -0.065
+TIC foreign UST holdings yoy %                1.00     0.060      0.022  1835     0.078      0.030
+Fed custody foreign Δ13w %                    0.64    -0.036     -0.027  1168    -0.010     -0.053
+auction bid-to-cover (notes, 8-auction avg)   0.72     0.072     -0.018  1324     0.119      0.006
+
+--- forward 3m SPX excess by tercile / extremes (top & bottom decile) ---
+  COT ES spec net %OI z52                        low:  +9.0% n=471 | mid:  +6.5% n=471 | high:  +4.5% n=471  | bottom10% +14.5% top10%  +3.0%
+  COT ES spec net %OI pct156                     low:  +9.3% n=451 | mid:  +5.9% n=450 | high:  +4.4% n=450  | bottom10% +11.9% top10%  +3.5%
+  COT SPX cons spec net %OI z52                  low: +13.7% n=258 | mid:  +8.0% n=258 | high: +13.9% n=258  | bottom10% +14.6% top10%  +8.8%
+  COT SPX cons spec net %OI pct156               low: +10.2% n=238 | mid: +16.1% n=238 | high: +11.0% n=238  | bottom10%  +9.3% top10%  +4.4%
+  COT SPX asset-mgr net %OI z52                  low: +13.4% n=257 | mid: +10.3% n=256 | high: +12.1% n=256  | bottom10% +18.2% top10%  +6.0%
+  COT SPX asset-mgr net %OI pct156               low: +12.4% n=237 | mid: +17.5% n=236 | high:  +8.0% n=236  | bottom10%  +9.3% top10%  +2.9%
+  COT SPX lev-funds net %OI z52                  low:  +6.4% n=257 | mid: +12.4% n=256 | high: +16.9% n=256  | bottom10%  -0.4% top10% +14.9%
+  COT SPX lev-funds net %OI pct156               low:  +9.0% n=237 | mid: +14.2% n=236 | high: +14.7% n=236  | bottom10%  +6.1% top10%  +8.9%
+  COT UST10 spec net %OI z52                     low:  +2.9% n=612 | mid:  +9.3% n=611 | high: +11.4% n=612  | bottom10%  +4.6% top10% +16.6%
+  COT UST10 spec net %OI pct156                  low:  +6.5% n=612 | mid:  +5.9% n=611 | high: +11.2% n=612  | bottom10%  +8.9% top10%  +9.6%
+  COT UST10 lev-funds net %OI z52                low:  +9.4% n=257 | mid:  +7.2% n=256 | high: +19.0% n=256  | bottom10%  +8.6% top10% +20.8%
+  COT UST10 lev-funds net %OI pct156             low: +11.1% n=237 | mid: +10.5% n=236 | high: +16.2% n=236  | bottom10%  +8.5% top10% +22.0%
+  COT VIX spec net %OI z52                       low:  +8.6% n=357 | mid:  +9.5% n=356 | high:  +9.0% n=357  | bottom10%  +2.2% top10% +16.5%
+  COT VIX spec net %OI pct156                    low: +10.9% n=337 | mid:  +4.6% n=336 | high: +12.5% n=337  | bottom10% +13.1% top10% +19.5%
+  COT DXY spec net %OI z52                       low: +12.8% n=612 | mid:  +8.2% n=611 | high:  +2.7% n=612  | bottom10% +12.6% top10%  -0.1%
+  COT DXY spec net %OI pct156                    low: +12.2% n=612 | mid:  +9.0% n=611 | high:  +2.5% n=612  | bottom10% +12.0% top10%  +0.6%
+  COT JPY spec net %OI z52                       low:  +9.5% n=612 | mid:  +4.0% n=611 | high: +10.2% n=612  | bottom10% +10.2% top10% +13.7%
+  COT JPY spec net %OI pct156                    low:  +9.8% n=612 | mid:  +4.7% n=611 | high:  +9.2% n=612  | bottom10%  +7.8% top10% +18.4%
+  CBOE COR1M                                     low:  +7.7% n=343 | mid:  +4.3% n=342 | high: +15.1% n=342  | bottom10%  +5.2% top10% +25.7%
+  CBOE COR1M z252                                low:  +2.8% n=333 | mid: +11.5% n=332 | high: +13.5% n=332  | bottom10%  +5.7% top10% +14.1%
+  VVIX                                           low:  +3.8% n=340 | mid: +10.0% n=339 | high: +13.5% n=340  | bottom10%  -5.8% top10% +19.7%
+  VVIX z252                                      low:  +6.3% n=326 | mid:  +9.6% n=325 | high: +11.6% n=326  | bottom10%  +8.8% top10% +12.2%
+  SKEW 21d                                       low:  +2.6% n=610 | mid: +10.8% n=610 | high: +10.4% n=610  | bottom10%  +4.5% top10%  +8.7%
+  SKEW 21d z252                                  low:  +6.1% n=600 | mid: +11.8% n=600 | high:  +7.1% n=600  | bottom10%  +9.9% top10%  +1.4%
+  NAAIM level                                    low: +10.3% n=334 | mid:  +9.7% n=334 | high:  +8.0% n=334  | bottom10%  +3.8% top10%  +9.6%
+  NAAIM z52                                      low:  +6.9% n=325 | mid:  +9.8% n=324 | high: +10.8% n=324  | bottom10% +17.4% top10% +12.0%
+  ACM TP10 level                                 low: +11.4% n=612 | mid:  +6.5% n=611 | high:  +5.8% n=612  | bottom10%  +9.5% top10%  +9.0%
+  ACM TP10 Δ63d                                  low: +13.5% n=612 | mid:  +4.4% n=611 | high:  +5.7% n=612  | bottom10% +17.8% top10%  +8.2%
+  TIC net LT purchases (3m sum)                  low:  +7.2% n=612 | mid:  +6.5% n=611 | high:  +9.9% n=612  | bottom10%  +2.3% top10% +13.8%
+  TIC foreign UST holdings yoy %                 low:  +6.5% n=612 | mid:  +7.8% n=611 | high:  +9.3% n=612  | bottom10%  -0.0% top10% +16.9%
+  Fed custody foreign Δ13w %                     low: +10.9% n=390 | mid:  +9.5% n=389 | high:  +7.7% n=389  | bottom10% +10.4% top10%  +9.8%
+  auction bid-to-cover (notes, 8-auction avg)    low:  +0.2% n=442 | mid:  +9.3% n=441 | high:  +9.7% n=441  | bottom10%  -3.3% top10% +15.9%
+
+--- ladder overlays (2003-2026): cap 65% when variable in top decile (crowded long) / floor 65% in bottom decile ---
+BASELINE                                                 | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+cap65 top-decile [COT ES spec net %OI z52]               | Sh 0.760 DD -18.2 CAGR  9.11 E 0.69 | Sh 0.778 DD -11.7 CAGR  8.31 E 0.64 | Sh 0.749 DD -18.2 CAGR  9.94 E 0.74
+floor65 bottom-decile [COT ES spec net %OI z52]          | Sh 0.792 DD -19.6 CAGR  9.82 E 0.72 | Sh 0.783 DD -12.4 CAGR  8.63 E 0.66 | Sh 0.805 DD -19.6 CAGR 11.06 E 0.77
+cap65 top-decile [COT ES spec net %OI pct156]            | Sh 0.771 DD -16.9 CAGR  9.17 E 0.68 | Sh 0.761 DD -11.7 CAGR  8.09 E 0.63 | Sh 0.785 DD -16.9 CAGR 10.30 E 0.73
+floor65 bottom-decile [COT ES spec net %OI pct156]       | Sh 0.825 DD -19.3 CAGR 10.26 E 0.72 | Sh 0.821 DD -11.1 CAGR  9.09 E 0.66 | Sh 0.834 DD -19.3 CAGR 11.48 E 0.78
+cap65 top-decile [COT SPX cons spec net %OI z52]         | Sh 0.758 DD -18.2 CAGR  9.13 E 0.70 | Sh 0.775 DD -11.7 CAGR  8.37 E 0.65 | Sh 0.747 DD -18.2 CAGR  9.92 E 0.74
+floor65 bottom-decile [COT SPX cons spec net %OI z52]    | Sh 0.777 DD -17.8 CAGR  9.54 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.792 DD -17.8 CAGR 10.83 E 0.77
+cap65 top-decile [COT SPX cons spec net %OI pct156]      | Sh 0.768 DD -18.0 CAGR  9.29 E 0.70 | Sh 0.766 DD -11.7 CAGR  8.30 E 0.66 | Sh 0.774 DD -18.0 CAGR 10.31 E 0.75
+floor65 bottom-decile [COT SPX cons spec net %OI pct156] | Sh 0.793 DD -19.3 CAGR  9.79 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.822 DD -19.3 CAGR 11.33 E 0.78
+cap65 top-decile [COT SPX asset-mgr net %OI z52]         | Sh 0.772 DD -18.2 CAGR  9.28 E 0.69 | Sh 0.775 DD -11.7 CAGR  8.32 E 0.65 | Sh 0.775 DD -18.2 CAGR 10.27 E 0.73
+floor65 bottom-decile [COT SPX asset-mgr net %OI z52]    | Sh 0.735 DD -18.0 CAGR  9.55 E 0.72 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.724 DD -18.0 CAGR 10.83 E 0.78
+cap65 top-decile [COT SPX asset-mgr net %OI pct156]      | Sh 0.780 DD -18.2 CAGR  9.28 E 0.69 | Sh 0.792 DD -11.7 CAGR  8.49 E 0.65 | Sh 0.773 DD -18.2 CAGR 10.11 E 0.73
+floor65 bottom-decile [COT SPX asset-mgr net %OI pct156] | Sh 0.809 DD -16.6 CAGR 10.13 E 0.72 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.853 DD -16.6 CAGR 12.02 E 0.78
+cap65 top-decile [COT SPX lev-funds net %OI z52]         | Sh 0.738 DD -18.2 CAGR  8.91 E 0.69 | Sh 0.762 DD -11.7 CAGR  8.23 E 0.65 | Sh 0.720 DD -18.2 CAGR  9.62 E 0.74
+floor65 bottom-decile [COT SPX lev-funds net %OI z52]    | Sh 0.740 DD -21.9 CAGR  9.09 E 0.71 | Sh 0.771 DD -11.7 CAGR  8.37 E 0.66 | Sh 0.719 DD -21.9 CAGR  9.85 E 0.76
+cap65 top-decile [COT SPX lev-funds net %OI pct156]      | Sh 0.750 DD -18.0 CAGR  9.06 E 0.70 | Sh 0.759 DD -11.7 CAGR  8.20 E 0.65 | Sh 0.747 DD -18.0 CAGR  9.95 E 0.74
+floor65 bottom-decile [COT SPX lev-funds net %OI pct156] | Sh 0.758 DD -19.1 CAGR  9.32 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.757 DD -19.1 CAGR 10.36 E 0.77
+cap65 top-decile [COT UST10 spec net %OI z52]            | Sh 0.752 DD -18.2 CAGR  9.07 E 0.69 | Sh 0.755 DD -11.7 CAGR  8.07 E 0.64 | Sh 0.755 DD -18.2 CAGR 10.11 E 0.75
+floor65 bottom-decile [COT UST10 spec net %OI z52]       | Sh 0.820 DD -16.7 CAGR 10.20 E 0.72 | Sh 0.866 DD -12.2 CAGR  9.90 E 0.68 | Sh 0.780 DD -16.7 CAGR 10.51 E 0.76
+cap65 top-decile [COT UST10 spec net %OI pct156]         | Sh 0.733 DD -18.2 CAGR  8.85 E 0.69 | Sh 0.746 DD -11.7 CAGR  7.95 E 0.63 | Sh 0.728 DD -18.2 CAGR  9.78 E 0.74
+floor65 bottom-decile [COT UST10 spec net %OI pct156]    | Sh 0.827 DD -18.5 CAGR 10.31 E 0.72 | Sh 0.901 DD -11.7 CAGR 10.31 E 0.68 | Sh 0.760 DD -18.5 CAGR 10.31 E 0.76
+cap65 top-decile [COT UST10 lev-funds net %OI z52]       | Sh 0.757 DD -18.2 CAGR  9.16 E 0.70 | Sh 0.767 DD -11.7 CAGR  8.30 E 0.65 | Sh 0.753 DD -18.2 CAGR 10.06 E 0.75
+floor65 bottom-decile [COT UST10 lev-funds net %OI z52]  | Sh 0.758 DD -21.6 CAGR  9.34 E 0.71 | Sh 0.773 DD -11.7 CAGR  8.38 E 0.66 | Sh 0.751 DD -21.6 CAGR 10.33 E 0.77
+cap65 top-decile [COT UST10 lev-funds net %OI pct156]    | Sh 0.747 DD -18.0 CAGR  9.04 E 0.70 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.733 DD -18.0 CAGR  9.79 E 0.74
+floor65 bottom-decile [COT UST10 lev-funds net %OI pct156] | Sh 0.776 DD -18.2 CAGR  9.46 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.788 DD -18.2 CAGR 10.66 E 0.76
+cap65 top-decile [COT VIX spec net %OI z52]              | Sh 0.744 DD -18.2 CAGR  8.96 E 0.69 | Sh 0.742 DD -12.2 CAGR  8.00 E 0.65 | Sh 0.751 DD -18.2 CAGR  9.96 E 0.74
+floor65 bottom-decile [COT VIX spec net %OI z52]         | Sh 0.670 DD -25.0 CAGR  8.64 E 0.72 | Sh 0.579 DD -25.0 CAGR  7.10 E 0.68 | Sh 0.760 DD -18.5 CAGR 10.26 E 0.76
+cap65 top-decile [COT VIX spec net %OI pct156]           | Sh 0.757 DD -17.4 CAGR  9.05 E 0.69 | Sh 0.753 DD -12.0 CAGR  8.09 E 0.64 | Sh 0.765 DD -17.4 CAGR 10.06 E 0.74
+floor65 bottom-decile [COT VIX spec net %OI pct156]      | Sh 0.682 DD -23.6 CAGR  8.65 E 0.71 | Sh 0.598 DD -23.6 CAGR  7.09 E 0.67 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+cap65 top-decile [COT DXY spec net %OI z52]              | Sh 0.752 DD -18.2 CAGR  9.06 E 0.69 | Sh 0.758 DD -11.7 CAGR  8.14 E 0.65 | Sh 0.752 DD -18.2 CAGR 10.02 E 0.74
+floor65 bottom-decile [COT DXY spec net %OI z52]         | Sh 0.800 DD -18.8 CAGR  9.97 E 0.71 | Sh 0.827 DD -11.7 CAGR  9.04 E 0.66 | Sh 0.785 DD -18.8 CAGR 10.93 E 0.77
+cap65 top-decile [COT DXY spec net %OI pct156]           | Sh 0.789 DD -16.2 CAGR  9.47 E 0.70 | Sh 0.748 DD -11.7 CAGR  8.04 E 0.64 | Sh 0.831 DD -16.2 CAGR 10.97 E 0.75
+floor65 bottom-decile [COT DXY spec net %OI pct156]      | Sh 0.769 DD -18.2 CAGR  9.36 E 0.71 | Sh 0.774 DD -11.7 CAGR  8.39 E 0.66 | Sh 0.769 DD -18.2 CAGR 10.37 E 0.76
+cap65 top-decile [COT JPY spec net %OI z52]              | Sh 0.760 DD -18.2 CAGR  9.14 E 0.69 | Sh 0.783 DD -11.7 CAGR  8.44 E 0.65 | Sh 0.743 DD -18.2 CAGR  9.87 E 0.74
+floor65 bottom-decile [COT JPY spec net %OI z52]         | Sh 0.776 DD -15.8 CAGR  9.54 E 0.71 | Sh 0.771 DD -11.7 CAGR  8.53 E 0.66 | Sh 0.783 DD -15.8 CAGR 10.59 E 0.76
+cap65 top-decile [COT JPY spec net %OI pct156]           | Sh 0.776 DD -18.2 CAGR  9.31 E 0.70 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.787 DD -18.2 CAGR 10.35 E 0.74
+floor65 bottom-decile [COT JPY spec net %OI pct156]      | Sh 0.763 DD -16.8 CAGR  9.33 E 0.71 | Sh 0.761 DD -11.7 CAGR  8.26 E 0.66 | Sh 0.769 DD -16.8 CAGR 10.45 E 0.76
+cap65 top-decile [CBOE COR1M]                            | Sh 0.755 DD -18.2 CAGR  9.17 E 0.71 | Sh 0.744 DD -11.6 CAGR  8.04 E 0.65 | Sh 0.769 DD -18.2 CAGR 10.35 E 0.76
+floor65 bottom-decile [CBOE COR1M]                       | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+cap65 top-decile [CBOE COR1M z252]                       | Sh 0.751 DD -18.0 CAGR  9.11 E 0.70 | Sh 0.765 DD -11.7 CAGR  8.29 E 0.65 | Sh 0.743 DD -18.0 CAGR  9.96 E 0.75
+floor65 bottom-decile [CBOE COR1M z252]                  | Sh 0.729 DD -18.2 CAGR  8.95 E 0.71 | Sh 0.697 DD -14.8 CAGR  7.69 E 0.67 | Sh 0.761 DD -18.2 CAGR 10.26 E 0.76
+cap65 top-decile [VVIX]                                  | Sh 0.730 DD -17.3 CAGR  8.71 E 0.69 | Sh 0.752 DD -11.6 CAGR  8.11 E 0.65 | Sh 0.712 DD -17.3 CAGR  9.34 E 0.73
+floor65 bottom-decile [VVIX]                             | Sh 0.754 DD -18.2 CAGR  9.21 E 0.71 | Sh 0.749 DD -11.7 CAGR  8.16 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+cap65 top-decile [VVIX z252]                             | Sh 0.741 DD -18.0 CAGR  8.94 E 0.70 | Sh 0.769 DD -11.6 CAGR  8.27 E 0.65 | Sh 0.720 DD -18.0 CAGR  9.63 E 0.75
+floor65 bottom-decile [VVIX z252]                        | Sh 0.733 DD -20.4 CAGR  9.09 E 0.72 | Sh 0.713 DD -13.4 CAGR  7.90 E 0.67 | Sh 0.756 DD -20.4 CAGR 10.34 E 0.77
+cap65 top-decile [SKEW 21d]                              | Sh 0.762 DD -15.9 CAGR  8.73 E 0.64 | Sh 0.808 DD -10.9 CAGR  8.34 E 0.61 | Sh 0.723 DD -15.9 CAGR  9.12 E 0.66
+floor65 bottom-decile [SKEW 21d]                         | Sh 0.690 DD -20.3 CAGR  8.67 E 0.71 | Sh 0.617 DD -20.3 CAGR  7.15 E 0.67 | Sh 0.760 DD -18.5 CAGR 10.26 E 0.76
+cap65 top-decile [SKEW 21d z252]                         | Sh 0.758 DD -18.2 CAGR  9.14 E 0.69 | Sh 0.777 DD -11.7 CAGR  8.31 E 0.65 | Sh 0.748 DD -18.2 CAGR 10.01 E 0.74
+floor65 bottom-decile [SKEW 21d z252]                    | Sh 0.764 DD -16.7 CAGR  9.52 E 0.72 | Sh 0.733 DD -12.4 CAGR  8.18 E 0.67 | Sh 0.795 DD -16.7 CAGR 10.92 E 0.77
+cap65 top-decile [NAAIM level]                           | Sh 0.750 DD -18.2 CAGR  8.96 E 0.68 | Sh 0.763 DD -11.4 CAGR  8.13 E 0.64 | Sh 0.742 DD -18.2 CAGR  9.82 E 0.72
+floor65 bottom-decile [NAAIM level]                      | Sh 0.661 DD -25.9 CAGR  9.33 E 0.73 | Sh 0.597 DD -25.9 CAGR  7.97 E 0.69 | Sh 0.723 DD -22.0 CAGR 10.74 E 0.77
+cap65 top-decile [NAAIM z52]                             | Sh 0.752 DD -18.2 CAGR  9.11 E 0.70 | Sh 0.739 DD -11.7 CAGR  8.00 E 0.65 | Sh 0.768 DD -18.2 CAGR 10.26 E 0.75
+floor65 bottom-decile [NAAIM z52]                        | Sh 0.701 DD -22.0 CAGR  9.42 E 0.72 | Sh 0.719 DD -12.8 CAGR  8.44 E 0.67 | Sh 0.694 DD -22.0 CAGR 10.44 E 0.78
+cap65 top-decile [ACM TP10 level]                        | Sh 0.761 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.765 DD -11.7 CAGR  8.30 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+floor65 bottom-decile [ACM TP10 level]                   | Sh 0.736 DD -23.0 CAGR  9.62 E 0.72 | Sh 0.773 DD -11.7 CAGR  8.38 E 0.66 | Sh 0.723 DD -23.0 CAGR 10.90 E 0.78
+cap65 top-decile [ACM TP10 Δ63d]                         | Sh 0.750 DD -18.2 CAGR  9.07 E 0.70 | Sh 0.771 DD -11.7 CAGR  8.31 E 0.65 | Sh 0.736 DD -18.2 CAGR  9.86 E 0.75
+floor65 bottom-decile [ACM TP10 Δ63d]                    | Sh 0.691 DD -19.5 CAGR  8.92 E 0.72 | Sh 0.729 DD -18.2 CAGR  8.51 E 0.68 | Sh 0.660 DD -19.5 CAGR  9.34 E 0.76
+cap65 top-decile [TIC net LT purchases (3m sum)]         | Sh 0.750 DD -18.2 CAGR  8.95 E 0.68 | Sh 0.772 DD -11.7 CAGR  8.19 E 0.63 | Sh 0.737 DD -18.2 CAGR  9.73 E 0.73
+floor65 bottom-decile [TIC net LT purchases (3m sum)]    | Sh 0.615 DD -35.9 CAGR  8.59 E 0.73 | Sh 0.473 DD -35.9 CAGR  6.65 E 0.69 | Sh 0.780 DD -18.7 CAGR 10.63 E 0.77
+cap65 top-decile [TIC foreign UST holdings yoy %]        | Sh 0.764 DD -18.2 CAGR  9.27 E 0.70 | Sh 0.773 DD -11.7 CAGR  8.29 E 0.65 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+floor65 bottom-decile [TIC foreign UST holdings yoy %]   | Sh 0.780 DD -19.6 CAGR  9.65 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.798 DD -19.6 CAGR 11.03 E 0.77
+cap65 top-decile [Fed custody foreign Δ13w %]            | Sh 0.760 DD -18.2 CAGR  9.24 E 0.71 | Sh 0.762 DD -11.7 CAGR  8.24 E 0.65 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+floor65 bottom-decile [Fed custody foreign Δ13w %]       | Sh 0.815 DD -19.8 CAGR 10.29 E 0.72 | Sh 0.753 DD -15.0 CAGR  8.40 E 0.67 | Sh 0.875 DD -19.8 CAGR 12.27 E 0.78
+cap65 top-decile [auction bid-to-cover (notes, 8-auction a] | Sh 0.783 DD -18.2 CAGR  9.34 E 0.69 | Sh 0.818 DD -10.6 CAGR  8.43 E 0.62 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+floor65 bottom-decile [auction bid-to-cover (notes, 8-auction a] | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76

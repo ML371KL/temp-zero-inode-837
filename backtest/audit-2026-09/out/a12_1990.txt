@@ -1,0 +1,101 @@
+=== A12 regime map, 1990-01-02..2026-09-01 ===
+
+--- (1) Spearman IC of each regime variable vs forward SPX excess return (weekly samples) ---
+                                                            cover  ic_1m  n_1m  ic_3m  n_3m
+var                                                                                        
+growth_level (CFNAI-MA3)                                     1.00 -0.003  1843  0.046  1835
+growth_mom (ΔCFNAI-MA3, 3m)                                  1.00 -0.002  1843  0.034  1835
+INDPRO 3m ann %                                              1.00  0.041  1843  0.093  1835
+payrolls 3m avg chg                                          1.00 -0.021  1843  0.020  1835
+ISM level (2007+)                                            0.53 -0.016   981 -0.045   973
+ISM Δ3m                                                      0.53  0.115   968  0.175   960
+core CPI yoy                                                 1.00 -0.070  1843 -0.133  1835
+infl_mom (3m ann − yoy)                                      1.00 -0.002  1843 -0.022  1835
+real FF (FF − core yoy)                                      1.00 -0.046  1843 -0.063  1835
+FF − nominal GDP yoy                                         1.00  0.000  1843  0.022  1835
+real 10y level                                               0.64 -0.067  1186 -0.109  1178
+real 10y Δ60d bp                                             0.64 -0.088  1178 -0.172  1170
+breakeven 10y Δ60d bp                                        0.64 -0.032  1178  0.037  1170
+real10 − breakeven (real minus infl exp)                     0.64 -0.009  1186 -0.009  1178
+30y yield vs 252d max (bp below)                             1.00 -0.066  1843 -0.086  1835
+10y−2y slope Δ60d bp                                         1.00  0.015  1843  0.023  1835
+bear steepening flag                                         1.00 -0.010  1843  0.057  1835
+HY OAS pct rank 1y                                           0.71  0.016  1308 -0.072  1300
+HY OAS pct rank 3y                                           0.68  0.059  1250  0.025  1242
+VIX/VIX3M                                                    0.51  0.134   939  0.135   931
+VIX9D/VIX (1w vs 1m vol)                                     0.43  0.110   783  0.103   775
+MOVE                                                         0.65 -0.003  1193 -0.046  1185
+MOVE pct rank 1y                                             0.63  0.029  1162 -0.006  1154
+USDJPY realized vol 21d                                      1.00  0.023  1843  0.042  1835
+dollar Δ60d %                                                1.00  0.035  1843 -0.038  1835
+net liquidity Δ13w %                                         0.64  0.050  1176  0.042  1168
+CF read: credit tight & 30y at highs (infl>recession risk)   1.00 -0.050  1843 -0.040  1835
+CF read: growth decel & Fed restrictive (liquidity gap)      1.00  0.005  1843 -0.027  1835
+quadrant (1 G↑I↓ 2 G↑I↑ 3 G↓I↑ 4 G↓I↓)                       1.00  0.020  1843 -0.024  1835
+
+--- (2) Forward returns by regime read (annualized %, 3m horizon) for each asset ---
+
+bear steepening flag:
+  SPX            0:  +10.0% (n=8398) | 1:  +16.7% (n=773)
+  UST10 (proxy)  0:   +4.7% (n=8398) | 1:   +5.9% (n=773)
+  TLT            0:   -0.6% (n=5352) | 1:   +3.6% (n=647)
+  Dollar         0:   +0.8% (n=8398) | 1:   -5.9% (n=773)
+  Gold           0:  +10.6% (n=5785) | 1:  +11.7% (n=691)
+  WTI            0:   +2.9% (n=8396) | 1:  +12.4% (n=773)
+  Copper         0:   +6.8% (n=5785) | 1:  +15.9% (n=691)
+  NDX/SPX        0:   +5.2% (n=8398) | 1:   +2.8% (n=773)
+  RUT/SPX        0:   -0.6% (n=8398) | 1:   +0.2% (n=773)
+
+CF read: credit tight & 30y at highs (infl>recession risk):
+  SPX            0:  +10.8% (n=8352) | 1:   +7.6% (n=819)
+  UST10 (proxy)  0:   +4.6% (n=8352) | 1:   +6.8% (n=819)
+  TLT            0:   -1.2% (n=5180) | 1:   +6.6% (n=819)
+  Dollar         0:   +0.4% (n=8352) | 1:   -1.7% (n=819)
+  Gold           0:  +10.6% (n=5657) | 1:  +11.2% (n=819)
+  WTI            0:   +4.0% (n=8350) | 1:   +0.7% (n=819)
+  Copper         0:   +7.5% (n=5657) | 1:   +9.1% (n=819)
+  NDX/SPX        0:   +5.3% (n=8352) | 1:   +2.0% (n=819)
+  RUT/SPX        0:   -0.0% (n=8352) | 1:   -5.5% (n=819)
+
+CF read: growth decel & Fed restrictive (liquidity gap):
+  SPX            0:  +10.4% (n=7048) | 1:  +11.1% (n=2123)
+  UST10 (proxy)  0:   +4.0% (n=7048) | 1:   +7.7% (n=2123)
+  TLT            0:   -0.2% (n=5171) | 1:   +0.4% (n=828)
+  Dollar         0:   +0.2% (n=7048) | 1:   +0.4% (n=2123)
+  Gold           0:   +8.2% (n=5462) | 1:  +24.3% (n=1014)
+  WTI            0:   +1.3% (n=7046) | 1:  +11.5% (n=2123)
+  Copper         0:   +8.5% (n=5462) | 1:   +3.5% (n=1014)
+  NDX/SPX        0:   +4.6% (n=7048) | 1:   +6.5% (n=2123)
+  RUT/SPX        0:   -0.1% (n=7048) | 1:   -2.1% (n=2123)
+
+quadrant (1 G↑I↓ 2 G↑I↑ 3 G↓I↑ 4 G↓I↓):
+  SPX            1:  +13.1% (n=2288) | 2:  +11.5% (n=2051) | 3:   +8.1% (n=2455) | 4:   +9.8% (n=2377)
+  UST10 (proxy)  1:   +7.6% (n=2288) | 2:   +2.9% (n=2051) | 3:   +6.6% (n=2455) | 4:   +2.0% (n=2377)
+  TLT            1:   +1.3% (n=1342) | 2:   -0.1% (n=1425) | 3:   +3.1% (n=1541) | 4:   -4.3% (n=1691)
+  Dollar         1:   -2.5% (n=2288) | 2:   -0.0% (n=2051) | 3:   +1.7% (n=2455) | 4:   +1.6% (n=2377)
+  Gold           1:  +10.0% (n=1486) | 2:   +6.6% (n=1551) | 3:   +8.7% (n=1671) | 4:  +16.8% (n=1768)
+  WTI            1:   +4.0% (n=2288) | 2:   +4.5% (n=2051) | 3:   -0.6% (n=2454) | 4:   +7.0% (n=2376)
+  Copper         1:  +19.4% (n=1486) | 2:  +13.2% (n=1551) | 3:   -2.4% (n=1671) | 4:   +2.7% (n=1768)
+  NDX/SPX        1:   +2.6% (n=2288) | 2:   +3.9% (n=2051) | 3:   +4.2% (n=2455) | 4:   +9.1% (n=2377)
+  RUT/SPX        1:   -3.0% (n=2288) | 2:   +1.9% (n=2051) | 3:   -3.8% (n=2455) | 4:   +3.1% (n=2377)
+
+--- (3) Forward 3m SPX excess by tercile of continuous reads ---
+  real FF (FF − core yoy)                      low: +10.6% hit 73% n=612 | mid:  +4.6% hit 67% n=611 | high:  +8.5% hit 70% n=612
+  FF − nominal GDP yoy                         low:  +8.8% hit 70% n=612 | mid:  +9.6% hit 74% n=611 | high:  +5.2% hit 65% n=612
+  real10 − breakeven (real minus infl exp)     low: +11.0% hit 74% n=393 | mid:  +6.3% hit 71% n=392 | high: +11.5% hit 74% n=393
+  HY OAS pct rank 3y                           low:  +8.8% hit 73% n=414 | mid:  +6.9% hit 72% n=414 | high:  +8.4% hit 66% n=414
+  VIX/VIX3M                                    low:  +7.4% hit 73% n=311 | mid:  +9.5% hit 75% n=310 | high: +12.7% hit 74% n=310
+  MOVE pct rank 1y                             low:  +9.0% hit 74% n=385 | mid:  +9.9% hit 74% n=384 | high:  +8.5% hit 69% n=385
+  USDJPY realized vol 21d                      low:  +7.5% hit 70% n=612 | mid:  +5.1% hit 69% n=611 | high: +11.1% hit 71% n=612
+  net liquidity Δ13w %                         low: +10.0% hit 69% n=390 | mid:  +8.5% hit 74% n=389 | high:  +9.6% hit 75% n=389
+  growth_mom (ΔCFNAI-MA3, 3m)                  low:  +4.7% hit 67% n=612 | mid:  +8.3% hit 69% n=611 | high: +10.6% hit 73% n=612
+  infl_mom (3m ann − yoy)                      low:  +7.8% hit 72% n=612 | mid: +10.3% hit 71% n=611 | high:  +5.6% hit 66% n=612
+
+--- (4) Ladder overlays: cap exposure when a CF risk read is on (2003-2026 panel) ---
+BASELINE                                             | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76
+cap 65% when [bear steepening flag]                  | Sh 0.732 DD -18.2 CAGR  8.88 E 0.70 | Sh 0.752 DD -11.7 CAGR  8.11 E 0.65 | Sh 0.720 DD -18.2 CAGR  9.67 E 0.75
+    (flag on 10.6% of days)
+cap 65% when [CF read: credit tight & 30y at highs (] | Sh 0.774 DD -18.2 CAGR  9.17 E 0.68 | Sh 0.790 DD -11.7 CAGR  8.37 E 0.64 | Sh 0.764 DD -18.2 CAGR 10.00 E 0.72
+    (flag on 14.6% of days)
+cap 65% when [CF read: growth decel & Fed restrictiv] | Sh 0.751 DD -18.2 CAGR  8.97 E 0.68 | Sh 0.776 DD -11.7 CAGR  8.20 E 0.63 | Sh 0.735 DD -18.2 CAGR  9.77 E 0.73
+    (flag on 14.6% of days)
