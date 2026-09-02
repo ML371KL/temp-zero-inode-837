@@ -46,7 +46,14 @@ const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastru
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
   T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:26,CES0500000003:26,
-  PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам */
+  PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
+  THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
+  v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст» */
+/* v4.15: бесключевые источники справочного блока — CFTC (Socrata JSON, спекулятивная позиция в E-mini S&P,
+   ~3,3 года недельных отчётов) и CBOE (CSV подразумеваемой корреляции COR1M). Оба без ключей и без CORS-проблем
+   на сервере; страница читает их из снимка по ключам cftc:es и cboe:cor1m (см. snapKey в index.html). */
+const CFTC_ES_URL="https://publicreporting.cftc.gov/resource/6dca-aqww.json?market_and_exchange_names=E-MINI%20S%26P%20500%20-%20CHICAGO%20MERCANTILE%20EXCHANGE&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170&$select=report_date_as_yyyy_mm_dd,open_interest_all,noncomm_positions_long_all,noncomm_positions_short_all";
+const CBOE_COR1M_URL="https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv";
 /* ленивые резервы — добираются, если упал первичный путь */
 const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
@@ -149,6 +156,8 @@ function valid(key,j){
   if(key.startsWith("fh:news")) return Array.isArray(j);
   if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
+  if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
+  if(key==="cboe:cor1m")        return typeof j==="string"&&j.trim().split(/\r?\n/).length>260&&/^DATE,/i.test(j.trim());       /* v4.15: ≥ год дневных точек */
   return true;
 }
 async function put(key,fn){
@@ -181,6 +190,13 @@ async function main(){
 
   /* ── Минфин (дневная касса) ── */
   await put("fiscal:tga",()=>getJSON("https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dts/operating_cash_balance?fields=record_date,account_type,open_today_bal&filter=account_type:in:(Treasury%20General%20Account%20(TGA)%20Closing%20Balance)&sort=-record_date&page[size]=260"));
+  /* v4.15: справочный блок «контекст» — позиционирование и корреляция (без ключей) */
+  await put("cftc:es",()=>getJSON(CFTC_ES_URL));
+  await put("cboe:cor1m",async()=>{
+    const t=String(await getTEXT(CBOE_COR1M_URL)).trim();
+    const lines=t.split(/\r?\n/);                       /* полная история с 2006 — ~5 200 строк; в снимке держим ~1,5 года */
+    return [lines[0],...lines.slice(-400)].join("\n");
+  });
 
   /* ── Крипто/золото: CoinGecko, резерв Binance ── */
   await put("cg:bitcoin", ()=>getJSON("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily"));
