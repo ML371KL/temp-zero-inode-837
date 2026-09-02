@@ -1,0 +1,37 @@
+
+=== 2003-2026 full panel ===
+jpy score share (as built): {-2.0: 0.94, -1.0: 0.039, 0.0: 0.021}
+BASELINE                             | Sh 0.762 DD -18.2 CAGR  9.28 E 0.71 | Sh 0.767 DD -11.7 CAGR  8.32 E 0.66 | Sh 0.763 DD -18.2 CAGR 10.29 E 0.76 | BUY 8.9% lead>=10 23%
+JPY change-only (rel. thresholds)    | Sh 0.755 DD -16.8 CAGR  9.47 E 0.73 | Sh 0.756 DD -14.0 CAGR  8.53 E 0.68 | Sh 0.758 DD -16.8 CAGR 10.45 E 0.78 | BUY 17.4% lead>=10 46%
+P1 (VIX change)                      | Sh 0.813 DD -16.8 CAGR  9.78 E 0.70 | Sh 0.852 DD -11.0 CAGR  9.11 E 0.65 | Sh 0.784 DD -16.8 CAGR 10.47 E 0.75 | BUY 7.6% lead>=10 23%
+P1 + JPY change-only                 | Sh 0.791 DD -17.8 CAGR  9.79 E 0.72 | Sh 0.828 DD -11.5 CAGR  9.13 E 0.67 | Sh 0.764 DD -17.8 CAGR 10.47 E 0.78 | BUY 14.7% lead>=10 46%
+JPY dropped                          | Sh 0.753 DD -17.6 CAGR  9.51 E 0.73 | Sh 0.763 DD -14.0 CAGR  8.65 E 0.68 | Sh 0.749 DD -17.6 CAGR 10.39 E 0.79 | BUY 17.9% lead>=10 49%
+   JPYrel vs BASE        full..end : dSh -0.008 P(<=0)=0.586
+   JPYrel vs BASE        2003..2014: dSh -0.011 P(<=0)=0.559
+   JPYrel vs BASE        2015..end : dSh -0.005 P(<=0)=0.588
+   P1+JPYrel vs P1       full..end : dSh -0.022 P(<=0)=0.895
+   P1+JPYrel vs P1       2003..2014: dSh -0.024 P(<=0)=0.806
+   P1+JPYrel vs P1       2015..end : dSh -0.020 P(<=0)=0.829
+   JPY dropped vs BASE   full..end : dSh -0.009 P(<=0)=0.543
+   JPY dropped vs BASE   2003..2014: dSh -0.004 P(<=0)=0.434
+   JPY dropped vs BASE   2015..end : dSh -0.014 P(<=0)=0.685
+
+=== 1990-2026 CORE ===
+jpy score share (as built): {-2.0: 0.954, -1.0: 0.03, 0.0: 0.016}
+BASELINE                             | Sh 0.629 DD -20.8 CAGR  8.77 E 0.67 | Sh 0.449 DD -17.3 CAGR  8.80 E 0.62 | Sh 0.804 DD -14.9 CAGR  8.62 E 0.65 | Sh 0.661 DD -16.3 CAGR  8.91 E 0.75 | BUY 11.4% lead>=10 20%
+JPY change-only (rel. thresholds)    | Sh 0.626 DD -19.8 CAGR  9.04 E 0.70 | Sh 0.462 DD -18.5 CAGR  9.21 E 0.67 | Sh 0.748 DD -13.7 CAGR  8.40 E 0.68 | Sh 0.692 DD -17.4 CAGR  9.50 E 0.77 | BUY 23.7% lead>=10 48%
+P1 (VIX change)                      | Sh 0.673 DD -17.4 CAGR  9.17 E 0.66 | Sh 0.518 DD -16.3 CAGR  9.50 E 0.61 | Sh 0.843 DD -11.4 CAGR  8.93 E 0.64 | Sh 0.687 DD -16.1 CAGR  9.06 E 0.73 | BUY 9.7% lead>=10 20%
+P1 + JPY change-only                 | Sh 0.671 DD -16.6 CAGR  9.51 E 0.70 | Sh 0.548 DD -16.3 CAGR 10.19 E 0.66 | Sh 0.738 DD -14.0 CAGR  8.32 E 0.68 | Sh 0.743 DD -16.6 CAGR 10.00 E 0.76 | BUY 20.4% lead>=10 48%
+JPY dropped                          | Sh 0.633 DD -22.6 CAGR  9.15 E 0.71 | Sh 0.477 DD -21.0 CAGR  9.42 E 0.68 | Sh 0.748 DD -13.7 CAGR  8.42 E 0.68 | Sh 0.697 DD -18.2 CAGR  9.60 E 0.77 | BUY 24.5% lead>=10 50%
+   JPYrel vs BASE        full..end : dSh -0.003 P(<=0)=0.492
+   JPYrel vs BASE        1990..2002: dSh +0.014 P(<=0)=0.402
+   JPYrel vs BASE        2003..2014: dSh -0.055 P(<=0)=0.827
+   JPYrel vs BASE        2015..end : dSh +0.031 P(<=0)=0.223
+   P1+JPYrel vs P1       full..end : dSh -0.003 P(<=0)=0.535
+   P1+JPYrel vs P1       1990..2002: dSh +0.030 P(<=0)=0.252
+   P1+JPYrel vs P1       2003..2014: dSh -0.104 P(<=0)=0.899
+   P1+JPYrel vs P1       2015..end : dSh +0.056 P(<=0)=0.034
+   JPY dropped vs BASE   full..end : dSh +0.004 P(<=0)=0.412
+   JPY dropped vs BASE   1990..2002: dSh +0.028 P(<=0)=0.324
+   JPY dropped vs BASE   2003..2014: dSh -0.055 P(<=0)=0.809
+   JPY dropped vs BASE   2015..end : dSh +0.036 P(<=0)=0.191

@@ -1,0 +1,72 @@
+=== (i) IC of RAW PIT levels vs forward excess (positive = high spread/vol/unemployment -> higher future return) ===
+  raw hy         | 1m +0.126 (neg 0% of 5 phases) | 3m +0.171 (neg 0% of 13 phases) | 6m +0.218 (neg 0% of 26 phases) | 12m +0.346 (neg 0% of 51 phases)
+  raw vix        | 1m +0.173 (neg 0% of 5 phases) | 3m +0.227 (neg 0% of 13 phases) | 6m +0.214 (neg 0% of 26 phases) | 12m +0.243 (neg 0% of 51 phases)
+  raw sahm       | 1m +0.098 (neg 0% of 5 phases) | 3m +0.208 (neg 0% of 13 phases) | 6m +0.247 (neg 0% of 26 phases) | 12m +0.276 (neg 0% of 51 phases)
+  raw ratevol    | 1m +0.023 (neg 0% of 5 phases) | 3m +0.002 (neg 54% of 13 phases) | 6m -0.012 (neg 50% of 26 phases) | 12m +0.067 (neg 35% of 51 phases)
+  raw hy_mom     | 1m +0.042 (neg 20% of 5 phases) | 3m -0.065 (neg 85% of 13 phases) | 6m -0.099 (neg 69% of 26 phases) | 12m -0.091 (neg 63% of 51 phases)
+  raw wti        | 1m -0.070 (neg 100% of 5 phases) | 3m -0.184 (neg 100% of 13 phases) | 6m -0.216 (neg 100% of 26 phases) | 12m -0.169 (neg 98% of 51 phases)
+  raw dgs2_chg60 | 1m -0.118 (neg 100% of 5 phases) | 3m -0.192 (neg 100% of 13 phases) | 6m -0.181 (neg 85% of 26 phases) | 12m -0.189 (neg 82% of 51 phases)
+  -> score IC sign for hy/vix/sahm is just the raw level's sign inverted by the zone map; not a coding artifact.
+
+=== (ii) IC of composite / coin / hy with non-overlapping samples, EXCLUDING 2008-09 and 2020 (signal date) ===
+  composite  | 1m: ex08-09,20 -0.113 (100%neg) ; also ex07H2,22 -0.141 (100%neg) | 3m: ex08-09,20 -0.105 (85%neg) ; also ex07H2,22 -0.205 (100%neg) | 6m: ex08-09,20 -0.131 (88%neg) ; also ex07H2,22 -0.244 (100%neg) | 12m: ex08-09,20 -0.352 (98%neg) ; also ex07H2,22 -0.491 (100%neg)
+  comp_raw   | 1m: ex08-09,20 -0.134 (100%neg) ; also ex07H2,22 -0.154 (100%neg) | 3m: ex08-09,20 -0.148 (100%neg) ; also ex07H2,22 -0.238 (100%neg) | 6m: ex08-09,20 -0.180 (100%neg) ; also ex07H2,22 -0.280 (100%neg) | 12m: ex08-09,20 -0.377 (100%neg) ; also ex07H2,22 -0.509 (100%neg)
+  coin       | 1m: ex08-09,20 -0.135 (100%neg) ; also ex07H2,22 -0.146 (100%neg) | 3m: ex08-09,20 -0.161 (100%neg) ; also ex07H2,22 -0.232 (100%neg) | 6m: ex08-09,20 -0.192 (100%neg) ; also ex07H2,22 -0.268 (100%neg) | 12m: ex08-09,20 -0.348 (100%neg) ; also ex07H2,22 -0.448 (100%neg)
+  lead       | 1m: ex08-09,20 -0.077 (100%neg) ; also ex07H2,22 -0.107 (100%neg) | 3m: ex08-09,20 -0.018 (77%neg) ; also ex07H2,22 -0.106 (100%neg) | 6m: ex08-09,20 +0.015 (50%neg) ; also ex07H2,22 -0.087 (65%neg) | 12m: ex08-09,20 -0.103 (71%neg) ; also ex07H2,22 -0.216 (88%neg)
+  detpts     | 1m: ex08-09,20 +0.025 (20%neg) ; also ex07H2,22 +0.004 (60%neg) | 3m: ex08-09,20 +0.094 (15%neg) ; also ex07H2,22 +0.032 (38%neg) | 6m: ex08-09,20 +0.135 (19%neg) ; also ex07H2,22 +0.064 (27%neg) | 12m: ex08-09,20 +0.043 (39%neg) ; also ex07H2,22 -0.033 (61%neg)
+  hy         | 1m: ex08-09,20 -0.121 (100%neg) ; also ex07H2,22 -0.115 (100%neg) | 3m: ex08-09,20 -0.152 (100%neg) ; also ex07H2,22 -0.180 (100%neg) | 6m: ex08-09,20 -0.194 (100%neg) ; also ex07H2,22 -0.224 (100%neg) | 12m: ex08-09,20 -0.362 (100%neg) ; also ex07H2,22 -0.393 (100%neg)
+  ig         | 1m: ex08-09,20 -0.097 (100%neg) ; also ex07H2,22 -0.114 (100%neg) | 3m: ex08-09,20 -0.101 (92%neg) ; also ex07H2,22 -0.161 (100%neg) | 6m: ex08-09,20 -0.153 (96%neg) ; also ex07H2,22 -0.215 (100%neg) | 12m: ex08-09,20 -0.363 (100%neg) ; also ex07H2,22 -0.446 (100%neg)
+  sloos      | 1m: ex08-09,20 -0.053 (100%neg) ; also ex07H2,22 -0.064 (100%neg) | 3m: ex08-09,20 -0.119 (100%neg) ; also ex07H2,22 -0.148 (100%neg) | 6m: ex08-09,20 -0.193 (100%neg) ; also ex07H2,22 -0.209 (100%neg) | 12m: ex08-09,20 -0.284 (94%neg) ; also ex07H2,22 -0.334 (100%neg)
+  sahm       | 1m: ex08-09,20 -0.036 (100%neg) ; also ex07H2,22 -0.034 (100%neg) | 3m: ex08-09,20 -0.142 (100%neg) ; also ex07H2,22 -0.143 (100%neg) | 6m: ex08-09,20 -0.222 (100%neg) ; also ex07H2,22 -0.223 (100%neg) | 12m: ex08-09,20 -0.216 (90%neg) ; also ex07H2,22 -0.221 (98%neg)
+  vix        | 1m: ex08-09,20 -0.031 (60%neg) ; also ex07H2,22 -0.028 (60%neg) | 3m: ex08-09,20 -0.055 (54%neg) ; also ex07H2,22 -0.128 (77%neg) | 6m: ex08-09,20 -0.096 (69%neg) ; also ex07H2,22 -0.177 (77%neg) | 12m: ex08-09,20 -0.042 (61%neg) ; also ex07H2,22 -0.099 (76%neg)
+
+=== (iii) Forward excess return by TRADED rung (ladder state at signal date), annualized %, full vs ex-crisis ===
+  full                 1m  | rung0(0%): -9.4% n=408 hit 51% | rung1(35%): +26.3% n=646 hit 73% | rung2(65%): +9.5% n=1274 hit 68% | rung3(85%): +8.7% n=3125 hit 67% | rung4(100%): +6.3% n=480 hit 60%
+  full                 3m  | rung0(0%): -14.3% n=408 hit 44% | rung1(35%): +25.0% n=646 hit 80% | rung2(65%): +10.6% n=1274 hit 70% | rung3(85%): +9.1% n=3083 hit 76% | rung4(100%): +8.2% n=480 hit 66%
+  full                 12m | rung0(0%): -5.8% n=408 hit 48% | rung1(35%): +15.7% n=644 hit 90% | rung2(65%): +14.4% n=1258 hit 95% | rung3(85%): +8.2% n=2915 hit 85% | rung4(100%): +3.5% n=477 hit 75%
+  ex 2008-09 & 2020    1m  | rung0(0%): +19.5% n=47 hit 60% | rung1(35%): +26.6% n=481 hit 71% | rung2(65%): +10.9% n=1105 hit 67% | rung3(85%): +8.8% n=3062 hit 67% | rung4(100%): +6.3% n=480 hit 60%
+  ex 2008-09 & 2020    3m  | rung0(0%): +1.2% n=47 hit 47% | rung1(35%): +21.4% n=481 hit 77% | rung2(65%): +9.4% n=1105 hit 67% | rung3(85%): +9.4% n=3020 hit 76% | rung4(100%): +8.2% n=480 hit 66%
+  ex 2008-09 & 2020    12m | rung0(0%): -14.9% n=47 hit 55% | rung1(35%): +13.2% n=479 hit 86% | rung2(65%): +13.3% n=1089 hit 94% | rung3(85%): +7.8% n=2852 hit 85% | rung4(100%): +3.5% n=477 hit 75%
+  ex 07H2,08-09,20,22  1m  | rung0(0%): +44.3% n=9 hit 78% | rung1(35%): +35.5% n=327 hit 76% | rung2(65%): +16.1% n=994 hit 72% | rung3(85%): +10.3% n=2991 hit 68% | rung4(100%): +6.8% n=476 hit 61%
+  ex 07H2,08-09,20,22  3m  | rung0(0%): +33.3% n=9 hit 67% | rung1(35%): +34.6% n=327 hit 93% | rung2(65%): +13.1% n=994 hit 73% | rung3(85%): +10.1% n=2949 hit 78% | rung4(100%): +8.4% n=476 hit 67%
+  ex 07H2,08-09,20,22  12m | rung0(0%): +22.7% n=9 hit 100% | rung1(35%): +21.5% n=325 hit 100% | rung2(65%): +15.4% n=978 hit 99% | rung3(85%): +8.5% n=2781 hit 87% | rung4(100%): +3.7% n=473 hit 76%
+
+=== (iv) Constant-jpy offset on the lead gate and composite ===
+  lead: mean with jpy -0.69, without +7.26, mean diff -7.95 pts; composite mean diff -2.23 pts
+  share of days lead>=10 (BUY gate open): with jpy 22.6% ; without 49.1%
+  share of days lead<=-10 (PROTECT gate open): with jpy 20.8% ; without 13.2%
+  verdict shares with jpy   : {'HOLD+': 51.7, 'HOLD': 22.1, 'REDUCE': 10.0, 'BUY': 8.9, 'PROTECT': 7.2, 'NA': 0.2}
+  verdict shares without jpy: {'HOLD+': 46.1, 'HOLD': 19.9, 'BUY': 17.9, 'REDUCE': 9.4, 'PROTECT': 6.3, 'NA': 0.4}
+  jpy score by era: pre-2024 -2.00 ; 2024+ -1.28
+  other near-constant scores: stagf modal share 0.97, srf 0.88, real10 0.87, rrp 0.85
+
+=== (v) Opportunity cost by rung: cumulative market excess (next-day execution) while at each rung, by year ===
+  rung 0 (0%): days 408, cum market excess +1.8% ; worst yrs {2008: -40.6, 2020: 0.4} best yrs {2009: 18.8, 2022: 12.4, 2007: 3.6}
+  rung 1 (35%): days 646, cum market excess +29.7% ; worst yrs {2022: -14.3, 2025: -3.3} best yrs {2020: 7.9, 2023: 6.9, 2009: 6.5}
+  rung 2 (65%): days 1274, cum market excess +105.9% ; worst yrs {2007: -5.2, 2018: -4.4} best yrs {2010: 16.0, 2003: 15.8, 2025: 14.0}
+  rung 3 (85%): days 3145, cum market excess +107.5% ; worst yrs {2022: -12.7, 2015: -9.2} best yrs {2013: 22.8, 2024: 15.4, 2004: 14.2}
+  rung 4 (100%): days 480, cum market excess +13.0% ; worst yrs {2004: -4.6, 2006: -3.6} best yrs {2021: 14.4, 2017: 9.5, 2019: 2.5}
+  DASH minus const-matched daily diff summed by used rung (pp): {0: np.float64(-1.7), 1: np.float64(-11.8), 2: np.float64(-7.6), 3: np.float64(14.3), 4: np.float64(3.5)}
+  ... summed by year: {2003: -0.4, 2004: 0.6, 2005: -0.1, 2006: 0.9, 2007: -3.0, 2008: 28.1, 2009: -16.2, 2010: -3.7, 2011: -5.7, 2012: -1.4, 2013: 2.9, 2014: 0.6, 2015: -3.9, 2016: -1.2, 2017: 4.0, 2018: -0.7, 2019: -1.9, 2020: -3.6, 2021: 5.8, 2022: -6.3, 2023: -1.8, 2024: 2.0, 2025: 1.0, 2026: 0.4}
+  ... total -3.3pp; excluding 2008: -31.4pp; excluding 2008-2009: -15.3pp
+
+=== (vi) Rolling 3y Sharpe: DASH vs B&H, share of windows where DASH wins; sub-period table ===
+  3y windows: 5199; DASH>B&H in 41% ; mean diff +0.033; windows ending 2011-2026 only: 34%
+  2003-01-01..2007-09-30: DASH Sh 0.79 CAGR 10.69 DD   -7.4 E 0.82 | B&H Sh 0.87 CAGR 14.13 DD  -13.8
+  2007-10-01..2009-06-30: DASH Sh -0.54 CAGR -1.49 DD   -7.6 E 0.11 | B&H Sh -0.57 CAGR -23.32 DD  -55.3
+  2009-07-01..2019-12-31: DASH Sh 0.85 CAGR  8.75 DD  -13.4 E 0.74 | B&H Sh 0.98 CAGR 15.10 DD  -19.4
+  2020-01-01..2020-12-31: DASH Sh 1.10 CAGR 12.79 DD   -8.5 E 0.54 | B&H Sh 0.65 CAGR 18.32 DD  -33.8
+  2021-01-01..2026-09-01: DASH Sh 0.76 CAGR 12.04 DD  -18.2 E 0.77 | B&H Sh 0.73 CAGR 15.03 DD  -24.5
+
+=== (vii) Family-averaging & coverage sanity ===
+  coverage min/median: 0.57 0.93 ; days cover<0.6: 11
+  hand-recomputed comp_raw on 2026-09-01: 29.47 vs engine 29.47; detpts -4.0; blocks {k:round(v,1) for k,v in B.items()} {'plumb': np.float64(15.3), 'credit': np.float64(58.3), 'market': np.float64(50.0), 'macro': np.float64(0.0), 'regime': np.float64(7.1)}
+  composite with per-indicator (no family) averaging: corr with engine comp_raw 0.987, mean abs diff 3.1 pts
+
+=== (viii) Reproducible extras: deep-dd clusters, OH/V7/gate mechanics, payrolls release-timing jitter ===
+  deep-dd (>20% below 1y high) clusters, gap>63 trading days separates: [('2008-07-09', '2009-09-03'), ('2020-03-12', '2020-04-07'), ('2022-06-13', '2023-01-03')]
+  OH vs plain oil detector: detpts differ on 104 days (OH more negative on 104, less negative on 0); composite corr 0.9996
+  V7 turn +10 active days: 881 (14.8%)
+  lead gate flips verdict on 626 days: {('BUY', 'HOLD+'): 578, ('PROTECT', 'REDUCE'): 48}
+  payrolls lag-35 vs first-Friday release: early in 61/283 months (by -2..-1 days), late in 222 (by up to 7 days); mean offset +1.55 days
+  payrolls score changes on 53 days in the window; |IC| <= 0.080
