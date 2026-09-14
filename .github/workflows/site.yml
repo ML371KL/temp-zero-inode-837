@@ -41,6 +41,17 @@ jobs:
           rm -f site/snapshot.json
           echo "публикуется:"; ls -la site
 
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+
+      - name: Проверить функцию снимка до публикации
+        # Функция исполняется на краю Cloudflare, где местный прогон её не увидит, а
+        # сломанная — это голый 500 вместо данных у страницы и сторожа. Тест гоняет
+        # НАСТОЯЩИЙ код функции с подменными R2 и кэшем края; без зелёного теста сайт не
+        # публикуется. Node 24: функция лежит в .js без package.json, и её ESM-синтаксис
+        # распознаётся автоматически только в Node не старше 22.7.
+        run: node scripts/snapshot-function-test.mjs
+
       - name: Опубликовать
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
