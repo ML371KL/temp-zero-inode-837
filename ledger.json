@@ -1,0 +1,12 @@
+{
+ "v": 1,
+ "updated_at": "2026-10-02T17:18:27.830Z",
+ "snapshot_at": "2026-10-02T17:18:00.488Z",
+ "dataAsOf": "2026-10-01",
+ "memory": {"v":2,"rung":2,"since":"2026-10-01","pend":null,"pendSession":null,"lastMove":null},
+ "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":10.17,"lead":-3.33,"coin":30,"tail":{"p":0.1189,"base":0.17},"override":false,"frozen":false},
+ "transitions": [],
+ "diary": [
+  {"d":"2026-10-01","c":10.2,"l":-3.3,"r":2,"g":"moderate","spx":7666.45,"p":0.119}
+ ]
+}
