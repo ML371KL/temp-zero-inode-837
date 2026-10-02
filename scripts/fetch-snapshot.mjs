@@ -45,17 +45,23 @@ const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastru
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
-  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:26,CES0500000003:26,
+  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:300,DGS2:160,CPILFESL:26,CES0500000003:26,
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
-  THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
-  v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст» */
+  THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,
+  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
+  v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст»;
+  v5.0: DCOILWTICO 140 → 300 — нефть меряется отношением к своей средней за год (нужно ≥252 торговых дня);
+  DFEDTARU — верх коридора ставки ФРС для карточки «путь ФРС» (2-летка минус ставка);
+  BAMLH0A3HYC/BAMLH0A1HYBB — спреды CCC и BB для справочной карточки расслоения кредита */
 /* v4.15: бесключевые источники справочного блока — CFTC (Socrata JSON, спекулятивная позиция в E-mini S&P,
    ~3,3 года недельных отчётов) и CBOE (CSV подразумеваемой корреляции COR1M). Оба без ключей и без CORS-проблем
    на сервере; страница читает их из снимка по ключам cftc:es и cboe:cor1m (см. snapKey в index.html). */
 const CFTC_ES_URL="https://publicreporting.cftc.gov/resource/6dca-aqww.json?market_and_exchange_names=E-MINI%20S%26P%20500%20-%20CHICAGO%20MERCANTILE%20EXCHANGE&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170&$select=report_date_as_yyyy_mm_dd,open_interest_all,noncomm_positions_long_all,noncomm_positions_short_all";
 const CBOE_COR1M_URL="https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv";
 /* ленивые резервы — добираются, если упал первичный путь */
-const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
+/* v5.0: резерв SRF — RPONTTLD (все виды обеспечения), а не RPONTSYD (только казначейские): в стрессовые
+   дни заметная часть обращений идёт под MBS — 31.10.2025 это 50,35 против 29,4 млрд */
+const LAZY={RRPONTSYD:300,RPONTTLD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* v4.13.4: глобальный дедлайн сборки. Воркфлоу обрубается на 15-й минуте БЕЗ коммита —
@@ -156,6 +162,7 @@ function valid(key,j){
   if(key==="fiscal:tga")        return Array.isArray(j.data)&&j.data.length>20;
   if(key.startsWith("fh:news")) return Array.isArray(j);
   if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
+  if(key.startsWith("ypx:"))    return Array.isArray(j)&&j.length>=150&&j.every(r=>Array.isArray(r)&&r.length===3&&r[1]>0); /* v5.0: год дневных закрытий */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
   return true;
@@ -238,7 +245,7 @@ async function main(){
 
   /* ── резервы каскадов, если первичный путь упал ── */
   if(!R["nyfed:rrp"]) await put("fred:RRPONTSYD",()=>getJSON(fredURL("RRPONTSYD",LAZY.RRPONTSYD)));
-  if(!R["nyfed:srf"]) await put("fred:RPONTSYD", ()=>getJSON(fredURL("RPONTSYD", LAZY.RPONTSYD)));
+  if(!R["nyfed:srf"]) await put("fred:RPONTTLD", ()=>getJSON(fredURL("RPONTTLD", LAZY.RPONTTLD)));
   if(!R["fred:SAHMREALTIME"]) await put("fred:UNRATE",()=>getJSON(fredURL("UNRATE",LAZY.UNRATE)));
 
   /* ── Finnhub: новости и котировки (если задан ключ) ──
@@ -307,6 +314,24 @@ async function main(){
         .sort((a,b)=>a.date-b.date).map(x=>[x.date,x.amount]).slice(-10):[];
       if(list.length<5) throw new Error("мало точек ("+list.length+")");
       return list;
+    });
+  }
+
+  /* ── v5.0: цена самой ставки — дневные закрытия корзин капекса и BDC за год (Yahoo, с поправкой на
+     дивиденды: adjclose). Радары-детекторы видят события и забывают их через 14/45 дней; цена носителей
+     ставки помнит всё: просадка от пика, доля бумаг ниже 200-дневной, относительная доходность против
+     S&P. BIZD здесь же — его дневное изменение по полной доходности не рисует ложный «обвал» в
+     экс-дивидендные даты. Справочный слой: в балл не идёт. */
+  for(const s of [...CAPEX_TICKERS,...BDC_TICKERS,"BIZD","SPY"]){
+    await sleep(300+Math.random()*500);
+    await put("ypx:"+s,async()=>{
+      const r=await yahooChart(s,"1y","1d");
+      const ts=r.timestamp||[], q=(r.indicators&&r.indicators.quote&&r.indicators.quote[0])||{};
+      const adj=(r.indicators&&r.indicators.adjclose&&r.indicators.adjclose[0]&&r.indicators.adjclose[0].adjclose)||[];
+      const out=[];
+      for(let i=0;i<ts.length;i++){ const c=q.close&&q.close[i], a=adj[i]; if(c>0) out.push([ts[i],+c.toFixed(4),+(a>0?a:c).toFixed(4)]); }
+      if(out.length<150) throw new Error("мало точек ("+out.length+")");
+      return out;
     });
   }
 
@@ -387,10 +412,19 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
     if(prevSnap){
       const prev=prevSnap;
       const failedKeys=failed.map(f=>String(f).split(" — ")[0]);
+      /* v5.0: устаревшая подложка первоисточника не должна заслонять СВЕЖИЙ резерв того же ряда.
+         Страница берёт первоисточник, если его ключ есть, и до резерва не доходит — поэтому при
+         многодневном сбое NY Fed она видела SRF/RRP недельной давности, хотя свежий FRED-резерв лежал
+         рядом в том же снимке. Если резерв этого прогона собран, первоисточник не подкладываем. */
+      const FALLBACK={"nyfed:srf":["fred:RPONTTLD"],"nyfed:rrp":["fred:RRPONTSYD"],
+        "cg:bitcoin":["bin:BTCUSDT","stqd:btcusd"],"cg:pax-gold":["bin:PAXGUSDT","stqd:xauusd"],
+        "fx:JPY":["fred:DEXJPUS"],"fx:CNY":["fred:DEXCHUS"],"fred:SAHMREALTIME":["fred:UNRATE"]};
       for(const k of failedKeys){
+        if((FALLBACK[k]||[]).some(f=>R[f]!==undefined)) continue;
         const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
         const age=Date.now()-origin;
-        const cap=k.startsWith("ydiv:")?45*86400e3:                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
+        const cap=k.startsWith("ydiv:")?45*86400e3:
+                  k.startsWith("ypx:")?3*86400e3:                                     /* v5.0: цены корзин — как интрадей, 3 сут. */                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
                   (k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
         if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
         if(prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){
