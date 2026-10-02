@@ -38,24 +38,33 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
    Совпавшие заголовки копятся отдельным слоем fh:newsHit:SYM с 14-дневным окном и слиянием между
    запусками — иначе у гиперскейлеров фон ~90 заголовков/день выталкивает событие из хвоста 120
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
-/* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
-   правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
+/* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (ядро ⟦NEWS-CORE⟧ в index.html) и
+   побайтово равен клиентской копии — оба условия проверяет scripts/news-test.mjs.
+   v5.0: + force majeure / stargate / ai campus / ai factory / bankrupt / chapter 11 / tender /
+   wrote down — новые формы событий (форс-мажор Oracle 24.09 префильтр пропускал, если в
+   заголовке не было «data center»). */
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
-  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:140,DGS2:160,CPILFESL:26,CES0500000003:26,
+  T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:300,DGS2:160,CPILFESL:26,CES0500000003:26,
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
-  THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
-  v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст» */
+  THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,
+  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
+  v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст»;
+  v5.0: DCOILWTICO 140 → 300 — нефть меряется отношением к своей средней за год (нужно ≥252 торговых дня);
+  DFEDTARU — верх коридора ставки ФРС для карточки «путь ФРС» (2-летка минус ставка);
+  BAMLH0A3HYC/BAMLH0A1HYBB — спреды CCC и BB для справочной карточки расслоения кредита */
 /* v4.15: бесключевые источники справочного блока — CFTC (Socrata JSON, спекулятивная позиция в E-mini S&P,
    ~3,3 года недельных отчётов) и CBOE (CSV подразумеваемой корреляции COR1M). Оба без ключей и без CORS-проблем
    на сервере; страница читает их из снимка по ключам cftc:es и cboe:cor1m (см. snapKey в index.html). */
 const CFTC_ES_URL="https://publicreporting.cftc.gov/resource/6dca-aqww.json?market_and_exchange_names=E-MINI%20S%26P%20500%20-%20CHICAGO%20MERCANTILE%20EXCHANGE&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170&$select=report_date_as_yyyy_mm_dd,open_interest_all,noncomm_positions_long_all,noncomm_positions_short_all";
 const CBOE_COR1M_URL="https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv";
 /* ленивые резервы — добираются, если упал первичный путь */
-const LAZY={RRPONTSYD:300,RPONTSYD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
+/* v5.0: резерв SRF — RPONTTLD (все виды обеспечения), а не RPONTSYD (только казначейские): в стрессовые
+   дни заметная часть обращений идёт под MBS — 31.10.2025 это 50,35 против 29,4 млрд */
+const LAZY={RRPONTSYD:300,RPONTTLD:20,DEXJPUS:70,DEXCHUS:70,UNRATE:30};
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* v4.13.4: глобальный дедлайн сборки. Воркфлоу обрубается на 15-й минуте БЕЗ коммита —
@@ -156,6 +165,7 @@ function valid(key,j){
   if(key==="fiscal:tga")        return Array.isArray(j.data)&&j.data.length>20;
   if(key.startsWith("fh:news")) return Array.isArray(j);
   if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
+  if(key.startsWith("ypx:"))    return Array.isArray(j)&&j.length>=150&&j.every(r=>Array.isArray(r)&&r.length===3&&r[1]>0); /* v5.0: год дневных закрытий */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
   return true;
@@ -238,7 +248,7 @@ async function main(){
 
   /* ── резервы каскадов, если первичный путь упал ── */
   if(!R["nyfed:rrp"]) await put("fred:RRPONTSYD",()=>getJSON(fredURL("RRPONTSYD",LAZY.RRPONTSYD)));
-  if(!R["nyfed:srf"]) await put("fred:RPONTSYD", ()=>getJSON(fredURL("RPONTSYD", LAZY.RPONTSYD)));
+  if(!R["nyfed:srf"]) await put("fred:RPONTTLD", ()=>getJSON(fredURL("RPONTTLD", LAZY.RPONTTLD)));
   if(!R["fred:SAHMREALTIME"]) await put("fred:UNRATE",()=>getJSON(fredURL("UNRATE",LAZY.UNRATE)));
 
   /* ── Finnhub: новости и котировки (если задан ключ) ──
@@ -249,27 +259,24 @@ async function main(){
      жёсткие кандидаты собираются для серверного LLM-судьи. */
   let prevSnap=null;
   try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
-  /* регэкспы кандидатов извлекаются из docs/index.html — единый источник истины с клиентом */
+  /* v5.0: ядро сканера исполняется ЦЕЛИКОМ со страницы — блок ⟦NEWS-CORE⟧…⟦/NEWS-CORE⟧ из
+     docs/index.html (кандидаты по клаузам, атрибуция компании по алиасам, якоря, промпт и разбор
+     ответа судьи). v4.13.5 выдирал отдельные регэкспы по шаблонам строк — схема ломалась от
+     любой перестройки словарей, а рукописная копия расходилась с оригиналом. Корзины — те же,
+     что выше из картриджа CYCLE. Сбой извлечения → кандидатов нет, судья пропускается, слой
+     fh:newsHit (HIT_RX ниже) собирается как обычно. */
   const CL=(()=>{
     try{
       const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
-      const g=n=>{const m=page.match(new RegExp("const "+n+"=([^\\n]*?);\\n"));if(!m)throw new Error("нет "+n);return m[1];};
-      const CAPEX_VERBS=eval(g("CAPEX_VERBS")), CAPEX_NOUN=eval(g("CAPEX_NOUN")), MACROSUBJ=eval(g("MACROSUBJ"));
-      /* v4.13.5: САМО ВЫРАЖЕНИЕ capexHard берётся со страницы и вычисляется в этой области
-         видимости — рукописная копия шаблона разошлась с оригиналом при первой же правке
-         словаря (у сборщика не было ни макро-стража, ни границ слова), и сборщик судил
-         заголовки, которых страница кандидатами уже не считает. Единый источник истины. */
-      const capexExpr=page.match(/capexHard:(new RegExp\([\s\S]*?,"i"\)),\n/);
-      if(!capexExpr) throw new Error("нет выражения capexHard");
-      const capexHard=eval(capexExpr[1]);
-      const bdcHard=eval(page.match(/bdcHard:(\/[^\n]+\/i),\n/)[1]);
-      const NEG=eval(page.match(/\nconst NEG=(\/[^\n]+\/i);/)[1]);
-      const trigNoNeg=(h,rx)=>{const m=rx.exec(h);if(!m)return false;return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));};
-      return {capexHard,bdcHard,trigNoNeg};
-    }catch(e){console.log("извлечение клиентских регэкспов не удалось:",String(e&&e.message||e));return null;}
+      const m=page.match(/\/\* ⟦NEWS-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/NEWS-CORE⟧ \*\//);
+      if(!m) throw new Error("нет блока ⟦NEWS-CORE⟧");
+      const core=new Function("CONFIG",m[1]+"\nreturn {newsMatch,judgePrompt,parseJudge,JUDGE_SYS,VER_TTL};")
+        ({CYCLE:{capexTickers:CAPEX_TICKERS,bdcTickers:BDC_TICKERS}});
+      if(typeof core.newsMatch!=="function") throw new Error("ядро без newsMatch");
+      return core;
+    }catch(e){console.log("извлечение ядра сканера не удалось:",String(e&&e.message||e));return null;}
   })();
-  const CAPEX_SET=new Set(CAPEX_TICKERS);             /* капекс-радар — прямо из картриджа CYCLE */
-  const CAND=[];                                       /* жёсткие кандидаты для LLM-судьи */
+  const CAND=[];                                       /* кандидаты для LLM-судьи: {h,kind:"C"|"B",sym,t} */
   let LLM_JUDGED=0;                                    /* рассужено в ЭТОМ прогоне (для meta.llm) */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
@@ -287,8 +294,10 @@ async function main(){
           .filter(n=>{const k=(n.url||n.headline||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
           .sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,400);
         R["fh:newsHit:"+s]=hits;                       /* пишем слой напрямую: valid() к нему не применяем */
-        if(CL) hits.forEach(n=>{const h=n.headline||"";
-          if(CL.trigNoNeg(h,CAPEX_SET.has(s)?CL.capexHard:CL.bdcHard)) CAND.push({sym:s,h,capex:CAPEX_SET.has(s)});});
+        /* v5.0: оба словаря по любой ленте — компанию события называет заголовок (newsMatch держит
+           кандидата без компании корзины только в ленте своей корзины, как и страница) */
+        if(CL) hits.forEach(n=>{const h=n.headline||"";const m=CL.newsMatch(h,[s],n.source||"");
+          if(m.capex||m.bdc) CAND.push({h,kind:m.capex?"C":"B",sym:(m.capex||m.bdc).sym,t:n.datetime||0});});
         return full.slice(0,120);                      /* фон для ленты — как раньше */
       });
     for(const s of ["BIZD","SMH","SPY","RSP"])
@@ -310,41 +319,58 @@ async function main(){
     });
   }
 
-  /* ── серверный LLM-судья кандидатов (fh:newsVer: [заголовок, "fact"|"opinion", tсуда]) ── */
+  /* ── v5.0: цена самой ставки — дневные закрытия корзин капекса и BDC за год (Yahoo, с поправкой на
+     дивиденды: adjclose). Радары-детекторы видят события и забывают их через 14/45 дней; цена носителей
+     ставки помнит всё: просадка от пика, доля бумаг ниже 200-дневной, относительная доходность против
+     S&P. BIZD здесь же — его дневное изменение по полной доходности не рисует ложный «обвал» в
+     экс-дивидендные даты. Справочный слой: в балл не идёт. */
+  for(const s of [...CAPEX_TICKERS,...BDC_TICKERS,"BIZD","SPY"]){
+    await sleep(300+Math.random()*500);
+    await put("ypx:"+s,async()=>{
+      const r=await yahooChart(s,"1y","1d");
+      const ts=r.timestamp||[], q=(r.indicators&&r.indicators.quote&&r.indicators.quote[0])||{};
+      const adj=(r.indicators&&r.indicators.adjclose&&r.indicators.adjclose[0]&&r.indicators.adjclose[0].adjclose)||[];
+      const out=[];
+      for(let i=0;i<ts.length;i++){ const c=q.close&&q.close[i], a=adj[i]; if(c>0) out.push([ts[i],+c.toFixed(4),+(a>0?a:c).toFixed(4)]); }
+      if(out.length<150) throw new Error("мало точек ("+out.length+")");
+      return out;
+    });
+  }
+
+  /* ── серверный LLM-судья кандидатов ──
+     fh:newsVer: [заголовок, "fact"|"opinion"|"unverified", tсуда, subject, type]; старые записи
+     [h,"fact"|"opinion",t] страница читает как есть (subject нет → атрибуция по алиасам).
+     v5.0: судья возвращает класс, компанию-подлежащее (тикер корзины или "none") и тип события;
+     ленту ему НЕ сообщаем — именно она путала атрибуцию. Отказ («opinion»/«unverified») живёт в
+     кэше 3 суток, факт — всё 14-дневное окно: одна ошибка free-модели больше не немит заголовок
+     на всё окно. Первыми судятся кандидаты с компанией корзины (они двигают порог), затем свежие. */
   {
-    const nowSec=Math.floor(Date.now()/1000), cutSec=nowSec-14*86400;
+    const nowSec=Math.floor(Date.now()/1000);
+    const ttl=(CL&&CL.VER_TTL)||{fact:14*86400,neg:3*86400};
     const prevVer=((prevSnap&&prevSnap.responses&&prevSnap.responses["fh:newsVer"])||[])
-      .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>cutSec);
+      .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>nowSec-(e[1]==="fact"?ttl.fact:ttl.neg));
     const known=new Map(prevVer.map(e=>[e[0],e]));
     const fresh=[]; const seenH=new Set();
-    for(const c of CAND){ if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);} }
+    for(const c of CAND.slice().sort((a,b)=>(!!b.sym-!!a.sym)||((b.t||0)-(a.t||0))))
+      if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);}
     if(OPENROUTER_KEY&&fresh.length&&!late()){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
       try{
-        const list=fresh.slice(0,40).map((c,i)=>(c.capex?"C":"B")+i+"|"+c.sym+"|"+c.h).join("\n");
-        const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
-        const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
-C-заголовки: гиперскейлер СНИЗИЛ капекс/гайденс расходов, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
-B-заголовки: BDC-фонд/его управляющий ВВЁЛ гейт или приостановку выкупа, ОБЪЯВИЛ снижение дивиденда/дистрибуции, СТОЛКНУЛСЯ с волной заявок на выкуп (redemption requests).
-НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may","about to","likely"), вопросы, мнения и модельные портфели аналитиков, обзоры сектора.
-Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
-Заголовки:\n`+list;
+        const batch=fresh.slice(0,40), rows=batch.map((c,i)=>[c.kind+i,c.h]);
         const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
-          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
+          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:4000,messages:[{role:"system",content:CL.JUDGE_SYS},{role:"user",content:CL.judgePrompt(rows)}]}),
           signal:AbortSignal.timeout(late()?30000:90000)});  /* v4.13.4: за дедлайном судья ждёт меньше — кандидаты досудит следующая сборка */
         if(!r.ok) throw new Error("HTTP "+r.status);
         const j=await r.json();
         const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
-        /* v4.12: reasoning-модели пишут {...} в рассуждениях; v4.13.4: берём ПОСЛЕДНЕЕ
-           совпадение — модель может процитировать пример формата из промпта до вердикта */
-        const mm=txt.match(/\{[^{}]*"confirmed"[^{}]*\}/g); if(!mm) throw new Error("нет JSON");
-        const m=[mm[mm.length-1]];
-        const cj=JSON.parse(m[0]);
-        if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
-        const ok=new Set(cj.confirmed);
-        fresh.slice(0,40).forEach((c,i)=>known.set(c.h,[c.h, ok.has((c.capex?"C":"B")+i)?"fact":"opinion", nowSec]));
-        LLM_JUDGED=Math.min(fresh.length,40);
-        console.log("LLM-судья: рассужено "+LLM_JUDGED+" новых кандидатов ("+OPENROUTER_MODEL+")");
+        /* v4.12/v4.13.4: reasoning-модели пишут {...} в рассуждениях и цитируют пример формата —
+           parseJudge берёт плоские объекты по id и при повторе id — ПОСЛЕДНИЙ */
+        const got=CL.parseJudge(txt,rows.map(x=>x[0]));
+        if(!got.size) throw new Error("нет JSON");
+        batch.forEach((c,i)=>{const v=got.get(c.kind+i);    /* не вернувшийся в ответе — досудится следующей сборкой */
+          if(v) known.set(c.h,v.subject?[c.h,v.cls,nowSec,v.subject,v.type]:[c.h,v.cls,nowSec]);});
+        LLM_JUDGED=got.size;
+        console.log("LLM-судья: рассужено "+LLM_JUDGED+" из "+batch.length+" новых кандидатов ("+OPENROUTER_MODEL+")");
       }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }
     } else if(fresh.length){ console.log("LLM-судья пропущен (нет OPENROUTER_KEY): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
     if(known.size||CAND.length) R["fh:newsVer"]=[...known.values()];
@@ -387,10 +413,19 @@ B-заголовки: BDC-фонд/его управляющий ВВЁЛ гей
     if(prevSnap){
       const prev=prevSnap;
       const failedKeys=failed.map(f=>String(f).split(" — ")[0]);
+      /* v5.0: устаревшая подложка первоисточника не должна заслонять СВЕЖИЙ резерв того же ряда.
+         Страница берёт первоисточник, если его ключ есть, и до резерва не доходит — поэтому при
+         многодневном сбое NY Fed она видела SRF/RRP недельной давности, хотя свежий FRED-резерв лежал
+         рядом в том же снимке. Если резерв этого прогона собран, первоисточник не подкладываем. */
+      const FALLBACK={"nyfed:srf":["fred:RPONTTLD"],"nyfed:rrp":["fred:RRPONTSYD"],
+        "cg:bitcoin":["bin:BTCUSDT","stqd:btcusd"],"cg:pax-gold":["bin:PAXGUSDT","stqd:xauusd"],
+        "fx:JPY":["fred:DEXJPUS"],"fx:CNY":["fred:DEXCHUS"],"fred:SAHMREALTIME":["fred:UNRATE"]};
       for(const k of failedKeys){
+        if((FALLBACK[k]||[]).some(f=>R[f]!==undefined)) continue;
         const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
         const age=Date.now()-origin;
-        const cap=k.startsWith("ydiv:")?45*86400e3:                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
+        const cap=k.startsWith("ydiv:")?45*86400e3:
+                  k.startsWith("ypx:")?3*86400e3:                                     /* v5.0: цены корзин — как интрадей, 3 сут. */                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
                   (k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
         if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
         if(prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){

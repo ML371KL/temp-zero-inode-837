@@ -5,27 +5,37 @@ on:
 jobs:
   selftest:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
+      # v5.0: самопроверка берёт ТОТ ЖЕ промпт и разбор, что боевые судьи (сборщик и страница), — блок
+      # ⟦NEWS-CORE⟧ из docs/index.html. Раньше здесь жила своя копия старого промпта {"confirmed":[…]},
+      # и после смены формата самопроверка проверяла уже не то, чем судят на самом деле.
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
       - name: Тестовая классификация той же моделью и тем же промптом
         env:
           OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
         run: |
           node - <<'EOF'
+          const {readFileSync}=require("node:fs");
           const KEY=process.env.OPENROUTER_KEY, MODEL=process.env.OPENROUTER_MODEL;
           if(!KEY){console.error("нет секрета OPENROUTER_KEY");process.exit(1);}
-          const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
-          const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
-          B-заголовки: BDC-фонд ВВЁЛ гейт, ОБЪЯВИЛ снижение дивиденда, СТОЛКНУЛСЯ с волной redemption requests.
-          Формат ответа: {"confirmed":["B0"]} — только подтверждённые.
-          Заголовки:
-          B0|TEST|Ares Capital cuts quarterly dividend to $0.40
-          B1|TEST|3 BDCs that could cut dividends next year`;
+          const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
+          const cyc=n=>JSON.parse(page.match(new RegExp(n+":\\s*(\\[[^\\]]*\\])"))[1]);
+          const CONFIG={CYCLE:{capexTickers:cyc("capexTickers"),bdcTickers:cyc("bdcTickers")}};
+          const blk=page.match(/\/\* ⟦NEWS-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/NEWS-CORE⟧ \*\//);
+          if(!blk){console.error("нет блока ⟦NEWS-CORE⟧ в docs/index.html");process.exit(1);}
+          const C=new Function("CONFIG",blk[1]+"\nreturn {judgePrompt,parseJudge,JUDGE_SYS};")(CONFIG);
+          /* ожидания: B0 — факт ARCC; B1 — листикл (не факт); C0 — факт ORCL (форс-мажор); C1 — вопрос (не факт) */
+          const rows=[["B0","Ares Capital cuts quarterly dividend to $0.40 from $0.48"],["B1","3 BDCs that could cut dividends next year"],
+                      ["C0","Oracle declares force majeure on Stargate data center in Texas"],["C1","Will Meta take an impairment on Reality Labs?"]];
           const t0=Date.now();
           fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
             headers:{"Content-Type":"application/json","Authorization":"Bearer "+KEY,"X-Title":"Razlom-26 selftest"},
-            body:JSON.stringify({model:MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
+            body:JSON.stringify({model:MODEL,max_tokens:4000,messages:[{role:"system",content:C.JUDGE_SYS},{role:"user",content:C.judgePrompt(rows)}]}),
             signal:AbortSignal.timeout(90000)})
           .then(async r=>{
             const txt=await r.text();
@@ -33,18 +43,13 @@ jobs:
             if(!r.ok){console.error("ОШИБКА ПРОВАЙДЕРА:",txt.slice(0,300));process.exit(1);}
             const j=JSON.parse(txt);
             const c=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
-            console.log("ответ модели:",c.slice(0,200));
-            /* v4.13.5: как и боевые судьи (fetch-snapshot.mjs, index.html) — берём ПОСЛЕДНИЙ
-               блок: модель может процитировать пример формата из промпта до своего вердикта,
-               и на первом блоке самопроверка давала бы ложное «✓ САМОПРОВЕРКА ПРОЙДЕНА». */
-            const mm=c.match(/\{[^{}]*"confirmed"[^{}]*\}/g);
-            if(!mm){console.error("НЕТ JSON С confirmed — модель не следует формату");process.exit(1);}
-            const m=[mm[mm.length-1]];
-            const cj=JSON.parse(m[0]);
-            const okShape=cj&&Array.isArray(cj.confirmed);
-            const correct=okShape&&cj.confirmed.includes("B0")&&!cj.confirmed.includes("B1");
-            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факт распознан, мнение отклонено"
-                               :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(cj.confirmed));
-            if(!okShape)process.exit(1);
+            console.log("ответ модели:",c.slice(0,300));
+            const got=C.parseJudge(c,rows.map(x=>x[0]));
+            if(got.size<rows.length){console.error("РАЗОБРАНО "+got.size+" из "+rows.length+" — модель не следует формату");process.exit(1);}
+            const v=id=>got.get(id)||{};
+            const correct=v("B0").cls==="fact"&&v("B0").subject==="ARCC"&&v("B1").cls!=="fact"
+                        &&v("C0").cls==="fact"&&v("C0").subject==="ORCL"&&v("C1").cls!=="fact";
+            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факты распознаны с верной компанией, мнение и вопрос отклонены"
+                               :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(Object.fromEntries(got)));
           }).catch(e=>{console.error("СБОЙ:",String(e));process.exit(1);});
           EOF

@@ -5,3 +5,17 @@ node_modules/
 # Локальный кэш wrangler: рабочее состояние публикатора, не код.
 .wrangler/
 site/
+# бэктест-стенд v5: исторические данные и кэши качаются заново (backtest/v5/README.md)
+backtest/v5/data/
+backtest/v5/mirror/
+backtest/v5/cache/
+backtest/v5/cache5/
+backtest/v5/__pycache__/
+# бэктест-стенд v5: исторические данные и кэши качаются заново (backtest/v5/README.md)
+backtest/v5/data/
+backtest/v5/mirror/
+backtest/v5/cache/
+backtest/v5/cache5/
+backtest/v5/__pycache__/
+# рабочие копии агентов Claude Code — локальная служебка
+.claude/worktrees/

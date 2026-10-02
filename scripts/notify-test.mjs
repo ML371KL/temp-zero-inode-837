@@ -1,7 +1,8 @@
 // Тесты уведомлений. Все фикстуры синтетические и НЕ зависят от текущей даты: проверяется
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
-import { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE } from "./notify.mjs";
+import { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, RUNG_PCT } from "./notify.mjs";
 
 let passed = 0;
 const test = (name, fn) => {
@@ -637,6 +638,367 @@ test("проверочное сообщение показывает текущ�
   assert.match(m, /20%/);
   assert.match(m, /Тревожный \(СРАБОТАЛ\)/, "нештатные детекторы обязаны быть названы");
   assert.ok(!m.includes("Спокойный"), "спокойные детекторы не перечисляются поимённо");
+});
+
+/* ---- каноническая ступень: state.decision → журнал решений → сообщение ---- */
+
+// Решение страницы по контракту v5 (DECISION_SPEC): всё, что не задано, — спокойная ступень 2.
+const REGIME_OF = ["crisis", "elevated", "moderate"];
+const WORD_OF = { crisis: "КРИЗИС · ЗАЩИТА", elevated: "РИСК ПОВЫШЕН", moderate: "РИСК УМЕРЕННЫЙ" };
+const TRIG_OF = [
+  { down: null, up: { pct: 50, composite: -27 } },
+  { down: { pct: 0, composite: -33 }, up: { pct: 100, composite: -7 } },
+  { down: { pct: 50, composite: -13 }, up: null },
+];
+const decisionOf = (o = {}) => {
+  const rung = o.rung ?? 2;
+  const since = o.since ?? "2026-09-30";
+  const regime = o.regime ?? REGIME_OF[rung];
+  return {
+    v: 5, settled: true, noData: false, dataAsOf: o.dataAsOf ?? since,
+    composite: 17.7, lead: -3.6, coin: 35,
+    regime, regimeWord: WORD_OF[regime] || "", raw: rung, rung, pct: RUNG_PCT[rung], since,
+    pend: null, pendPct: null, pendSession: null, override: false, frozen: false, freezeBy: [],
+    triggers: TRIG_OF[rung], tail: { p: 0.1, base: 0.17 },
+    action: "Держите долю акций по ступени.", source: "writer",
+    memory: { v: 2, rung, since, pend: null, pendSession: null },
+    ...o,
+  };
+};
+// Панель после headless-прогона: решение уже разобрано canonicalize (как в main).
+const canonPanel = (dec, prevLedger = null, extra = {}) => {
+  const p = panelOf([ind({})], { source: "page", decision: dec, snapshot_at: `${dec.dataAsOf}T20:06:00.000Z`, ...extra });
+  const r = mute(() => canonicalize(p, prevLedger, { snapshotAt: p.snapshot_at, spx: 7666.45, now: Date.parse("2026-10-02T12:00:00Z") }));
+  return { panel: p, ...r };
+};
+const ledgerAt = (rung, since = "2026-09-29") => buildLedger(null, decisionOf({ rung, since }), { spx: 7600, now: 0 });
+const allocEvents = (evs) => evs.filter((e) => e.kind === "allocation");
+
+test("каноническая смена доли идёт от журнала и говорит новыми словами", () => {
+  const prevLedger = ledgerAt(2);
+  const base = stateOf(panelOf([ind({})]));
+  const { panel: p } = canonPanel(decisionOf({ rung: 1, since: "2026-10-01", composite: -14.2 }), prevLedger);
+  const ev = allocEvents(diff({ ...base, ledger: prevLedger }, p));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].title, "Доля акций сокращена");
+  assert.equal(ev[0].before, "100% нормы");
+  assert.equal(ev[0].after, "50% нормы");
+  assert.match(ev[0].detail, /РИСК УМЕРЕННЫЙ → РИСК ПОВЫШЕН/, "режим называется словами шапки");
+  assert.match(ev[0].detail, /01\.10\.2026/, "сессия данных указана");
+  assert.match(ev[0].key, /@2026-10-01$/, "в ключе — дата смены");
+  assert.match(ev[0].causes[0], /Сводная оценка рынка −14,2/);
+  const msg = renderMessage(ev[0], "к");
+  assert.match(msg, /100% нормы → <b>50% нормы<\/b>/);
+  assert.ok(!/85%|65%|35%/.test(msg), `старая пятиступенчатая лестница не должна протекать: ${msg}`);
+});
+
+test("первый канонический прогон без журнала — база, а не сообщение", () => {
+  const legacy = stateOf(panelOf([ind({})], { allocation: { pct: 85 } }));
+  const { panel: p } = canonPanel(decisionOf({ rung: 2 }));
+  assert.equal(allocEvents(diff({ ...legacy, ledger: null }, p)).length, 0, "«85% → 100%» на смене лестницы — не событие");
+});
+
+test("каноническая ступень без смены против журнала — молчит", () => {
+  const prevLedger = ledgerAt(1);
+  const { panel: p } = canonPanel(decisionOf({ rung: 1, since: "2026-09-29", composite: -15 }), prevLedger);
+  assert.equal(allocEvents(diff({ ...stateOf(panelOf([ind({})])), ledger: prevLedger }, p)).length, 0);
+});
+
+test("объявленная ступень важнее журнала: упавшая рассылка не теряет смену", () => {
+  // Прошлый прогон записал журнал (ступень 1), но Telegram упал — база состояния осталась на 2.
+  const announced = stateOf(canonPanel(decisionOf({ rung: 2 })).panel);
+  const ledgerMoved = ledgerAt(1, "2026-10-01");
+  const { panel: p } = canonPanel(decisionOf({ rung: 1, since: "2026-10-01", dataAsOf: "2026-10-02" }), ledgerMoved);
+  const ev = allocEvents(diff({ ...announced, ledger: ledgerMoved }, p));
+  assert.equal(ev.length, 1, "смена, которую читатель ещё не получил, обязана уйти");
+  assert.equal(ev[0].after, "50% нормы");
+});
+
+test("сбой данных (noData) не порождает сообщения о доле", () => {
+  const prevLedger = ledgerAt(2);
+  const base = { ...stateOf(panelOf([ind({})])), ledger: prevLedger };
+  // Даже если ступень почему-то другая — при покрытии < 60% доли нет вовсе (фантом «85% → 60% → 85%»).
+  for (const rung of [2, 1]) {
+    const { panel: p } = canonPanel(decisionOf({ rung, noData: true, regime: "nodata", regimeWord: "НЕДОСТАТОЧНО ДАННЫХ" }), prevLedger);
+    assert.equal(p.allocation, null);
+    assert.equal(allocEvents(diff(base, p)).length, 0, `noData со ступенью ${rung} дал сообщение о доле`);
+  }
+  // Рубильник — исключение: защита немедленно и при любых данных.
+  const { panel: forced } = canonPanel(decisionOf({ rung: 0, noData: true, override: true, since: "2026-10-01" }), prevLedger);
+  const ev = allocEvents(diff(base, forced));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].after, "0% нормы");
+  assert.equal(ev[0].stability[0].tier, "forced");
+});
+
+test("A→B→A→B за неделю — четыре сообщения, повтор того же прогона — ни одного", () => {
+  let ledger = ledgerAt(2);
+  let state = stateOf(canonPanel(decisionOf({ rung: 2 }), ledger).panel);
+  const sent = {};
+  let delivered = 0;
+  let last = null;
+  for (const [rung, since] of [[1, "2026-10-01"], [2, "2026-10-02"], [1, "2026-10-05"], [2, "2026-10-06"]]) {
+    const run = canonPanel(decisionOf({ rung, since, composite: rung === 2 ? 0 : -20 }), ledger);
+    const evs = allocEvents(diff({ ...state, ledger }, run.panel)).filter((e) => !sent[sentKey(e)]);
+    for (const e of evs) { sent[sentKey(e)] = "2026-10-06T00:00:00Z"; delivered++; }
+    last = { before: { ...state, ledger }, panel: run.panel };
+    state = stateOf(run.panel);
+    ledger = run.ledger;
+  }
+  assert.equal(delivered, 4, "настоящие повторные переходы не должны глушиться индексом доставленного");
+  assert.equal(ledger.transitions.length, 4, "журнал записал все четыре смены");
+  const again = allocEvents(diff(last.before, last.panel)).filter((e) => !sent[sentKey(e)]);
+  assert.equal(again.length, 0, "перезапуск того же прогона не шлёт ту же смену второй раз");
+});
+
+test("переходный режим (полоса): A→B→A→B на разных снимках — тоже четыре сообщения", () => {
+  let state = stateOf(panelOf([ind({})], { allocation: { pct: 85 }, snapshot_at: "2026-10-01T10:00:00Z" }));
+  const sent = {};
+  let delivered = 0;
+  [65, 85, 65, 85].forEach((pct, k) => {
+    const p = panelOf([ind({})], { allocation: { pct }, snapshot_at: `2026-10-0${k + 2}T10:00:00Z` });
+    for (const e of allocEvents(diff(state, p)).filter((e) => !sent[sentKey(e)])) { sent[sentKey(e)] = "x"; delivered++; }
+    state = stateOf(p);
+  });
+  assert.equal(delivered, 4);
+});
+
+test("повторное срабатывание сигнала риска на новом снимке — снова сообщение", () => {
+  const det = (state) => [{ id: "fund", name: "Фондинговый стресс", state, inputs: "", note: "" }];
+  let state = stateOf(panelOf([ind({})], { detectors: det("calm") }));
+  const sent = {};
+  let delivered = 0;
+  ["fired", "calm", "fired", "calm"].forEach((st, k) => {
+    const p = panelOf([ind({})], { detectors: det(st), snapshot_at: `2026-10-0${k + 1}T10:00:00Z` });
+    const evs = diff(state, p).filter((e) => e.kind === "risk" && !sent[sentKey(e)]);
+    for (const e of evs) { sent[sentKey(e)] = "x"; delivered++; }
+    if (k === 2) {
+      // тот же снимок прогоняется ещё раз (перезапуск) — ключ уже в индексе
+      assert.equal(diff(state, p).filter((e) => !sent[sentKey(e)]).length, 0, "повтор того же снимка не шлёт");
+    }
+    state = stateOf(p);
+  });
+  assert.equal(delivered, 4, "второе срабатывание фондинга глушилось неделю, хотя база сдвигалась");
+});
+
+/* ---- «насколько устойчиво»: запас до порога ОТКАТА, а не до порога дальнейшего движения ---- */
+
+const canonStability = (prevRung, dec) => {
+  const announced = stateOf(canonPanel(decisionOf({ rung: prevRung })).panel);
+  const { panel: p } = canonPanel(dec, ledgerAt(prevRung));
+  const ev = allocEvents(diff({ ...announced, ledger: ledgerAt(prevRung) }, p));
+  assert.equal(ev.length, 1);
+  return { st: ev[0].stability[0], text: ev[0].stability[0].reason.join(" | ") };
+};
+
+test("после понижения запас меряется до порога ПОВЫШЕНИЯ, а вернуть долю может условие ↑", () => {
+  const { text } = canonStability(2, decisionOf({ rung: 1, since: "2026-10-01", composite: -14 }));
+  assert.match(text, /улучшиться на 7 пунктов/, `после понижения доле нужно улучшение до −7: ${text}`);
+  assert.ok(!/ухудшиться/.test(text), `«ухудшиться» после понижения — мерка не в ту сторону: ${text}`);
+  assert.match(text, /вернуть 100% нормы может рост сводной оценки рынка до −7/);
+});
+
+test("после повышения запас меряется до порога ПОНИЖЕНИЯ, а вернуть долю может условие ↓", () => {
+  const { text } = canonStability(1, decisionOf({ rung: 2, since: "2026-10-01", composite: 2 }));
+  assert.match(text, /ухудшиться ещё на 15 пунктов/, text);
+  assert.match(text, /вернуть 50% нормы может падение сводной оценки рынка до −13/, `строка отката обязана печатать условие ↓: ${text}`);
+});
+
+test("переходный разбор полосы тоже берёт порог отката по направлению смены", () => {
+  const strip = { up: "до 85%: композит ≥ +13", down: "до 35%: композит ≤ −13" };
+  const down = diff(stateOf(panelOf([ind({})], { allocation: { pct: 85 } })), panelOf([ind({})], { allocation: { pct: 65, score: 5, ...strip } }));
+  const dt = down[0].stability[0].reason.join(" | ");
+  assert.match(dt, /улучшиться на 8 пунктов/, dt);
+  assert.match(dt, /вернуть прежнюю долю может: до 85%/, dt);
+  const up = diff(stateOf(panelOf([ind({})], { allocation: { pct: 65 } })), panelOf([ind({})], { allocation: { pct: 85, score: 15, up: "до 100%: композит ≥ +33 и опереж ≥ +13", down: "до 65%: композит < +7" } }));
+  const ut = up[0].stability[0].reason.join(" | ");
+  assert.match(ut, /ухудшиться ещё на 8 пунктов/, ut);
+  assert.match(ut, /вернуть прежнюю долю может: до 65%/, `после повышения печаталось условие дальнейшего повышения: ${ut}`);
+});
+
+test("понижение при замороженном апгрейде: откат назван заблокированным, а не числом", () => {
+  const { text } = canonStability(2, decisionOf({ rung: 1, since: "2026-10-01", composite: -14, frozen: true, freezeBy: ["Фондинг"] }));
+  assert.match(text, /вернуть 100% нормы сейчас нельзя/);
+  assert.match(text, /нехватки долларов/, "детектор называется человеческими словами");
+  assert.ok(!/пункт/.test(text), `запас до порога при заморозке ничего не значит: ${text}`);
+});
+
+test("условие отката уже выполняется — решение шаткое", () => {
+  const { st, text } = canonStability(2, decisionOf({ rung: 1, since: "2026-10-01", composite: -5 }));
+  assert.equal(st.tier, "shaky");
+  assert.match(text, /условие отката уже выполняется/);
+});
+
+test("журнал смен ступени даёт базу частот откатов", () => {
+  let ledger = ledgerAt(2, "2026-09-01");
+  for (const [rung, since] of [[1, "2026-09-02"], [2, "2026-09-03"], [1, "2026-09-04"]]) ledger = buildLedger(ledger, decisionOf({ rung, since }), { now: 0 });
+  const announced = stateOf(canonPanel(decisionOf({ rung: 1, since: "2026-09-04" })).panel);
+  const { panel: p } = canonPanel(decisionOf({ rung: 2, since: "2026-09-05", composite: 0 }), ledger);
+  const text = allocEvents(diff({ ...announced, ledger }, p))[0].stability[0].reason.join(" ");
+  assert.match(text, /откатил/, `смены из журнала обязаны попасть в эмпирику: ${text}`);
+});
+
+/* ---- журнал решений ---- */
+
+test("журнал: первая версия — память и дневник, смен ещё нет", () => {
+  const l = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { snapshotAt: "2026-10-02T12:46:27Z", spx: 7666.45, now: Date.parse("2026-10-02T12:50:00Z") });
+  assert.equal(l.v, 1);
+  assert.equal(l.updated_at, "2026-10-02T12:50:00.000Z");
+  assert.equal(l.snapshot_at, "2026-10-02T12:46:27Z");
+  assert.equal(l.dataAsOf, "2026-10-01");
+  assert.deepEqual(l.memory, { v: 2, rung: 2, since: "2026-09-30", pend: null, pendSession: null });
+  assert.equal(l.transitions.length, 0, "сид — не смена");
+  assert.deepEqual(l.diary, [{ d: "2026-10-01", c: 17.7, l: -3.6, r: 2, g: "moderate", spx: 7666.45, p: 0.1 }]);
+  assert.equal(l.decision.regimeWord, "РИСК УМЕРЕННЫЙ");
+  assert.equal(l.decision.pct, 100);
+});
+
+test("журнал: смена ступени дописывается, строка дневника на сессию переписывается", () => {
+  const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45 });
+  const l1 = buildLedger(l0, decisionOf({ rung: 1, since: "2026-10-02", dataAsOf: "2026-10-02", composite: -14.26 }), { spx: 7500 });
+  assert.deepEqual(l1.transitions, [{ d: "2026-10-02", from: 2, to: 1, composite: -14.3 }]);
+  assert.equal(l1.diary.length, 2);
+  const l2 = buildLedger(l1, decisionOf({ rung: 1, since: "2026-10-02", dataAsOf: "2026-10-02", composite: -16 }), { spx: null });
+  assert.equal(l2.transitions.length, 1, "та же ступень — новой смены нет");
+  assert.equal(l2.diary.length, 2, "та же сессия — одна строка");
+  assert.equal(l2.diary[1].c, -16, "свежий прогон переписывает строку своей сессии");
+  assert.equal(l2.diary[1].spx, 7500, "закрытие S&P не стирается прогоном, у которого его нет");
+  const late = buildLedger(l2, decisionOf({ rung: 1, since: "2026-10-02", dataAsOf: "2026-09-30" }), {});
+  assert.deepEqual(late.diary.map((x) => x.d), ["2026-09-30", "2026-10-01", "2026-10-02"], "дневник идёт по датам");
+});
+
+test("журнал: внутридневная дрожь балла не даёт коммита, значимый сдвиг — даёт", () => {
+  const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45 });
+  const jitter = buildLedger(l0, { ...decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), composite: 18.3, tail: { p: 0.104, base: 0.17 } }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, jitter), false, "сдвиг на 0,6 пт и 0,4 п.п. риска — не повод для коммита");
+  const moved = buildLedger(l0, { ...decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), composite: 19.0 }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, moved), true, "сдвиг на 1,3 пт — новая строка");
+  assert.equal(moved.diary[0].c, 19);
+});
+
+test("журнал: сессия без данных в дневник не идёт", () => {
+  const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), {});
+  const l1 = buildLedger(l0, decisionOf({ rung: 2, dataAsOf: "2026-10-02", noData: true }), {});
+  assert.deepEqual(l1.diary.map((x) => x.d), ["2026-10-01"]);
+});
+
+test("журнал: смены и дневник подрезаются до 200 и 800", () => {
+  const prev = {
+    memory: { v: 2, rung: 2, since: "2020-01-01", pend: null, pendSession: null },
+    transitions: Array.from({ length: 250 }, (_, k) => ({ d: "2020-01-01", from: k % 2 ? 1 : 2, to: k % 2 ? 2 : 1, composite: 0 })),
+    diary: Array.from({ length: 900 }, (_, k) => ({ d: new Date(Date.UTC(2020, 0, 1) + k * 864e5).toISOString().slice(0, 10), c: 0, l: 0, r: 2, g: "moderate", spx: 1, p: 0.1 })),
+  };
+  const l = buildLedger(prev, decisionOf({ rung: 1, since: "2026-10-01", dataAsOf: "2026-10-01" }), {});
+  assert.equal(l.transitions.length, 200);
+  assert.equal(l.transitions[199].to, 1, "свежая смена остаётся, срезается самое старое");
+  assert.equal(l.diary.length, 800);
+  assert.equal(l.diary[799].d, "2026-10-01");
+});
+
+test("журнал: коммит — только при изменении памяти, смен или дневника", () => {
+  const dec = decisionOf({ rung: 2, dataAsOf: "2026-10-01" });
+  const l0 = buildLedger(null, dec, { spx: 7666.45, now: 0 });
+  assert.equal(ledgerChanged(null, l0), true, "первой версии ещё нет — коммит нужен");
+  const same = buildLedger(l0, dec, { spx: 7666.45, snapshotAt: "другой снимок", now: 1e12 });
+  assert.equal(ledgerChanged(l0, JSON.parse(JSON.stringify(same))), false, "новое время прогона само по себе коммита не стоит");
+  const armed = buildLedger(l0, { ...dec, memory: { ...dec.memory, pend: 1, pendSession: "2026-10-01" } }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, armed), true, "взведённая смена — изменение памяти");
+  const moved = buildLedger(l0, { ...dec, composite: 12 }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, moved), true, "строка дневника сессии изменилась");
+});
+
+test("журнал печатается валидным JSON, строка на запись", () => {
+  const l = buildLedger(ledgerAt(2), decisionOf({ rung: 1, since: "2026-10-01" }), { spx: 7000 });
+  const text = formatLedger(l);
+  assert.deepEqual(JSON.parse(text), l);
+  assert.ok(text.split("\n").some((s) => s.trim().startsWith('{"d":"2026-10-01","from":2,"to":1')), "смена — одной строкой");
+});
+
+test("решение принимается каноническим только от писателя и устоявшимся", () => {
+  assert.equal(decisionStatus(null).ok, false);
+  assert.equal(decisionStatus(decisionOf()).ok, true);
+  assert.match(decisionStatus(decisionOf({ source: "local" })).why, /писателя/);
+  assert.match(decisionStatus(decisionOf({ settled: false })).why, /settled/);
+  assert.equal(decisionStatus(decisionOf({ v: 4 })).ok, false);
+  assert.equal(decisionStatus(decisionOf({ rung: 1, memory: { v: 2, rung: 2 } })).ok, false, "ступень и память расходятся");
+  assert.equal(decisionStatus(decisionOf({ rung: 3, memory: { v: 2, rung: 3 } })).ok, false);
+});
+
+test("без state.decision — переходный режим: доля из полосы, журнал не пишется", () => {
+  const p = panelOf([ind({})], { source: "page", allocation: { pct: 65 } });
+  const r = mute(() => canonicalize(p, ledgerAt(2)));
+  assert.equal(r.ledger, null);
+  assert.deepEqual(p.allocation, { pct: 65 }, "старый разбор полосы остаётся в силе");
+});
+
+test("не писатель — ни доли, ни журнала", () => {
+  const { panel: p, ledger } = canonPanel(decisionOf({ source: "local" }), ledgerAt(2));
+  assert.equal(ledger, null);
+  assert.equal(p.allocation, null, "посеянная от вердикта ступень каноничной не является");
+});
+
+test("сид при сбое данных журнал не начинает, а при живой памяти журнал ведётся", () => {
+  assert.equal(canonPanel(decisionOf({ noData: true })).ledger, null);
+  const kept = canonPanel(decisionOf({ noData: true, since: "2026-09-29", dataAsOf: "2026-10-02" }), ledgerAt(2));
+  assert.ok(kept.ledger, "память есть — журнал пишется (дневник сессию без данных пропустит)");
+  assert.equal(kept.changed, false, "память та же, дневник не тронут — коммита нет");
+});
+
+test("непрочитанный журнал — не первый прогон: ни доли, ни записи", () => {
+  const announced = stateOf(canonPanel(decisionOf({ rung: 1 })).panel);
+  const { panel: p, ledger } = canonPanel(decisionOf({ rung: 2, since: "2026-10-02" }), { unreadable: true });
+  assert.equal(ledger, null, "сид от вердикта не должен лечь поверх живой истории");
+  assert.equal(p.allocation, null);
+  assert.equal(allocEvents(diff({ ...announced, ledger: { unreadable: true } }, p)).length, 0, "сид от вердикта — фантомная «смена»");
+});
+
+test("каноническое решение задаёт и долю, и слово шапки", () => {
+  const { panel: p, ledger, changed } = canonPanel(decisionOf({ rung: 0, since: "2026-10-01", composite: -40, lead: -15 }), ledgerAt(1));
+  assert.equal(p.allocation.canonical, true);
+  assert.equal(p.allocation.pct, 0);
+  assert.equal(p.verdict.word, "КРИЗИС · ЗАЩИТА");
+  assert.equal(changed, true);
+  assert.deepEqual(ledger.transitions.map((t) => [t.from, t.to]), [[1, 0]]);
+  assert.equal(allocationFromDecision(decisionOf({ noData: true })), null);
+});
+
+test("закрытие S&P берётся на дату данных решения", () => {
+  const pts = [{ d: "2026-09-30", v: 7651.54 }, { d: "2026-10-01", v: 7666.45 }, { d: "2026-10-02", v: 7700 }];
+  assert.equal(closeOn(pts, "2026-10-01"), 7666.45, "закрытие после даты данных в дневник этой сессии не идёт");
+  assert.equal(closeOn(pts, ""), 7700);
+  assert.equal(closeOn([], "2026-10-01"), null);
+  const snap = { responses: { "fred:SP500": { observations: [{ date: "2026-10-01", value: "7666.45" }, { date: "2026-09-30", value: "." }] } } };
+  assert.deepEqual(snapshotSpx(snap), [{ d: "2026-10-01", v: 7666.45 }], "пропуск FRED «.» отбрасывается");
+});
+
+test("проверка связи называет долю в долях нормы", () => {
+  const { panel: p } = canonPanel(decisionOf({ rung: 1, since: "2026-10-01" }), ledgerAt(1));
+  const m = pingMessage(p);
+  assert.match(m, /РИСК ПОВЫШЕН/);
+  assert.match(m, /<b>50%<\/b> стратегической нормы/);
+});
+
+testAsync("прошлый журнал: нет файла, null, битый и нормальный", async () => {
+  const { mkdtemp, writeFile: wf, rm: rmd } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "ledger-"));
+  try {
+    assert.equal(await readLedger(join(dir, "нет.json")), null);
+    await wf(join(dir, "null.json"), "null\n");
+    assert.equal(await readLedger(join(dir, "null.json")), null, "так воркфлоу пишет «ветки ещё нет»");
+    await wf(join(dir, "unreadable.json"), '"unreadable"\n');
+    assert.deepEqual(await readLedger(join(dir, "unreadable.json")), { unreadable: true }, "ветка есть, но не прочиталась — это не первый прогон");
+    await wf(join(dir, "broken.json"), "{\"memory\":");
+    let got;
+    const said = await quiet(async () => { got = await readLedger(join(dir, "broken.json")); });
+    assert.equal(got, null);
+    assert.match(said, /не читается/, "битый журнал называется в логе");
+    await wf(join(dir, "ok.json"), formatLedger(ledgerAt(1)));
+    assert.equal((await readLedger(join(dir, "ok.json"))).memory.rung, 1);
+  } finally {
+    await rmd(dir, { recursive: true, force: true });
+  }
 });
 
 /* ---- комментатор LLM: сеть подменяется, ключ фиктивный ---- */

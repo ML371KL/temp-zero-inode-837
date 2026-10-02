@@ -16,6 +16,8 @@ on:
       - "docs/**"
       - "!docs/snapshot.json"
       - "functions/**"
+      - "scripts/engine-test.mjs"
+      - "scripts/news-test.mjs"
       - ".github/workflows/site.yml"
   workflow_dispatch:
 
@@ -51,6 +53,30 @@ jobs:
         # публикуется. Node 24: функция лежит в .js без package.json, и её ESM-синтаксис
         # распознаётся автоматически только в Node не старше 22.7.
         run: node scripts/snapshot-function-test.mjs
+
+      - name: Проверить функцию журнала решений до публикации
+        # /ledger.json отдаёт странице каноническую ступень из ветки `ledger`. Сломанная функция
+        # — это страница, молча ведущая ступень по памяти устройства, то есть тот самый разнобой
+        # между устройствами, который журнал устраняет. Тест гоняет НАСТОЯЩИЙ код функции с
+        # подменными GitHub и кэшем края.
+        run: node scripts/ledger-function-test.mjs
+
+      - name: Проверить новостные детекторы
+        # Ядро сканера ⟦NEWS-CORE⟧ исполняют и страница, и сборщик: батарея размеченных заголовков,
+        # спор якоря с судьёй, склейка перепечаток, дивидендная нога, покрытие префильтра. Без сети.
+        run: node scripts/news-test.mjs
+
+      - name: Проверить движок панели в настоящем Chrome
+        # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,
+        # что видит пользователь и что читают уведомления и журнал ступени — досчёт без ошибок JS,
+        # согласованность решения, правила машины ступеней (подтверждение на следующей сессии, шаг в
+        # одну ступень, гистерезис, режим писателя). Без зелёного теста сайт не публикуется.
+        run: |
+          set -euo pipefail
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then echo "Chrome на раннере не найден"; exit 1; fi
+          npm i --no-save --no-package-lock --no-audit --no-fund puppeteer-core
+          CHROME_PATH="$CHROME" node scripts/engine-test.mjs
 
       - name: Опубликовать
         env:
