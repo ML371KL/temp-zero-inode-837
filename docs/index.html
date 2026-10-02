@@ -1992,123 +1992,399 @@ const BLOCKS={
 };
 
 /* ============ НОВОСТНОЙ СКАНЕР (Finnhub, 14 дней) ============ */
-/* v4.9 (техаудит): словари переработаны.
-   · capexHard: закрыты словоформы (trims/trimmed/lowers/cutting…), добавлены cancel/halt/shelve/
-     scrap/walk away; носитель расширен (стройка/аренда/проекты дата-центров, ai infrastructure,
-     spending on gpu/servers, spending/investment outlook|guidance) и добавлен в ОБЕ ветки
-     (noun-first «data center spend cuts» раньше был дырой); голое useful life убрано —
-     ПРОДЛЕНИЕ сроков службы (бычье) больше не триггер, ловится только сокращение сроков.
-   · bdcHard: у «gate» появилась граница слова и контекст фонда/выкупа — navigate/mitigate/
-     Stargate больше не жёсткие триггеры, а «fund gates redemptions» (3-е лицо) теперь ловится;
-     добавлены distribution/payout.
-   · Гео/тарифные регэкспы удалены вместе со справочными секциями (на балл не влияли). */
+/* v4.9 (техаудит): словари переработаны — закрыты словоформы глаголов, носитель капекса расширен
+   (стройка/аренда/проекты дата-центров, ai infrastructure, spending on gpu/servers) и стоит в ОБЕИХ
+   ветках, голое useful life убрано (ПРОДЛЕНИЕ сроков — бычье). bdcHard: «gate» с границей слова
+   и контекстом фонда/выкупа. v4.13.5: границы слова у КАЖДОЙ основы («cap» внутри «Capital»,
+   «gate» внутри «aggregate», «cut» внутри «consecutive») и макро-страж MACROSUBJ. */
+/* ═══ v5.0: ПЕРЕСБОРКА СКАНЕРА (аудит ложных «фактов» и пропущенных событий) ═══
+   1) Событие приписывается КОМПАНИИ ИЗ ЗАГОЛОВКА (словарь алиасов от картриджа CYCLE), а не
+      ленте Finnhub: в живом снимке лишь 41% заголовков fh:newsHit капекс-корзины упоминают «свою»
+      компанию — «Intel cuts capex forecast again» в ленте MSFT/AMZN считался фактом гиперскейлера.
+      Заголовок без компании корзины — контекст: показывается, но в пороги не идёт.
+   2) Перепечатки одной новости в разных лентах (набор слов совпадает ≥50% в пределах 72 ч, либо
+      та же секунда публикации) — ОДНО событие: «Broadcom to lend Anthropic up to $42 billion…»
+      в лентах MSFT и AMZN (одна и та же datetime) больше не изображает «две компании».
+   3) Кандидаты ищутся по КЛАУЗАМ (границы , ; : « - » but/yet/while): жадный [^.]{0,80} склеивал
+      «X cuts capex guidance, reiterates spending plans» в одно совпадение, и NEG (reiterat-) гасил
+      реальную срезку; «Fed slashes rates; BDC dividends at risk» склеивался через «;» в «срезку
+      дивиденда». Каждая клауза оценивается отдельно, NEG ищется только внутри своей клаузы.
+   4) Новые формы: force majeure, delays/pauses/halts data center, «Data Centre Delays»; BDC —
+      halts/gates/limits/caps redemptions|withdrawals|tender, «sets distribution at $X, down from $Y»,
+      suspends/cuts distribution. В живом снимке 24–30.09 ~35 заголовков про форс-мажор Oracle по
+      Project Jupiter/Stargate и задержки дата-центров дали НОЛЬ кандидатов.
+   5) Якорь факта больше НЕ сильнее отрицательного вердикта судьи: при споре — «неподтверждённый».
+      Факт = положительный вердикт судьи ЛИБО якорь при отсутствии вердикта. Якорь требует
+      подлежащего — компании корзины прямо перед глаголом — и объекта прямо после (≤3 слов, без
+      as/while/even/amid и без чужих объектов jobs/rates/costs…), а форма мнения/модальности
+      (вопрос, will/would/should/why/how, листикл, «should you»…) проверяется по ВСЕМУ заголовку,
+      и якорь её не обходит. impairment/write-down — якорь только для ИИ-/серверных/дата-центровых
+      активов компании корзины («Amazon takes write-down on Rivian stake» — не событие ставки).
+   ⟦NEWS-CORE⟧…⟦/NEWS-CORE⟧ — чистое ядро (без DOM/state/SNAP/fetch; извне читает только
+   CONFIG.CYCLE): тот же текст исполняют сборщик scripts/fetch-snapshot.mjs (кандидаты, промпт
+   и разбор ответа судьи) и тест scripts/news-test.mjs — кандидаты сервера и страницы разойтись
+   не могут (прежняя схема выдирала отдельные регэкспы по шаблонам строк и расходилась). */
+/* ⟦NEWS-CORE⟧ */
+/* v5.0: алиасы компаний корзин — ОДНО место. Сам тикер — всегда алиас (MSFT, $MSFT, (MSFT));
+   имена — отсюда, через «|». При смене цикла допишите имена новых тикеров: без записи тикер
+   ловится только по самому тикеру — деградация, а не поломка. «Blue Owl» без «Capital Inc /
+   Capital (OWL)» — OBDC: гейт выкупа в фонде семейства Blue Owl Credit (сестринский OBDC II
+   перед слиянием с OBDC) — ровно канарейка канала; сам управляющий OWL отсекается хвостом
+   CO_NOT. Голые «Ares»/«Blackstone»/«Apollo» намеренно НЕ алиасы: это диверсифицированные
+   управляющие, их новости — не про BDC корзины. */
+const CO_NAMES={MSFT:"Microsoft|Azure",GOOGL:"Alphabet|Google",AMZN:"Amazon|AWS",META:"Meta|Facebook",
+  ORCL:"Oracle",CRWV:"CoreWeave",ARCC:"Ares Capital",OBDC:"Blue Owl Capital Corp|Blue Owl",
+  FSK:"FS KKR",BXSL:"Blackstone Secured Lending",GBDC:"Golub Capital BDC|Golub",MFIC:"MidCap Financial"};
+const CO_NOT={OBDC:"\\s+Capital\\s+(?:Inc\\b|\\(OWL\\))"};
+const CO_TICKERS={capex:[...CONFIG.CYCLE.capexTickers],bdc:[...CONFIG.CYCLE.bdcTickers]};
+const CO_RX=(()=>{const o={},q=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  for(const t of [...CO_TICKERS.capex,...CO_TICKERS.bdc])
+    o[t]=new RegExp("(?<![\\w$])\\$?(?:"+[t,...(CO_NAMES[t]?CO_NAMES[t].split("|"):[])].map(q).join("|")+")(?!\\w)"+(CO_NOT[t]?"(?!"+CO_NOT[t]+")":""),"gi");
+  return o;})();
+function coFind(s,kind){                      /* все упоминания компаний корзины kind: [{t,i,e}] по позиции */
+  const out=[];
+  for(const t of CO_TICKERS[kind]){const rx=CO_RX[t];rx.lastIndex=0;let m;
+    while((m=rx.exec(s))){out.push({t,i:m.index,e:m.index+m[0].length});if(!m[0].length)rx.lastIndex++;}}
+  return out.sort((a,b)=>a.i-b.i);
+}
+/* v5.0: клаузы. Точка — граница только перед пробелом и не после сокращений (Corp., Sept., U.S.);
+   запятая внутри числа (6,000) — не граница. */
+const CL_SEP=/(?<!\b(?:inc|corp|co|ltd|plc|st|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|no|vs|mr|ms|dr|u\.s|u\.k|e\.g))\.(?=\s)|[;:|!?]|,(?!\d{3}(?!\d))|\s[-–—]+\s|\s(?:but|yet|while|whereas)\s/gi;
+function newsClauses(h){
+  const out=[];let i=0,m;CL_SEP.lastIndex=0;
+  while((m=CL_SEP.exec(h))){if(m.index>i)out.push({s:h.slice(i,m.index),i});i=m.index+m[0].length;}
+  if(i<h.length)out.push({s:h.slice(i),i});
+  return out;
+}
 /* v4.13.5: макро-страж — «rate/tax/wage cuts …» это заметка о ставках/налогах, а не действие
-   эмитента. Один список на все словари (bdcHard ниже держит его инлайном — регэксп-литерал
-   не принимает интерполяцию; правишь здесь — правь и там). */
-const MACROSUBJ="(?<!\\b(?:rate|tax|job|cost|fee|wage|price|budget)s?[\\s-])";
-const CAPEX_VERBS="cut(s|ting)?\\b(?!-edge)|trim\\w*|lower\\w*|reduc\\w*|slash\\w*|cancel\\w*|halt\\w*|shelv\\w*|scrap\\w*|slow\\w*|freez\\w*|walk\\w* away|pull(s|ing|ed)? back|scal\\w* back|paus\\w*|delay\\w*";
-const CAPEX_NOUN="(capex|capital expenditure|capital spending)s?\\b|data ?cent(er|re)s? (spend\\w*|build\\w*|plan\\w*|construction|project\\w*|expansion|lease\\w*)|ai infrastructure|spending[^.]{0,30}\\b(gpu|server|chip|data ?cent)|(spend(ing)?|investment) (outlook|plan\\w*|forecast|target\\w*|guidance)";
+   эмитента. v5.0: + макро-подлежащие (Fed/FOMC/Powell/ЦБ/доходности): «Fed slashes rates». */
+const MACROSUBJ="(?<!\\b(?:rate|tax|job|cost|fee|wage|price|budget)s?[\\s-])(?<!\\b(?:fed|fed['’]s|fomc|powell|federal reserve|central banks?|ecb|boe|boj|treasury yields?|yields?)\\s)";
+/* v5.0: разрыв между глаголом и объектом внутри клаузы — ленивый и ограниченный; рвётся на
+   подчинительных связках и чужих объектах («cuts 6,000 jobs even as it lifts capex forecast») */
+const GAP_STOP="as|while|even|amid|after|despite|though|although|because|whereas|rates?|jobs?|costs?|workers?|staff|prices?|workforce|headcount|employees|layoffs?|fees?|wages?|taxe?s?|payments?|price targets?|targets?|ratings?|estimates?";
+const GAPC="(?:(?!\\b(?:"+GAP_STOP+")\\b)(?:[^,;:]|,(?=\\d)))";
+const OG="(?:\\s+(?!(?:"+GAP_STOP+")\\b)[^\\s,;:]+){0,3}?\\s+";   /* ≤3 слов между глаголом якоря и объектом */
+const CAPEX_VERBS="cut(s|ting)?\\b(?!-edge)|trim\\w*|lower\\w*|reduc\\w*|slash\\w*|cancel\\w*|halt\\w*|shelv\\w*|scrap\\w*|slow\\w*|freez\\w*|walk\\w* away|pull(s|ing|ed)? back|scal\\w* back|paus\\w*|delay\\w*|postpon\\w*|abandon\\w*";
+const CAPEX_NOUN="(capex|capital expenditure|capital spending)s?\\b|data ?cent(er|re)s? (spend\\w*|build\\w*|plan\\w*|construction|project\\w*|expansion|lease\\w*)|ai infrastructure|spending[^,;:]{0,30}\\b(gpu|server|chip|data ?cent)|(spend(ing)?|investment) (outlook|plan\\w*|forecast|target\\w*|guidance)";
+/* v5.0: стройка дата-центров — голый «data center» только с глаголами остановки/отсрочки (не с
+   cut/lower/slow: «cuts ribbon on new data center» — не событие) и в форме «Data Centre Delays» */
+const DC_VERBS="delay\\w*|postpon\\w*|paus\\w*|halt\\w*|suspend\\w*|shelv\\w*|scrap\\w*|cancel\\w*|freez\\w*|froze|abandon\\w*|push(es|ed|ing)? back";
+const DC_NOUN="data ?cent(?:er|re)s?|stargate|ai (?:mega-?)?campus(?:es)?|ai factor(?:y|ies)";
+const AI_CTX=/\b(gpus?|servers?|data ?cent(er|re)s?|ai|depreciat\w*|useful li(fe|ves)|chips?|accelerators?)\b/i;
+const IMPAIR=/\bimpairments?\b|\bwrit(e|es|ten|ing)?[ -]?downs?\b|\bwrote[ -]?down\b/i;
+const LIMIT_V="(?<!\\b(?:capital|holdings|partners|group|trust|management|advisers|advisors|incorporated)\\s)limit(s|ed|ing)?(?!\\s+(?:announc|declar|report|pric|complet|issu|file|redeem))";
+const GATE_V="gat(e|es|ed|ing)|halt\\w*|suspend\\w*|restrict\\w*|freez\\w*|froze|frozen|paus\\w*|block\\w*|pro-?rat\\w*|cap(s|ped|ping)?|"+LIMIT_V;
+const RED_N="redemptions?|withdrawals?|tender offers?|tenders?";
+const DIV_N="(?:dividends?|distributions?|payouts?)(?!\\s+(?:reinvestment|centers?|centres?|channels?|network|partners?|agreements?|deals?|rights|facilit(?:y|ies)|warehouses?|business|segment|hubs?))";   /* DRIP, distribution center… — не выплата */
+const DIVCUT_V="cut|cuts|cutting|reduc\\w*|lower\\w*|halv\\w*|slash\\w*|suspend\\w*|trim\\w*|decreas\\w*|eliminat\\w*|omit\\w*";
+/* банкротство — событие ставки, только если банкротится САМА компания корзины (CoreWeave);
+   «National retailer files Chapter 11» в ленте AMZN — даже не контекст */
+const BANKR=/\bfil(e|es|ed|ing) for (chapter 11 )?bankruptcy\b|\bchapter 11\b/i;
+/* кандидаты — по клаузе; первый не-отрицаемый матч любой клаузы (не только первый матч заголовка) */
 const RX={
-  capexHard:new RegExp("("+CAPEX_NOUN+")[^.]{0,80}"+MACROSUBJ+"\\b("+CAPEX_VERBS+")|"+MACROSUBJ+"\\b("+CAPEX_VERBS+")\\b[^.]{0,60}("+CAPEX_NOUN+")|\\b(shorten\\w*|cut\\w*|reduc\\w*|lower\\w*|accelerat\\w*)[^.]{0,40}(useful li(fe|ves)|depreciat)|(useful li(fe|ves)|depreciat\\w*)[^.]{0,40}\\b(shorten\\w*|cut\\w*|reduc\\w*|accelerat\\w*)|\\bimpairment|\\bwrit(e|es|ten|ing)?[ -]?downs?","i"),
-  /* v4.13.5 (гранд-аудит): КАЖДАЯ основа получила границы слова. Без них «cap» ловился внутри
-     «Capital» (так называется почти каждый BDC), «gate» — внутри «aggregate» (формула нотных
-     пресс-релизов «redemption of $300 million aggregate principal»), «cut» — внутри
-     «consecutive» («declares 130th consecutive monthly dividend» — рутинный PR месячных
-     плательщиков) и «executive». Формы limit/limited выброшены намеренно: \blimited\b матчит
-     «Gladstone Capital Limited»; глагольные limits/limiting остаются. Плюс макро-страж:
-     «rate/tax cuts … dividends» — заметка о ставках, а не действие фонда. */
-  bdcHard:/\bgat(e|es|ed|ing)\b[^.]{0,40}\b(redemption|withdrawal|investor)|\b(fund|bdc|redemption|withdrawal)s?\b[^.]{0,30}\bgat(e|es|ed|ing)\b|(\b(suspend\w*|halt\w*|restrict\w*|cap(s|ped|ping)?)\b|(?<!\b(?:capital|holdings|partners|group|trust|management|advisers|advisors|incorporated)\s)\blimit(s|ed|ing)?\b(?!\s+(?:announc|declar|report|pric|complet|issu|file|redeem)))[^.]{0,40}\b(redemption|withdrawal)|\b(redemption|withdrawal)s?\b[^.]{0,40}(\b(suspend\w*|halt\w*|restrict\w*|gat(e|es|ed|ing)|cap(s|ped|ping))\b|(?<!\b(?:capital|holdings|partners|group|trust|management|advisers|advisors|incorporated)\s)\blimit(s|ed|ing)?\b(?!\s+(?:announc|declar|report|pric|complet|issu|file|redeem)))|\b(dividend|distribution|payout)s?\b[^.]{0,40}\b(cut|cuts|reduc\w*|lower\w*|slash\w*|suspend\w*|halv\w*|trim\w*|decreas\w*)\b|(?<!\b(?:rate|tax|job|cost|fee|wage|price|budget)s?[\s-])\b(cut|cuts|reduc\w*|lower\w*|halv\w*|slash\w*|suspend\w*|trim\w*|decreas\w*)\b[^.]{0,30}\b(dividend|distribution|payout)s?\b|\bredemption requests?\b|\bredemption[^.]{0,30}\b(surge|spike|exodus|mount\w*)\b|\binvestor exodus\b|\b(hit|flooded|swamped) by\b[^.]{0,40}\bredemption/i,
+  capex:[
+    new RegExp(MACROSUBJ+"\\b("+CAPEX_VERBS+")"+GAPC+"{0,60}?("+CAPEX_NOUN+")","i"),
+    new RegExp("("+CAPEX_NOUN+")"+GAPC+"{0,60}?"+MACROSUBJ+"\\b("+CAPEX_VERBS+")","i"),
+    new RegExp("\\b(shorten\\w*|cut\\w*|reduc\\w*|lower\\w*|accelerat\\w*)\\b"+GAPC+"{0,40}?(useful li(fe|ves)|depreciat)|(useful li(fe|ves)|depreciat\\w*)"+GAPC+"{0,40}?\\b(shorten\\w*|cut\\w*|reduc\\w*|accelerat\\w*)","i"),
+    new RegExp("\\b("+DC_VERBS+")\\b"+GAPC+"{0,50}?\\b("+DC_NOUN+")\\b|\\b("+DC_NOUN+")\\b"+GAPC+"{0,30}?\\b(delays?|delayed|postponements?|postponed|pauses?|paused|halts?|halted|suspended|shelved|scrapped|cancell?ations?|cancell?ed|frozen|abandoned|setbacks?|slowdowns?)\\b","i"),
+    /\bforce majeure\b/i,
+    BANKR,                                    /* + компания корзины в заголовке (см. newsMatch) */
+    IMPAIR                                    /* + ИИ-контекст в заголовке (см. newsMatch) */
+  ],
+  bdc:[
+    new RegExp("\\b(?:"+GATE_V+")\\b"+GAPC+"{0,40}?\\b(?:"+RED_N+")\\b","i"),
+    new RegExp("\\b(?:"+RED_N+")\\b"+GAPC+"{0,40}?\\b(?:"+GATE_V+")\\b","i"),
+    /\b(fund|bdc|investor)s?\b[^,;:]{0,30}?\bgat(e|es|ed|ing)\b/i,
+    new RegExp(MACROSUBJ+"\\b(?:"+DIVCUT_V+")\\b"+GAPC+"{0,30}?\\b(?:"+DIV_N+")\\b","i"),
+    new RegExp("\\b(?:"+DIV_N+")\\b"+GAPC+"{0,40}?\\b(?:"+DIVCUT_V+")\\b","i"),
+    /\bredemption requests?\b|\bredemptions?\b[^,;:]{0,30}?\b(surg\w*|spik\w*|soar\w*|jump\w*|exodus|mount\w*|climb\w*)\b|\binvestor exodus\b|\b(hit|flooded|swamped|deluged)\s+(by|with)\b[^,;:]{0,40}?\bredemption/i
+  ],
   bdcSoft:/non[- ]?accrual|navs?[^.]{0,30}(markdown|writ(e|es|ten|ing)?[ -]?downs?|decline)|default rate|pik income/i
 };
+/* «sets distribution at $0.48, down from $0.70» — сравнение живёт за запятой, поэтому по заголовку */
+const DIV_DOWN=new RegExp("\\b(?:"+DIV_N+")\\b[^;:|]{0,60}?\\b(?:down from|reduced from|lowered from|cut from|lower than (?:the )?(?:prior|previous))\\b","i");
 /* зеркало серверного HIT_RX (fetch-snapshot.mjs) — грубый префильтр релевантности для ЖИВОГО
-   режима: без него страховочный потолок в pull() резал бы сырой фид до RX-фильтрации */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
-/* Отрицания: "will NOT cut capex", "denies dividend cut".
-   v4.6: NEG проверяется в КЛАУЗЕ триггера (35 симв. до + сам матч), а не по всему
-   заголовку — «cuts capex despite strong demand» больше не гибнет как отрицание;
-   контекстные despite/unchanged/intact/keep убраны из списка: они описывают
-   обстоятельства ПОСЛЕ события, а не отменяют его. Настоящие отрицания
-   (not/denies/won't/rules out…) стоят перед глаголом и ловятся окном. */
-const NEG=/\b(not|no|never|deni\w*|(wo|do|does|did|is|are|was|were|has|have|had|ca|could|should|would|must)n['’]?t|will not|rule[sd]? out|maintain\w*|reiterat\w*|refus\w*|refut\w*|reject\w*|dismiss\w*|downplay\w*|debunk\w*|push(es|ed)? back)\b/i;
-/* Маркеры мнений/прогнозов/листиклов: «2 BDCs To Sell…», «Could X cut…», «Top 5…», вопросы.
-   Без ИИ такие заголовки не считаются ФАКТОМ: капекс — отсев, жёсткий BDC — в «мягкие». */
-/* v4.10: добавлены маркеры прогнозов/личного мнения (about to, set to, poised, likely, loom,
-   on the verge, i'm, how to, here's) — «OBDC is about to cut its dividend» это прогноз, не факт */
-const OP=/\?|\bto (sell|buy|avoid|watch|own)\b|\bbefore (it|they|the)\b|\bcould\b|\bmight\b|(?<!\b(?:in|of|by|since|until|during|from|for|on|per|through|effective|starting|last|next|this|early|late|mid)[\s-])\bmay\b(?!\s+\d)|\bshould\b|\bwould\b|\btop \d+\b|\b\d+ (bdcs?|stocks?|reits?|funds?)\b|\bbest\b|\bworst\b|\bwhy\b|\bpredict\w*|\bforecast\w*|\bwatchlist\b|\bopinion\b|\bbull(ish)?\b|\bbear(ish)?\b|\babout to\b|\bset to\b|\bpoised\b|\blikely\b|\bloom(s|ing)?\b|\bon the verge\b|\bi['’]?m\b|\bhow to\b|\bhere['’]?s\b|\bprice target\b|\btarget price\b/i;
-/* твёрдый факт сильнее маркеров мнений; v4.9: добавлена каноническая форма гайденс-срезки
-   («X cuts capex forecast/outlook») — 3-е лицо наст. времени не матчится модальными
-   could/may, поэтому мнения сюда не просочатся, а OP-маркер forecast её больше не убивает */
-/* v4.10: + срезка дивиденда/дистрибуции в 3-м лице ед. числа (cuts/reduces/slashes…) —
-   форма пресс-релиза/новостной ленты; модальные «could cut» и мн. число «they cut» не матчатся */
-/* v4.13.5 (гранд-аудит): якорь факта разделён на две ступени — прежний единый якорь давал
-   классу «факт» три пути из чужого подлежащего, а факт по дизайну v4.12 сильнее отрицательного
-   вердикта судьи, т.е. ложный факт по двум тикерам = ложные −15 без единого предохранителя:
-     · макро-заметка: «Fed rate cuts could pressure BDC dividends» (подлежащее — ставки);
-     · действие аналитика: «RBC lowers FSK price target, payout risk grows» (подлежащее — банк);
-     · голый токен в вопросе: «Could Meta face a massive GPU impairment?».
-   FACT_HARD — пресс-релизная форма «эмитент СДЕЛАЛ X»: глагол 3-го лица + объект рядом (≤24
-   символа: «cuts its regular quarterly dividend» проходит, «lowers FSK price target, payout» —
-   нет), с тремя стражами: макро-подлежащее, брокер-подлежащее, целевая лексика аналитика.
-   ТОЛЬКО FACT_HARD перекрывает отказ судьи — ровно тот смысл, ради которого писался v4.12.
-   FACT_SOFT — событие названо существительным (impairment/write-down): факт лишь тогда, когда
-   в клаузе перед токеном нет модальности (SPEC) и судья не сказал «мнение». */
-const NOTSUBJ=MACROSUBJ+"(?<!\\b(?:analyst|analysts|morgan stanley|goldman|goldman sachs|barclays|rbc|kbw|keefe|wells fargo|ubs|citi|citigroup|jpmorgan|jefferies|bofa|bank of america|deutsche bank|mizuho|piper sandler|raymond james|truist|wedbush|bernstein|oppenheimer|stifel|baird|evercore|td cowen|canaccord|btig|needham|guggenheim|nomura|macquarie|hsbc)\\s)";
-const NOTTGT="(?![^.]{0,24}\\b(?:price target|target price|estimate|rating|recommendation)\\b)";
-const FACT_HARD=new RegExp(NOTSUBJ+"\\b(cuts|reduces|lowers|slashes|suspends|halves|trims)\\b"+NOTTGT+"[^.]{0,34}\\b(dividend|distribution|payout)s?\\b|\\bsuspends? redemptions?\\b|\\bfiles (for )?bankruptcy\\b|"+NOTSUBJ+"\\b(cuts?|lowers|reduces|trims|slashes)\\b"+NOTTGT+" [^.]{0,40}(capex|capital expenditure|capital spending|spending)[^.]{0,20}(guidance|outlook|forecast|target)","i");
-const FACT_SOFT=/\bimpairment|\bwrit(e|es|ten|ing)?[ -]?downs?\b/i;
-const SPEC=/\b(risk\w*|could|may|might|potential\w*|possible|warn\w*|loom\w*|face[sd]?|facing|brace\w*|fear\w*|threat\w*|question\w*|if|whether|expect\w*)\b/i;
-const FACT=new RegExp(FACT_HARD.source+"|"+FACT_SOFT.source,"i");   /* объединение — только для метки провенанса «·якорь» в ленте */
-function factSoftOk(h){                       /* мягкий якорь без модальности в клаузе перед токеном */
-  const m=FACT_SOFT.exec(h||""); if(!m) return false;
-  return !SPEC.test(h.slice(Math.max(0,m.index-40),m.index));
-}
-const trigNoNeg=(h,rx)=>{
-  const m=rx.exec(h); if(!m) return false;
-  return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));
-};
-/* ═══ v4.10: классификация новостных кандидатов (вместо бинарного «жёсткий/мягкий») ═══
-   fact         — подтверждённое событие: LLM-вердикт (серверный из снимка или клиентский)
-                  либо твёрдый факт-якорь FACT (impairment, «X cuts dividend» в 3-м лице…)
-   unverified   — жёсткий кандидат из нейтрального источника без подтверждения
-   opinion      — маркеры мнений/прогнозов ИЛИ мнение-источник (SA-контрибьюторы и т.п.)
-                  без LLM-подтверждения; НА БАЛЛ НЕ ВЛИЯЕТ
-   soft         — мягкие фундаментальные упоминания (non-accrual, NAV); НА БАЛЛ НЕ ВЛИЯЕТ
-   Бэктест 2006–2026: хронический «−4 от мнений» стоил −0,7 п.п. годовых; страховка −15
-   по подтверждённым фактам нечувствительна к лагу подтверждения 0–5 дней. */
-const OPINION_SRC=/seeking ?alpha|motley|zacks|investorplace|tipranks|gurufocus|simply wall|insider monkey|benzinga|247 ?wall/i;
-/* синдикация с атрибуцией первоисточника («…» - Financial Times) повышает тир: агрегатор
-   пересказывает новость издания, а не публикует мнение (живой кейс: Blue Owl·FT через Benzinga) */
+   режима. ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ словарей выше (scripts/news-test.mjs проверяет и это,
+   и побайтовое совпадение с серверной копией). v5.0: + force majeure/stargate/ai campus/ai factory/
+   bankrupt/chapter 11/tender/wrote down. */
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
+/* Отрицания: "will NOT cut capex", "denies dividend cut". v4.6: контекстные despite/unchanged/
+   intact/keep убраны — описывают обстоятельства ПОСЛЕ события. v5.0: окно — 35 симв. до матча
+   И только внутри его клаузы: «…, reiterates spending plans» соседней клаузы срезку не гасит;
+   + unlikely («data center unlikely to be canceled, says analyst» — не событие). */
+const NEG=/\b(not|no|never|unlikely|deni\w*|(wo|do|does|did|is|are|was|were|has|have|had|ca|could|should|would|must)n['’]?t|will not|rule[sd]? out|maintain\w*|reiterat\w*|refus\w*|refut\w*|reject\w*|dismiss\w*|downplay\w*|debunk\w*|push(es|ed)? back)\b/i;
+/* Маркеры мнений/прогнозов/листиклов (v4.10, v5.0). Finnhub отдаёт источник «Yahoo» для 989 из 1301
+   заголовков — Motley Fool, Zacks, 24/7 Wall St, Simply Wall St прячутся за ним, поэтому мнение
+   распознаётся по ФОРМЕ заголовка: вопросы, «should you», «is it time», «stocks to buy», «N reasons»,
+   личные местоимения, доходные листиклы («$6,000 a month», «dividend snowball»…).
+   v5.0: «forecast» убран — это существительное гайденса («cuts capex forecast»), а не прогноз. */
+const MAY="(?<!\\b(?:in|of|by|since|until|during|from|for|on|per|through|effective|starting|last|next|this|early|late|mid)[\\s-])\\bmay\\b(?!\\s+\\d)";
+const OP=new RegExp("\\?|\\bto (sell|buy|avoid|watch|own|hold)\\b|\\bbefore (it|they|the)\\b|\\bcould\\b|\\bmight\\b|"+MAY+"|\\bshould\\b|\\bwould\\b|\\btop \\d+\\b|\\b\\d+ (bdcs?|stocks?|reits?|funds?|picks?|reasons?|things?|ways?|signs?|names?)\\b|\\b(best|worst)\\b(?!\\s+(day|week|month|quarter|year|session|start|performance|since)\\b)|\\bwhy\\b|\\bpredict\\w*|\\bwatchlist\\b|\\bopinion\\b|\\bbull(ish)?\\b|\\bbear(ish)?\\b|\\babout to\\b|\\bset to\\b|\\bpoised\\b|\\blikely\\b|\\bloom(s|ing)?\\b|\\bon the verge\\b|\\bhow to\\b|\\bhere['’]?s\\b|\\bhere is\\b|\\bprice target\\b|\\btarget price\\b|\\bis it time\\b|\\btime to (buy|sell)\\b|\\breasons? (to|why)\\b|\\b(buy|sell|hold)\\b(?=\\s+(now|today|rating|or|the dip))|\\bmust[- ]own\\b|\\bno[- ]brainer\\b|\\bmillionaire\\w*|\\bretire(ment|es?)\\b|\\bpassive income\\b|\\$[\\d,.]+k? (a|per) month\\b|\\bmonthly (income|paycheck|dividends?)\\b|\\b(dividend|income) (portfolio|investors?|stocks?|picks?|snowball|machines?|buckets?|fans?)\\b|\\b(under|over)valued\\b|\\bfair value\\b|\\bbargain\\b|\\boverdone\\b|\\bbeaten[- ]down\\b|\\bout of favou?r\\b|\\bmy\\b|\\byou(r|['’]re|['’]ll)?\\b|\\bwhat (it|this|that) (means|changes)\\b|\\bwhat to (know|expect|watch|do)\\b|\\b(facts?|things?) to (know|note|watch)\\b|\\bthesis\\b|\\btake-?aways?\\b|\\blessons?\\b|\\bwarning (sign|for)\\b|\\bwake-up call\\b|\\b(analysts?|strategists?|wall street) (says?|sees?|warns?|expects?|thinks?)\\b","i");
+const OP_I=/(?:^|[\s"“‘'(])I(?:['’](?:m|d|ll|ve))?\s/;   /* «Why I Won't…», «I'm Buying…» — регистрозависимо */
+/* v5.0: модальность/вопрос/слух по ВСЕМУ заголовку (прежний SPEC смотрел 40 символов перед
+   токеном и не знал will/would/should/why/how/is/are/«?»: «Will Meta take an impairment…?»,
+   «Why investors should write down…» давали факт). Модальный заголовок не бывает якорем; без
+   вердикта судьи он «неподтверждённый» (слух, отчёт) или «мнение» (если сработал OP). */
+const MODAL=new RegExp("\\?|^\\s*['\"‘“]?(is|are|was|were|does|do|did|has|have|had|can|could|should|will|would)\\b|\\b(will|would|could|should|might|must|can|cannot|shall)\\b|"+MAY+"|\\b(why|how|what|whether|if)\\b|\\b(risk\\w*|potential\\w*|possibl\\w*|warn\\w*|loom\\w*|fear\\w*|threat\\w*|brace\\w*|consider\\w*|mull\\w*|explor\\w*|planning to|plans? to|set to|poised|likely|unlikely|about to|in talks|rumou?r\\w*|chatter|unconfirmed|reportedly|sources? say|people familiar|said to)\\b|\\bweigh(s|ing)?\\b(?!\\s+(on|down)\\b)|(?<!\\b(?:than|as)\\s)\\bexpect\\w*","i");
+/* Источник-мнение (SA-контрибьюторы и т.п.); синдикация с атрибуцией первоисточника («…» -
+   Financial Times) повышает тир: агрегатор пересказывает новость издания (живой кейс Blue Owl·FT) */
+const OPINION_SRC=/seeking ?alpha|motley|fool|zacks|investorplace|tipranks|gurufocus|simply wall|insider monkey|benzinga|247 ?wall|24\/7/i;
 const ATTRIB=/[-–—]\s*(financial times|reuters|bloomberg|wsj|wall street journal|\bft\b|cnbc|barron)/i;
 const tier1Src=(s,h)=>!OPINION_SRC.test(s||"")||ATTRIB.test(h||"");
-function classifyNews(h,src){
-  const ver=state.newsVer&&state.newsVer.get(h);
-  if(ver==="fact") return "fact";
-  if(FACT_HARD.test(h)) return "fact";  /* твёрдый якорь сильнее маркеров мнений (v4.6.1) и
-                                           сильнее ОТРИЦАТЕЛЬНОГО LLM-вердикта (v4.12): ложный
-                                           отказ судьи (особенно free-моделей) не должен гасить
-                                           пресс-релизную форму «X cuts dividend»; положительный
-                                           вердикт судьи — высший приоритет */
-  /* v4.13.5: мягкий якорь (impairment/write-down существительным) держится ВЫШЕ вердикта судьи —
-     как и жёсткий: смысл v4.12 в том, что ошибочный отказ free-модели не должен гасить
-     пресс-релизную форму. Модальность отсекает страж SPEC («Could Meta face an impairment?» →
-     не якорь), а мнение-источник — тир: обе защиты работают ДО судьи и без него. */
-  if(factSoftOk(h)&&tier1Src(src,h)) return "fact";
-  if(ver) return "opinion";
-  if(OP.test(h)) return "opinion";
+/* ═══ v5.0: якоря факта — пресс-релизная форма «КОМПАНИЯ КОРЗИНЫ глагол объект» ═══
+   глагол 3-го лица (или однозначное прошедшее у force majeure/стройки), объект ≤3 слов после,
+   подлежащее — алиас корзины ≤3 слов ДО глагола, без притяжательного («Oracle’s delays…» —
+   существительное) и без связок/посредников (supplier, partner, says, as, after…). */
+const ANCH={
+  capex:[
+    ["capex_cut","(cuts|lowers|reduces|trims|slashes|halves)"+OG+"(?:capex|capital expenditures?|capital spending|(?:ai |data ?cent(?:er|re) )?(?:spending|investment|capex) (?:guidance|outlook|forecast|target|plans?|budget))"],
+    ["capex_cut","(shortens|cuts|reduces)"+OG+"(?:useful li(?:fe|ves)|depreciation (?:schedule|period|li(?:fe|ves)))"],
+    ["dc_delay","(declares|declared|invokes|invoked|cites|cited|triggers|triggered|issues|issued|sends|sent|serves|served|claims|claimed|seeks|sought)"+OG+"['‘’\"]?force majeure"],
+    ["dc_delay","(delays|delayed|postpones|postponed|pauses|paused|halts|halted|suspends|suspended|shelves|shelved|scraps|scrapped|cancels|cancell?ed|freezes|froze|abandons|abandoned)"+OG+"(?:"+DC_NOUN+")"],
+    ["other","(files|filed)"+OG+"(?:bankruptcy|chapter 11)"]
+  ],
+  bdc:[
+    ["dividend_cut","(cuts|reduces|lowers|slashes|halves|trims|suspends|eliminates|omits|scraps)"+OG+"(?:"+DIV_N+")"],
+    ["redemption_gate","(halts|halted|gates|gated|limits|caps|capped|suspends|suspended|restricts|restricted|freezes|froze|pauses|paused|blocks|blocked|prorates|prorated)"+OG+"(?:"+RED_N+")"],
+    ["other","(files|filed)"+OG+"(?:bankruptcy|chapter 11)"]
+  ]
+};
+for(const k in ANCH) ANCH[k]=ANCH[k].map(([t,s])=>[t,new RegExp("\\b"+s+"\\b","i")]);
+/* мягкий якорь: impairment/write-down ИИ-/серверных/дата-центровых активов (ИИ-контекст в клаузе) */
+const ANCH_SOFT=new RegExp("\\b(?:takes|took|records|recorded|books|booked|recognizes|recognized|reports|reported|posts|posted|announces|announced|incurs|incurred|flags|flagged)(?:\\s+(?!(?:"+GAP_STOP+")\\b)[^\\s,;:]+){0,4}?\\s+(?:impairments?|write-?downs?|writedowns?)\\b|\\b(?:writes|wrote) down\\b","i");
+const SUBJ_STOP=/^(says?|said|supplier|suppliers|partner|partners|rival|rivals|peer|peers|like|as|while|after|amid|and|or|vs\.?|than|from|to|of|on|at|for|with|by|over|about|unit|customer|customers|tenant|tenants|backed|lender|lenders|it|its)$/i;
+function subjBefore(c,at,kind){             /* компания корзины в позиции подлежащего перед глаголом at */
+  const f=coFind(c,kind).filter(x=>x.e<=at);if(!f.length)return null;
+  const a=f[f.length-1],gap=c.slice(a.e,at);
+  if(/^['’]s?(\s|$)/.test(gap))return null;   /* притяжательное: «Oracle’s delays at…» — дальше существительное */
+  const tk=gap.split(/[\s-]+/).filter(Boolean);   /* дефис — тоже граница: «Microsoft-backed OpenAI» */
+  return tk.length<=3&&!tk.some(w=>SUBJ_STOP.test(w.replace(/[(),"“”‘’]/g,"")))?a.t:null;
+}
+const VIA_RX=/\b(suppliers?|partners?|rivals?|peers?|customers?|tenants?|lenders?|backed|like|vs\.?|versus)\b/i;
+const negAt=(s,m)=>NEG.test(s.slice(Math.max(0,m.index-35),m.index+m[0].length));
+function anchorOf(h,cl,kind,src){
+  for(const c of cl){
+    for(const [type,rx] of ANCH[kind]){const m=rx.exec(c.s);if(!m||negAt(c.s,m))continue;
+      const sym=subjBefore(c.s,m.index,kind);if(sym)return {sym,type};}
+    /* мягкий — только с ИИ-контекстом В ЭТОЙ клаузе и из нейтрального источника (как в v4.13.5) */
+    if(kind==="capex"&&AI_CTX.test(c.s)&&tier1Src(src,h)){const m=ANCH_SOFT.exec(c.s);
+      if(m&&!negAt(c.s,m)){const sym=subjBefore(c.s,m.index,kind);if(sym)return {sym,type:"impairment"};}}
+  }
+  if(kind==="bdc"){const m=DIV_DOWN.exec(h);
+    if(m&&!negAt(h,m)){const f=coFind(h.slice(0,m.index),"bdc");if(f.length)return {sym:f[f.length-1].t,type:"dividend_cut"};}}
+  return null;
+}
+/* Сопоставление заголовка: {capex:{sym,anchor,at}|null, bdc:…|null, soft:{sym}|null}.
+   feeds — ленты, где лежит заголовок: кандидат БЕЗ компании корзины держится только в ленте своей
+   корзины (контекст); с компанией — из любой ленты («Oracle declares…» в ленте OBDC — это ORCL). */
+function newsMatch(h,feeds,src){
+  h=String(h||"");feeds=[].concat(feeds||[]);
+  const cl=newsClauses(h),out={capex:null,bdc:null,soft:null};
+  const formBlock=MODAL.test(h)||OP.test(h)||OP_I.test(h);   /* якорь не обходит форму мнения/модальности */
+  for(const kind of ["capex","bdc"]){
+    let hit=null;
+    for(const c of cl){
+      for(const rx of RX[kind]){const m=rx.exec(c.s);if(!m)continue;
+        if(rx===IMPAIR&&!AI_CTX.test(h))continue;  /* списание доли в Rivian/метавселенной — не событие ставки */
+        if(rx===BANKR&&!coFind(h,kind).length)continue;
+        if(negAt(c.s,m))continue;
+        hit={c,at:c.i+m.index};break;}
+      if(hit)break;
+    }
+    if(!hit&&kind==="bdc"){const m=DIV_DOWN.exec(h);if(m&&!negAt(h,m))hit={c:{s:h,i:0},at:m.index};}
+    if(!hit)continue;
+    const anc=formBlock?null:anchorOf(h,cl,kind,src);
+    let sym=anc?anc.sym:null;
+    if(!sym){                                 /* подлежащее клаузы (ближайшее перед триггером), иначе первое в заголовке */
+      const inC=coFind(hit.c.s,kind).map(x=>({t:x.t,e:x.e+hit.c.i}));
+      const pre=inC.filter(x=>x.e<=hit.at), near=pre.length?pre[pre.length-1]:null;
+      /* «Microsoft supplier Intel cuts capex», «Microsoft-backed OpenAI delays…» — между компанией
+         корзины и глаголом посредник: действует не она, событие — вне корзины */
+      sym= near&&VIA_RX.test(h.slice(near.e,hit.at)) ? null : (near||inC[0]||coFind(h,kind)[0]||{t:null}).t;
+    }
+    if(!sym&&!feeds.some(f=>CO_TICKERS[kind].includes(f)))continue;
+    out[kind]={sym,anchor:anc?anc.type:"",at:hit.at};
+  }
+  if(!out.bdc&&RX.bdcSoft.test(h)){const f=coFind(h,"bdc");
+    if(f.length||feeds.some(x=>CO_TICKERS.bdc.includes(x)))out.soft={sym:f.length?f[0].t:null};}
+  return out;
+}
+/* ═══ v4.10/v5.0: классы кандидатов ═══
+   fact        — положительный вердикт судьи (серверный из снимка или клиентский) ЛИБО якорь при
+                 ОТСУТСТВИИ вердикта (v5.0: якорь больше не перекрывает отказ судьи — спор → unverified)
+   unverified  — нейтральный источник без подтверждения; слух/отчёт; спор якоря с судьёй
+   opinion     — форма мнения/прогноза или мнение-источник без подтверждения; НА БАЛЛ НЕ ВЛИЯЕТ
+   soft        — мягкие упоминания (non-accrual, NAV); НА БАЛЛ НЕ ВЛИЯЕТ
+   Бэктест 2006–2026: хронический «−4 от мнений» стоил −0,7 п.п. годовых; страховка −15
+   по подтверждённым фактам нечувствительна к лагу подтверждения 0–5 дней. */
+function newsClass(m,h,src,ver){
+  if(ver&&ver.cls==="fact")return "fact";
+  if(ver)return m.anchor?"unverified":ver.cls==="unverified"?"unverified":"opinion";
+  if(m.anchor)return "fact";
+  if(OP.test(h)||OP_I.test(h))return "opinion";
   return tier1Src(src,h)?"unverified":"opinion";
+}
+/* компания события: подлежащее якоря (грамматика надёжнее) → subject судьи (тикер корзины или
+   «none») → алиас из заголовка. Старые вердикты без subject — сразу алиас (совместимость). */
+function newsSubject(m,kind,ver){
+  if(m.anchor)return m.sym;
+  if(ver&&ver.subject)return CO_TICKERS[kind].includes(ver.subject)?ver.subject:null;
+  return m.sym;
+}
+/* v5.0: события вместо заголовков. Перепечатки (Жаккар по набору слов ≥0,5 в пределах 72 ч, либо
+   та же секунда публикации) склеиваются; события РАЗНЫХ компаний не склеиваются никогда — порог
+   «≥2 компаний» не может потерять компанию из-за похожей формулировки. Представитель — лучший
+   класс, затем свежесть; dup — число склеенных редакций. */
+const newsTok=h=>new Set(String(h||"").toLowerCase().replace(/['’]s\b/g,"").match(/[a-z0-9$][a-z0-9$.]*[a-z0-9]|[a-z0-9]/g)||[]);
+function newsJac(a,b){let i=0;for(const x of a)if(b.has(x))i++;const u=a.size+b.size-i;return u?i/u:0;}
+const CLS_RANK={fact:0,unverified:1,opinion:2,soft:3};
+function newsEvents(arr){
+  const ev=[];
+  const items=(arr||[]).slice().sort((a,b)=>((CLS_RANK[a.cls]??9)-(CLS_RANK[b.cls]??9))||((b.t||0)-(a.t||0)));
+  for(const x of items){
+    const tk=newsTok(x.h);
+    const e=ev.find(e=>(!e.sym||!x.sym||e.sym===x.sym)&&e._m.some(y=>(x.t&&y.t===x.t)||(Math.abs((y.t||0)-(x.t||0))<=72*3600&&newsJac(y.tk,tk)>=0.5)));
+    if(e){e._m.push({t:x.t,tk});e.dup+=x.dup||1;if(!e.sym&&x.sym)e.sym=x.sym;}
+    else ev.push({...x,dup:x.dup||1,_m:[{t:x.t,tk}]});
+  }
+  return ev.map(({_m,...e})=>e);
+}
+/* счёт детектора: факты/неподтверждённые по компаниям корзины; без компании — контекст */
+function newsTally(arr){
+  const ev=newsEvents(arr),fE=ev.filter(x=>x.cls==="fact"),uE=ev.filter(x=>x.cls==="unverified");
+  const syms=a=>[...new Set(a.map(x=>x.sym).filter(Boolean))];
+  return {ev,fN:fE.filter(x=>x.sym).length,uN:uE.filter(x=>x.sym).length,oN:ev.filter(x=>x.cls==="opinion").length,
+    fSyms:syms(fE),uSyms:syms(uE),out:fE.filter(x=>!x.sym).length+uE.filter(x=>!x.sym).length};
+}
+/* ═══ v5.0: LLM-судья — промпт и разбор ответа ОДНИ для сборщика и вкладки ═══
+   Судья возвращает класс, компанию-подлежащее и тип события; ленту ему НЕ сообщаем (ровно она
+   и путала атрибуцию). impairment/write-down — факт только для ИИ-/серверных/ДЦ-активов. */
+const JUDGE_TYPES=["capex_cut","dc_delay","impairment","dividend_cut","redemption_gate","other"];
+const JUDGE_SYS="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
+/* TTL кэша вердиктов (сборщик): факт — всё окно, отказ — 3 суток: одна ошибка free-модели
+   не должна немить заголовок на все 14 дней (через 3 дня он переспрашивается) */
+const VER_TTL={fact:14*86400,neg:3*86400};
+function judgePrompt(rows){                   /* rows: [[id, заголовок]], id = C<n> | B<n> */
+  const bask=k=>CO_TICKERS[k].map(t=>t+" ("+(CO_NAMES[t]||t).split("|").join(" / ")+")").join(", ");
+  return `Классифицируй каждый заголовок. Корзина КАПЕКС: ${bask("capex")}. Корзина BDC: ${bask("bdc")}.
+Для каждого идентификатора верни объект с полями id, cls, subject, type.
+cls — "fact": заголовок сообщает о ФАКТИЧЕСКИ произошедшем или официально объявленном событии нужного типа; "unverified": событие нужного типа, но по слухам, анонимным источникам или неподтверждённому отчёту; "opinion": всё остальное — мнение, прогноз, вопрос, спекуляция ("could", "may", "will", "about to", "likely"), листикл, обзор сектора, отрицание ("will not cut"), намерение сохранить, макро-заметка (ФРС, ставки), действие аналитика (рейтинг, целевая цена), событие не того типа.
+subject — тикер компании из корзин, которая САМА совершила действие (не поставщик, не партнёр, не упомянутая вскользь); "none", если такой компании в корзинах нет.
+type — "capex_cut" | "dc_delay" | "impairment" | "dividend_cut" | "redemption_gate" | "other".
+C-заголовки (капекс): компания СНИЗИЛА капекс или гайденс расходов; ОТЛОЖИЛА, ПРИОСТАНОВИЛА или ОТМЕНИЛА стройку дата-центра либо объявила по нему форс-мажор; УКОРОТИЛА срок амортизации серверов/GPU; признала impairment/write-down ИМЕННО ИИ-, серверных или дата-центровых активов (списание доли в другой компании, метавселенной, гудвила — cls "opinion", type "other").
+B-заголовки (BDC): фонд или его управляющий ВВЁЛ гейт, приостановку или лимит выкупа (redemptions, withdrawals, tender); ОБЪЯВИЛ снижение или приостановку дивиденда/дистрибуции; СТОЛКНУЛСЯ с волной заявок на выкуп.
+Формат ответа: {"verdicts":[{"id":"C0","cls":"opinion","subject":"none","type":"other"}]} — ровно по одному объекту на каждый идентификатор.
+Заголовки:
+`+rows.map(r=>r[0]+"|"+r[1]).join("\n");
+}
+/* разбор: плоские объекты {"id":…} — устойчиво к рассуждениям reasoning-моделей; при повторе id
+   берётся ПОСЛЕДНИЙ (цитата примера формата из промпта не перебивает вердикт — v4.13.4) */
+function parseJudge(txt,ids){
+  const out=new Map(),s=String(txt||""),all=[...CO_TICKERS.capex,...CO_TICKERS.bdc],rx=/\{[^{}]*"id"\s*:\s*"([CB]\d+)"[^{}]*\}/g;
+  let m;
+  while((m=rx.exec(s))){let o;try{o=JSON.parse(m[0]);}catch(e){continue;}
+    if(!ids.includes(o.id))continue;
+    const cls=String(o.cls||"").toLowerCase();if(!["fact","opinion","unverified"].includes(cls))continue;
+    const sub=String(o.subject||"none").toUpperCase().replace(/^\$/,"");
+    out.set(o.id,{cls,subject:all.includes(sub)?sub:"none",type:JUDGE_TYPES.includes(o.type)?o.type:"other"});}
+  if(!out.size){                              /* совместимость: модель ответила старым форматом {"confirmed":[…]} */
+    const mm=s.match(/\{[^{}]*"confirmed"[^{}]*\}/g);
+    if(mm)try{const cj=JSON.parse(mm[mm.length-1]);
+      if(Array.isArray(cj.confirmed))ids.forEach(id=>out.set(id,{cls:cj.confirmed.includes(id)?"fact":"opinion",subject:null,type:null}));}catch(e){}
+  }
+  return out;
+}
+/* запись кэша fh:newsVer: [заголовок, "fact"|"opinion"|"unverified", tсуда, subject?, type?];
+   старые записи [h,"fact"|"opinion",t] читаются как есть (subject нет → атрибуция по алиасам) */
+function verEntry(e){
+  if(!Array.isArray(e)||typeof e[0]!=="string"||typeof e[1]!=="string")return null;
+  return {cls:e[1]==="fact"?"fact":e[1]==="unverified"?"unverified":"opinion",
+    subject:typeof e[3]==="string"&&e[3]?e[3].toUpperCase():null,type:typeof e[4]==="string"?e[4]:null,t:+e[2]||0};
+}
+/* ═══ дивидендная data-нога BDC (v4.11 → v5.0) — чистая функция ряда [[экс-дата, сумма]] ═══
+   v4.12: спец-/суплементарные выплаты исключаются ДО степ-теста (грубо — <50% модальной по ряду,
+   последовательно — <60% предыдущей ОСТАВЛЕННОЙ); v4.13.2/3: хвостовые офф-грид записи
+   отбрасываются; v4.13.4: ведущий спец снимается; v4.13.5: тай-брейк моды — в пользу большей.
+   v5.0: (а) последовательный фильтр «<60% предыдущей» делал срезку глубже 40% невидимой НАВСЕГДА,
+   а все выплаты нового уровня тоже отсеивались (тикер молча выпадал из ноги). Теперь глубокая
+   ступенька НА РЕГУЛЯРНОЙ СЕТКЕ (0,8–1,6 медианного шага от прошлой регулярной) — срезка, если
+   новый уровень держится ≥2 выплат подряд (±10%, без регулярной суммы между ними — так спец за
+   10 дней до регулярной, как у GBDC, срезкой не становится), либо это последняя выплата сетки
+   ≥35% прежней, за которой ≥0,15 шага (≈2 недели) не пришло регулярной вдогонку.
+   (б) приостановка: регулярная выплата не пришла за 1,6 медианного шага (или пришла меньше 35%
+   прежней) — событие; только для рядов с сеткой ≥5 выплат и не по подложенным из старого снимка
+   данным (stale) — иначе сбой Yahoo читался бы как приостановка. Свежесть — 45 дней от момента,
+   когда пропуск стал виден. */
+function divLeg(raw,nowSec,stale){
+  if(!Array.isArray(raw)||raw.length<5)return null;
+  const all=raw.map(e=>[+e[0],+e[1]]).filter(e=>e[0]>0&&e[1]>0);
+  if(!all.length)return null;                 /* v4.13.5: битый ряд (одни нули/мусор) */
+  const fq={};all.forEach(e=>{const k=e[1].toFixed(2);fq[k]=(fq[k]||0)+1;});
+  const modalAll=+Object.entries(fq).sort((a,b)=>b[1]-a[1]||(+b[0])-(+a[0]))[0][0];
+  const medOf=a=>{const v=[];for(let k=1;k<a.length;k++)v.push(a[k][0]-a[k-1][0]);v.sort((x,y)=>x-y);return v.length?v[Math.floor(v.length/2)]:0;};
+  /* шаг сетки оцениваем по прежнему фильтру (v4.12) — до спасения глубоких ступенек */
+  const pre=[];for(const e of all){if(e[1]<modalAll*0.5)continue;if(pre.length&&e[1]<pre[pre.length-1][1]*0.6)continue;pre.push(e);}
+  const med0=medOf(pre.length>=3?pre:all);
+  const dv=[];let lvl=modalAll;
+  for(let i=0;i<all.length;i++){
+    const [t,a]=all[i],prev=dv.length?dv[dv.length-1]:null;
+    if(!(a<lvl*0.5||(prev&&a<prev[1]*0.6))){dv.push(all[i]);continue;}
+    if(!prev||!med0)continue;                 /* ведущая низкая запись — спец (v4.13.4) */
+    const gap=t-prev[0],onGrid=gap>=med0*0.8&&gap<=med0*1.6;
+    const rest=all.slice(i+1),nxt=rest.find(e=>e[0]-t>=med0*0.8);
+    const persists=!!nxt&&Math.abs(nxt[1]/a-1)<=0.1&&!rest.some(e=>e[0]<nxt[0]&&e[1]>=a*1.5);
+    const latest=!rest.length&&a>=prev[1]*0.35&&nowSec-t>=med0*0.15;
+    if(onGrid&&(persists||latest)){dv.push(all[i]);lvl=a;}
+  }
+  while(dv.length>1&&dv[0][1]<dv[1][1]*0.6)dv.shift();
+  if(dv.length<5)return null;
+  const med=medOf(dv);
+  let end=dv.length;
+  while(end>2&&(dv[end-1][0]-dv[end-2][0])<med*0.7)end--;   /* хвостовой страж каденса (v4.13.2/3) */
+  const eff=dv.slice(0,end);
+  if(eff.length<5)return null;
+  const [lastT,lastA]=eff[eff.length-1];
+  const prior=eff.slice(-5,-1).map(e=>e[1]);
+  const fp={};prior.forEach(a=>{const k=a.toFixed(2);fp[k]=(fp[k]||0)+1;});
+  const modal=+Object.entries(fp).sort((a,b)=>b[1]-a[1]||(+b[0])-(+a[0]))[0][0];   /* ничья — в пользу регулярной */
+  const prev=prior[prior.length-1];
+  const fresh=(nowSec-lastT<=45*86400)&&lastA<prev*0.98&&lastA<modal*0.95;
+  let susp=null;
+  if(!stale&&nowSec-lastT>med*1.6&&!all.some(e=>e[0]>lastT&&e[1]>=lastA*0.35)){
+    const due=lastT+med*1.6;susp={due,days:(nowSec-lastT)/86400,fresh:nowSec-due<=45*86400};
+  }
+  return {prev,lastA,lastT,med,modal,fresh,staleCut:!fresh&&lastA<modal*0.95,susp};
+}
+/* ⟦/NEWS-CORE⟧ */
+/* ── дальше — склейка со страницей (state/SNAP/pull); в сборщик не уходит ── */
+/* классификация одной записи по вердикту из state.newsVer; prov — кто дал класс (для ленты):
+   LLM / якорь / спор (якорь против отказа судьи → неподтверждённый) */
+function applyVer(n){
+  const v=state.newsVer&&state.newsVer.get(n.h);
+  n.cls=newsClass(n.m,n.h,n.src,v); n.sym=newsSubject(n.m,n.kind,v);
+  n.prov= v&&v.cls==="fact"?"LLM": (n.m.anchor&&v)?"спор": n.m.anchor?"якорь": v?"LLM":"";
+  return n;
+}
+/* удобный вход для тестов и консоли: класс заголовка ("none" — не кандидат) */
+function classifyNews(h,src,kind,feeds){
+  const m=newsMatch(h,feeds||[],src),k=kind||(m.capex?"capex":m.bdc?"bdc":null);
+  if(!k||!m[k])return "none";
+  return applyVer({h,src,kind:k,m:m[k]}).cls;
 }
 async function scanNews(){
   const key=finnK();
-  const anySnapNews=[...CONFIG.CYCLE.capexTickers,...CONFIG.CYCLE.bdcTickers].some(s=>snapHas("fh:news:"+s)||snapHas("fh:newsHit:"+s));
+  const ALL=[...CONFIG.CYCLE.capexTickers,...CONFIG.CYCLE.bdcTickers];
+  const anySnapNews=ALL.some(s=>snapHas("fh:news:"+s)||snapHas("fh:newsHit:"+s));
   if(!key&&!anySnapNews) return;   /* в режиме снимка ключ не нужен */
   const from=iso(new Date(Date.now()-14*864e5)),to=iso(new Date());
   const news={capex:[],bdcHard:[],bdcSoft:[]};
   /* v4.10: серверные LLM-вердикты (fh:newsVer, судятся сборщиком по секрету OPENROUTER_KEY)
-     читаются ДО классификации — страница получает проверенные факты без ключа во вкладке */
+     читаются ДО классификации — страница получает проверенные факты без ключа во вкладке.
+     v5.0: вердикт — объект {cls,subject,type}; старые строковые записи читаются через verEntry */
   const prevClientVer=state.newsVer;                 /* v4.12: клиентские вердикты переживают обновление */
   state.newsVer=new Map(); state.newsVerSrv=0;
   const sv=SNAP&&SNAP.responses&&SNAP.responses["fh:newsVer"];
-  if(Array.isArray(sv)) for(const e of sv){ if(Array.isArray(e)&&e.length>=2&&typeof e[0]==="string"){state.newsVer.set(e[0],e[1]);state.newsVerSrv++;} }
+  if(Array.isArray(sv)) for(const e of sv){const v=verEntry(e); if(v){state.newsVer.set(e[0],v);state.newsVerSrv++;}}
   if(prevClientVer) for(const [k,v] of prevClientVer) if(!state.newsVer.has(k)) state.newsVer.set(k,v);
   /* v4.9: релевантность фильтруется ДО любого усечения (раньше slice(0,60) съедал 14-дневное
      окно у тикеров с плотным фоном); дополнительно подмешивается серверный префильтр-слой
@@ -2128,43 +2404,40 @@ async function scanNews(){
       .filter(n=>{const k2=(n.url||n.headline||"")+"|"+(n.datetime||0);if(seen.has(k2))return false;seen.add(k2);return true;})
       .slice(0,600);
   };
-  await pool(CONFIG.CYCLE.capexTickers,3,async sym=>{
-    (await pull(sym)).forEach(n=>{const h=n.headline||"";
-      if(trigNoNeg(h,RX.capexHard)) news.capex.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:classifyNews(h,n.source)});});
+  /* v5.0: ВСЕ ленты обеих корзин читаются обоими словарями — лента лишь источник заголовков,
+     компанию события называет сам заголовок. Одинаковый текст из разных лент — одна запись
+     (feeds — где лежит); перепечатки склеивает newsEvents. */
+  const byH=new Map();
+  await pool(ALL,3,async feed=>{
+    (await pull(feed)).forEach(n=>{const h=String(n.headline||"").trim(); if(!h) return;
+      const k=h.toLowerCase(), o=byH.get(k);
+      if(o){ if(!o.feeds.includes(feed)) o.feeds.push(feed); }
+      else byH.set(k,{h,u:n.url,t:n.datetime,src:n.source||"",feeds:[feed]});});
   });
-  await pool(CONFIG.CYCLE.bdcTickers,3,async sym=>{
-    (await pull(sym)).forEach(n=>{
-      const h=n.headline||"";
-      if(trigNoNeg(h,RX.bdcHard)) news.bdcHard.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:classifyNews(h,n.source)});
-      else if(RX.bdcSoft.test(h)) news.bdcSoft.push({sym,h,u:n.url,t:n.datetime,src:n.source||"",cls:"soft"});
-    });
-  });
-  /* v4.9: дедуп по (заголовок·тикер), а не по заголовку — общая новость «MSFT and META cut…»
-     из фидов двух тикеров легитимно считается за два тикера в distinct().
-     v4.10: сортировка сперва по классу (факты → неподтверждённые → мнения), потом по свежести —
-     волна мнений не может вытеснить факт из среза. */
-  const clsRank={fact:0,unverified:1,opinion:2,soft:3};
-  for(const k in news){const seen=new Set();
-    news[k]=news[k].filter(x=>{const kk=x.h+"|"+x.sym;if(seen.has(kk))return false;seen.add(kk);return true;})
-      .sort((a,b)=>((clsRank[a.cls]??9)-(clsRank[b.cls]??9))||((b.t||0)-(a.t||0))).slice(0,12);}
+  for(const x of byH.values()){
+    const m=newsMatch(x.h,x.feeds,x.src), base={h:x.h,u:x.u,t:x.t,src:x.src,feed:x.feeds[0],feeds:x.feeds};
+    if(m.capex) news.capex.push(applyVer({...base,kind:"capex",m:m.capex}));
+    if(m.bdc) news.bdcHard.push(applyVer({...base,kind:"bdc",m:m.bdc}));
+    else if(m.soft) news.bdcSoft.push({...base,kind:"bdc",sym:m.soft.sym,cls:"soft",m:{sym:m.soft.sym,anchor:""}});
+  }
+  /* v4.10: сортировка сперва по классу (факты → неподтверждённые → мнения), потом по свежести —
+     волна мнений не может вытеснить факт из среза. v5.0: срез — по СОБЫТИЯМ и с потолком на
+     компанию в каждом классе (фактов 8, прочих 4; 30 событий всего): 15 перепечаток форс-мажора
+     Oracle не вытесняют событие второй компании, от которого зависит порог «≥2». */
+  for(const k in news){const per={};
+    news[k]=newsEvents(news[k]).filter(x=>{const s=(x.sym||"∅")+x.cls;per[s]=(per[s]||0)+1;return per[s]<=(x.cls==="fact"?8:4);}).slice(0,30);}
   state.news=news;state.newsAt=new Date();
   state.symDrift=null;
   if(SNAP&&SNAP.responses){
     const srv=Object.keys(SNAP.responses).filter(k=>k.startsWith("fh:news:")).map(k=>k.slice(8)).sort();
-    const cli=[...CONFIG.CYCLE.capexTickers,...CONFIG.CYCLE.bdcTickers].sort(); /* единый источник — картридж CYCLE */
+    const cli=ALL.slice().sort(); /* единый источник — картридж CYCLE */
     if(srv.length&&srv.join()!==cli.join()) state.symDrift="серверный список тикеров ("+srv.length+") отличается от клиентского — обновите scripts/fetch-snapshot.mjs";
   }
   await llmVerifyNews(); /* подтверждение фактов текущим ИИ-провайдером, если задан ключ */
 }
 const distinct=(arr,f)=>new Set(arr.map(f)).size;
-/* v4.13.8: ОДИН И ТОТ ЖЕ заголовок Finnhub кладёт в ленты нескольких тикеров сразу
-   (синдикация — треть потока, встречается до 6 тикеров на заголовок). Порог «≥2 тикеров»
-   задумывался как «события у ДВУХ РАЗНЫХ компаний», то есть как признак секторной волны,
-   а не одной новости. Без дедупа по заголовку одна статья давала «3 тикера» → НАБЛЮДЕНИЕ,
-   а один синдицированный ФАКТ — сразу СРАБОТАЛ −15. Считаем тикеры по РАЗНЫМ заголовкам:
-   одна новость = одно событие, независимо от того, в скольких лентах она лежит. */
-const byHead=arr=>{const seen=new Set();return arr.filter(x=>{const k=(x.h||"").trim().toLowerCase();
-  if(!k||seen.has(k))return false;seen.add(k);return true;});};
+/* v4.13.8 → v5.0: прежний byHead (дедуп по ТОЧНОМУ тексту + тикер ленты) заменён событиями
+   newsEvents/newsTally: компания — из заголовка, перепечатки склеены по схожести. */
 
 /* ============ АВТОДЕТЕКТОРЫ СОБЫТИЙ ============ */
 /* Каждый: eval() → {st:"calm"|"watch"|"fired"|"good", pts, inputs, note} */
@@ -2189,101 +2462,53 @@ const DETECTORS=[
         +(state.sofrSpread!=null?" · спред "+fmt(sp,1)+" б.п. (ср₃ "+fmt(sp3,1)+")":" · SOFR: нет данных")};
   }},
  {id:"d_capex",triad:true,name:"Капекс / амортизация гиперскейлеров",
-  logic:"Сканер заголовков "+CONFIG.CYCLE.capexTickers.join("·")+" за 14 дней (серверный префильтр гарантирует полноту окна): срезка капекса/гайденса расходов, укорочение сроков службы, impairment/write-down. Каждый кандидат классифицируется: ФАКТ (подтверждён LLM — серверным судьёй из снимка или ИИ-ключом вкладки — либо твёрдым факт-якорем), НЕПОДТВЕРЖДЁННЫЙ (нейтральный источник, подтверждения нет), МНЕНИЕ (маркеры прогнозов/листиклов или мнение-источник типа SA-контрибьюторов). СРАБОТАЛ: ФАКТЫ по ≥2 разным тикерам → −15. НАБЛЮДЕНИЕ: факт по 1 тикеру ИЛИ неподтверждённые по ≥2 → −5. Мнения и опровержения на балл НЕ влияют (бэктест: хронический шум мнений стоил −0,7 п.п. годовых).",
+  logic:"Сканер заголовков за 14 дней по лентам обеих корзин (серверный префильтр гарантирует полноту окна): срезка капекса/гайденса расходов, отсрочка/пауза/отмена стройки дата-центров и форс-мажор по ним, укорочение сроков службы, impairment/write-down ИИ-, серверных и дата-центровых активов. Событие приписывается компании корзины "+CONFIG.CYCLE.capexTickers.join("·")+", названной В ЗАГОЛОВКЕ (или указанной LLM-судьёй), а не ленте, где он лежит; заголовок без компании корзины — контекст вне балла; перепечатки одной новости в разных лентах (совпадение слов ≥50% в пределах 72 ч) — одно событие. Классы: ФАКТ — подтверждён LLM (серверным судьёй из снимка или ИИ-ключом вкладки) либо, пока вердикта нет, твёрдым факт-якорем пресс-релизной формы «Компания cuts capex guidance / declares force majeure» (якорь не действует на вопросах, модальных и мнение-заголовках, а при отказе судьи даёт лишь НЕПОДТВЕРЖДЁННЫЙ); НЕПОДТВЕРЖДЁННЫЙ — нейтральный источник, слух или отчёт без подтверждения; МНЕНИЕ — форма заголовка (вопрос, листикл, «should you», прогноз) или мнение-источник. СРАБОТАЛ: ФАКТЫ по ≥2 разным компаниям → −15. НАБЛЮДЕНИЕ: факт по 1 компании ИЛИ неподтверждённые по ≥2 → −5. Мнения и опровержения на балл НЕ влияют (бэктест: хронический шум мнений стоил −0,7 п.п. годовых).",
   eval(){
-    const cap=state.news.capex;
-    const fN=cap.filter(x=>x.cls==="fact"), uN=cap.filter(x=>x.cls==="unverified"), oN=cap.filter(x=>x.cls==="opinion").length;
-    const fU=byHead(fN), uU=byHead(uN);          /* v4.13.8: одна новость = одно событие */
-    const fSyms=[...new Set(fU.map(x=>x.sym))];
-    const fT=fSyms.length, uT=distinct(uU,x=>x.sym);
+    /* v5.0: счёт по СОБЫТИЯМ (перепечатки склеены) и по КОМПАНИЯМ из заголовков, а не по лентам:
+       «Intel cuts capex» в ленте MSFT и две редакции одной статьи в лентах MSFT/AMZN больше не
+       изображают факты двух гиперскейлеров. Без компании корзины — «вне корзины», в порог не идёт. */
+    const T=newsTally(state.news.capex), fT=T.fSyms.length, uT=T.uSyms.length;
     const st= fT>=2?"fired": (fT>=1||uT>=2)?"watch":"calm";
     return {st,pts:st==="fired"?-15:st==="watch"?-5:0,
-      inputs:state.newsAt?("фактов: "+fU.length+(fT?" ["+fSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+uU.length+" ("+uT+" тик.) · мнений: "+oN+" (не в балле)"+llmTag()):"сканер: ожидание"};
+      inputs:state.newsAt?("фактов: "+T.fN+(fT?" ["+T.fSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+T.uN+" ("+uT+" тик.)"+(T.out?" · вне корзины: "+T.out+" (контекст)":"")+" · мнений: "+T.oN+" (не в балле)"+llmTag()):"сканер: ожидание"};
   }},
  {id:"d_bdc",triad:true,name:"Стресс BDC (гейты · дивиденды)",
-  logic:"Две ноги. НОВОСТИ: сканер "+CONFIG.CYCLE.bdcTickers.join("·")+" за 14 дней — гейт/приостановка выкупа, срезка дивиденда/дистрибуции, волна redemption requests; классы ФАКТ / НЕПОДТВЕРЖДЁННЫЙ / МНЕНИЕ. ДАННЫЕ: история выплат (Yahoo) — спец-/суплементарные выплаты (<50% модальной по ряду либо <60% предыдущей регулярной) исключаются, затем срезкой считается ступенька именно в последней регулярной выплате (<98% предыдущей И <95% модальной из 4 прежних) с экс-датой свежее 45 дней; давняя срезка с уже ровными выплатами по-новому свежей не считается. Это факт без всяких новостей и LLM; разовую срезку глубже ~40% (отсеется как спец) подстрахует новостная нога. СРАБОТАЛ: факты (новостные + данные) по ≥2 тикерам → −15. НАБЛЮДЕНИЕ: факт по 1 тикеру ИЛИ неподтверждённые по ≥2 → −4. Мнения («2 BDCs To Sell…») и мягкие упоминания (non-accrual, NAV-markdown) показываются справочно и на балл НЕ влияют — реальное ухудшение придёт выплатой/пресс-релизом (факт) или ценой (HY, BIZD).",
+  logic:"Две ноги. НОВОСТИ: сканер за 14 дней — гейт/приостановка/лимит выкупа (redemptions, withdrawals, tender), срезка или приостановка дивиденда/дистрибуции (в т.ч. «sets distribution at $X, down from $Y»), волна redemption requests; событие приписывается BDC корзины "+CONFIG.CYCLE.bdcTickers.join("·")+", названной в заголовке (макро-заметки «Fed cuts rates; BDC dividends…» и заголовки без компании корзины в балл не идут); перепечатки — одно событие; классы ФАКТ / НЕПОДТВЕРЖДЁННЫЙ / МНЕНИЕ по тем же правилам, что у капекса. ДАННЫЕ: история выплат (Yahoo) — спец-/суплементарные выплаты (<50% модальной по ряду либо <60% предыдущей регулярной) исключаются, НО глубокая ступенька на регулярной сетке выплат — срезка, если новый уровень держится ≥2 выплат подряд или это последняя выплата сетки (≥35% прежней, без регулярной суммы вдогонку ~2 недели); затем срезкой считается ступенька в последней регулярной выплате (<98% предыдущей И <95% модальной из 4 прежних) с экс-датой свежее 45 дней; давняя срезка с уже ровными выплатами по-новому свежей не считается. ПРИОСТАНОВКА: регулярная выплата не пришла за 1,6 медианного интервала (ряды с сеткой ≥5 выплат, только по свежим данным; свежесть 45 дней с момента пропуска). Это факты без всяких новостей и LLM. СРАБОТАЛ: факты (новостные + данные) по ≥2 тикерам → −15. НАБЛЮДЕНИЕ: факт по 1 тикеру ИЛИ неподтверждённые по ≥2 → −4. Мнения («2 BDCs To Sell…») и мягкие упоминания (non-accrual, NAV-markdown) показываются справочно и на балл НЕ влияют — реальное ухудшение придёт выплатой/пресс-релизом (факт) или ценой (HY, BIZD).",
   eval(){
-    const hard=state.news.bdcHard;
-    const fN=hard.filter(x=>x.cls==="fact"), uN=hard.filter(x=>x.cls==="unverified"), oN=hard.filter(x=>x.cls==="opinion").length;
+    const T=newsTally(state.news.bdcHard);
     /* v4.11: дивидендная data-нога — срезка видна в самих выплатах, независимо от новостей.
        v4.11.1: детали срезок публикуются в ленту (state.divCuts) — драйвер поправки виден
        глазами, а давние срезки (ступенька была раньше, выплаты уже ровные) показываются
-       как контекст и в балл не идут. */
+       как контекст и в балл не идут. v5.0: разбор ряда — чистая divLeg() в ядре сканера
+       (её гоняет scripts/news-test.mjs): глубокие срезки >40% и приостановки больше не
+       невидимы. Подложенный из старого снимка ряд (stale_keys) приостановкой не считается. */
     const divCut=[],divStale=[];
     let divData=false;
     state.divCuts=[];
+    const d10=t=>new Date(t*1000).toISOString().slice(0,10);
     for(const s of CONFIG.CYCLE.bdcTickers){
       const raw=SNAP&&SNAP.responses&&SNAP.responses["ydiv:"+s];
-      if(!Array.isArray(raw)||raw.length<5) continue;
-      /* v4.12 (финальный аудит): спец-/суплементарные дивиденды исключаются из ряда ДО
-         степ-теста, иначе маленькая доплата последней записью читалась бы как «срезка −95%»
-         (а доплата на позиции prev — маскировала бы реальную срезку). Два этапа:
-         (1) грубо — выплата <50% модальной по всему ряду; (2) последовательно — <60% от
-         предыдущей ОСТАВЛЕННОЙ (наблюдаемые спецы ≤53% регулярной, реальные срезки ≥69%).
-         Слепое пятно: разовая срезка глубже ~40% отсеется как спец — её ловит новостная нога. */
-      const allAmts=raw.map(e=>+e[1]).filter(x=>x>0);
-      if(!allAmts.length) continue;   /* v4.13.5: битый ряд (одни нули/мусор) — модальная не считается,
-                                         а Object.entries({})[0][0] ронял TypeError, и внешний catch гасил
-                                         ВЕСЬ детектор BDC вместе с новостной ногой */
-      const fAll={}; allAmts.forEach(a=>{const k=a.toFixed(2);fAll[k]=(fAll[k]||0)+1;});
-      /* v4.13.5: при равной частоте берём БОЛЬШУЮ сумму — спец всегда ниже регулярной,
-         а тай-брейк порядком вставки делал модой спец (два равных спеца в начале ряда
-         топили реальную срезку целиком). */
-      const modalAll=+Object.entries(fAll).sort((a,b)=>b[1]-a[1]||(+b[0])-(+a[0]))[0][0];
-      const dv=[];
-      for(const e of raw){const a=+e[1];
-        if(!(a>0)||a<modalAll*0.5) continue;
-        if(dv.length&&a<(+dv[dv.length-1][1])*0.6) continue;
-        dv.push(e);}
-      /* v4.13.4: ведущий спец — последовательный фильтр сравнивает только с ПРЕДЫДУЩЕЙ
-         оставленной, поэтому низкая первая запись (частичный/спец первой позицией) сама
-         не отсеивалась и занижала базу сравнения для второй. */
-      while(dv.length>1&&+dv[0][1]<+dv[1][1]*0.6) dv.shift();
-      if(dv.length<5) continue;
-      /* v4.13.2: каденс-страж — срезка обязана лежать на регулярной сетке выплат (спец в
-         коридоре 60–95% регулярного пробивал оба этапа фильтра, но спецы приходят МЕЖДУ
-         квартальными датами). v4.13.3: хвостовые офф-грид записи ОТБРАСЫВАЮТСЯ перед
-         степ-тестом — иначе спилловер после настоящей срезки маскировал саму срезку
-         (она ещё в 45-дневном окне, но тестировалась не она, а спец). */
-      const iv=[]; for(let k=1;k<dv.length;k++) iv.push(+dv[k][0]-+dv[k-1][0]);
-      const med=iv.slice().sort((a,b)=>a-b)[Math.floor(iv.length/2)];
-      /* Хвостовой страж каденса (v4.13.2/v4.13.3): офф-грид записи в ХВОСТЕ ряда отбрасываются
-         перед степ-тестом — спец между квартальными датами срезкой не считается.
-         v4.13.5: здесь был «проход вперёд с посадкой на сетку» — ОТКАЧЕН. Он чинил
-         недостижимый случай (спец в полосе 60–95% регулярной: в реальных историях всех шести
-         тикеров таких нет — наблюдаемые спецы ≤53%, а их снимает фильтр 60% ВЫШЕ по цепочке,
-         до стража) и вносил достижимый ложноположительный: при обычном джиттере экс-дат
-         регулярная выплата, пришедшая на несколько дней раньше срока, «садилась на сетку»
-         хуже следующего за ней спеца — проход выбрасывал регулярную, оставлял спец последним
-         и РОЖДАЛ срезку −15 из ряда, где срезки нет. Размен неверный: старый отказ —
-         задокументированный ложноотрицательный со страховкой новостной ногой, новый —
-         ложная тревога, переворачивающая рекомендацию. */
-      let end=dv.length;
-      while(end>2&&(+dv[end-1][0]-+dv[end-2][0])<med*0.7) end--;
-      const eff=dv.slice(0,end);
-      if(eff.length<5) continue;
+      const r=divLeg(raw,Date.now()/1000,!!(SNAP&&SNAP.stale_keys&&SNAP.stale_keys["ydiv:"+s]));
+      if(!r) continue;
       divData=true;                                      /* v4.13.3: «данные есть» = тикер реально оценён */
-      const lastE=eff[eff.length-1], lastT=+lastE[0], lastA=+lastE[1];
-      const prior=eff.slice(-5,-1).map(e=>+e[1]);
-      const freq={}; prior.forEach(a=>{const k=a.toFixed(2);freq[k]=(freq[k]||0)+1;});
-      const modal=+Object.entries(freq).sort((a,b)=>b[1]-a[1]||(+b[0])-(+a[0]))[0][0];   /* ничья — в пользу регулярной (v4.13.5) */
-      const prev=prior[prior.length-1];
-      const fresh=(Date.now()/1000-lastT<=45*86400)&&lastA<prev*0.98&&lastA<modal*0.95;
-      const stale=!fresh&&lastA<modal*0.95;             /* ступенька была раньше последней регулярной, либо вне окна */
-      if(fresh){divCut.push(s);
-        state.divCuts.push({sym:s,prev,last:lastA,t:lastT,
-          h:"Дивиденд "+s+": "+fmt(prev,2)+" → "+fmt(lastA,2)+" $ (−"+fmt((1-lastA/prev)*100,0)+"%, экс-дата "+new Date(lastT*1000).toISOString().slice(0,10)+") — срезка по данным выплат"});}
-      else if(stale) divStale.push(s);
+      if(r.fresh){divCut.push(s);
+        state.divCuts.push({sym:s,prev:r.prev,last:r.lastA,t:r.lastT,
+          h:"Дивиденд "+s+": "+fmt(r.prev,2)+" → "+fmt(r.lastA,2)+" $ (−"+fmt((1-r.lastA/r.prev)*100,0)+"%, экс-дата "+d10(r.lastT)+") — срезка по данным выплат"});}
+      else if(r.susp&&r.susp.fresh){divCut.push(s);
+        state.divCuts.push({sym:s,prev:r.lastA,last:0,t:Math.round(r.susp.due),
+          h:"Дивиденд "+s+": регулярная выплата не пришла — "+fmt(r.susp.days,0)+" дн. с экс-даты "+d10(r.lastT)+" ("+fmt(r.lastA,2)+" $) при медианном шаге "+fmt(r.med/86400,0)+" дн. — похоже на приостановку (по данным выплат)"});}
+      else if(r.staleCut||r.susp) divStale.push(s);     /* ступенька/пропуск были раньше, либо вне окна */
     }
     state.divData=divData;
-    const fU=byHead(fN), uU=byHead(uN);          /* v4.13.8: новости — по событиям; тикеры
-       див-ноги (divCut) не дедупим: это независимые факты из истории выплат, по одному на тикер */
-    const factSyms=[...new Set([...fU.map(x=>x.sym),...divCut])];
-    const fT=factSyms.length, uT=distinct(uU,x=>x.sym);
+    /* новости — по событиям и компаниям из заголовков; тикеры див-ноги (divCut) не дедупим:
+       это независимые факты из истории выплат, по одному на тикер */
+    const factSyms=[...new Set([...T.fSyms,...divCut])];
+    const fT=factSyms.length, uT=T.uSyms.length;
     const soft=state.news.bdcSoft.length;
     const st= fT>=2?"fired": (fT>=1||uT>=2)?"watch":"calm";
+    const divTxt="дивиденды по данным: "+(!divData?"нет данных":divCut.length?"СВЕЖАЯ СРЕЗКА/ПРИОСТАНОВКА у "+divCut.join(","):"свежих срезок нет");
     return {st,pts:st==="fired"?-15:st==="watch"?-4:0,
-      inputs:(state.newsAt?("фактов: "+(fU.length+divCut.length)+" по "+fT+" тикерам"+(fT?" ["+factSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+uU.length+" ("+uT+" тик.) · мнений: "+oN+" · мягких: "+soft+" (мнения/мягкие не в балле) · дивиденды по данным: "+(!divData?"нет данных":divCut.length?"СВЕЖАЯ СРЕЗКА у "+divCut.join(","):"свежих срезок нет")+(divStale.length?" · давние срезки (ступенька была раньше последней выплаты или вне окна 45 дн; не в балле): "+divStale.join(","):"")+llmTag()):("сканер новостей: ожидание · дивиденды по данным: "+(!divData?"нет данных":divCut.length?"СВЕЖАЯ СРЕЗКА у "+divCut.join(","):"свежих срезок нет")))};
+      inputs:(state.newsAt?("фактов: "+(T.fN+divCut.length)+" по "+fT+" тикерам"+(fT?" ["+factSyms.slice(0,3).join(",")+"]":"")+" · неподтв.: "+T.uN+" ("+uT+" тик.)"+(T.out?" · вне корзины: "+T.out+" (контекст)":"")+" · мнений: "+T.oN+" · мягких: "+soft+" (мнения/мягкие не в балле) · "+divTxt+(divStale.length?" · давние срезки/пропуски (ступенька была раньше последней выплаты или вне окна 45 дн; не в балле): "+divStale.join(","):"")+llmTag()):("сканер новостей: ожидание · "+divTxt))};
   }},
  {id:"d_oil",triad:false,name:"Нефтяной шок / Ормуз",
   logic:"По цене WTI (ряд EIA/FRED + внутридневной фьючерс поверх — шоковый день виден сразу): СРАБОТАЛ — >$95 (порог CPI-индексирован от базы 2026) или +25% за 30 дней. НАБЛЮДЕНИЕ — >$85 или +15%. Поправка: −10 / −4. Вход мгновенный, выход с гистерезисом: состояние держится, пока цена не отойдёт от порога на 1,5% (импульс — на 6%), иначе детектор дребезжал бы у самого порога по нескольку раз в сутки (v4.13.6).",
@@ -2431,16 +2656,13 @@ function taggedTriggers(){
   /* v4.10: метка = корзина · класс; v4.11: + провенанс (кто присвоил класс: LLM или якорь/правила) */
   const L={fact:"ФАКТ",unverified:"неподтв.",opinion:"мнение",soft:"мягкий"};
   const R2={fact:0,unverified:1,opinion:2,soft:3};
-  const prov=n=>{
-    if(n.cls==="soft") return "";
-    const v=state.newsVer&&state.newsVer.get(n.h);
-    /* v4.13.2: якорный факт при ОТРИЦАТЕЛЬНОМ LLM-вердикте помечается честно «·якорь»,
-       а не «·LLM» (класс дал якорь v4.12, LLM его как раз отклонил) */
-    if(n.cls==="fact") return v==="fact"?"·LLM":(FACT.test(n.h)?"·якорь":"·LLM");
-    if(v) return "·LLM";
-    return "";
-  };
-  const mk=(arr,tag)=>arr.map(n=>({...n,tag:tag+"·"+(L[n.cls]||"—")+prov(n)}));
+  /* v5.0: провенанс ставит applyVer: ·LLM (класс дал судья), ·якорь (факт по пресс-релизной форме
+     без вердикта), ·спор (якорь против отказа судьи → неподтверждённый — раньше такой заголовок
+     оставался ФАКТОМ). Компания — из заголовка; без компании корзины — «вне корзины · лента X»;
+     «·N ред.» — сколько перепечаток склеено в событие. */
+  const prov=n=>n.cls==="soft"||!n.prov?"":"·"+n.prov;
+  const mk=(arr,tag)=>arr.map(n=>({...n,sym:n.sym||("вне корзины · лента "+(n.feed||"?")),
+    tag:tag+"·"+(L[n.cls]||"—")+prov(n)+(n.dup>1?" ·"+n.dup+" ред.":"")}));
   /* v4.11.1: data-срезки дивидендов публикуются в ленту наравне с новостями — драйвер
      поправки детектора всегда виден глазами (ссылка ведёт на историю выплат) */
   const divItems=(state.divCuts||[]).map(c=>({sym:c.sym,h:c.h,t:c.t,cls:"fact",
@@ -2467,7 +2689,7 @@ function renderNews(){
   nb.innerHTML=(state.newsAt?`<p class="tagline">новостной сканер Finnhub (${CONFIG.CYCLE.capexTickers.length+CONFIG.CYCLE.bdcTickers.length} тикеров · окно 14 дн. · серверный префильтр)${esc(llmTag())} · ${state.newsAt.toLocaleTimeString("ru-RU")} · проверяйте первоисточники</p>`:"")
     +emptyWarn
     +(state.symDrift?`<p class="tagline">⚠ ${esc(state.symDrift)}</p>`:"")
-    +sec("Совпадения детекторов (капекс · BDC)",trig,"в балл идут только ФАКТЫ (и неподтверждённые при ≥2 тикерах); мнения и мягкие — справочно")+(trig.length?more:"");
+    +sec("Совпадения детекторов (капекс · BDC)",trig,"в балл идут только ФАКТЫ по компаниям корзин (и неподтверждённые при ≥2 компаниях); мнения, мягкие и «вне корзины» — справочно")+(trig.length?more:"");
 }
 
 /* ============ РЕНДЕР КАРТОЧЕК ============ */
@@ -3142,42 +3364,32 @@ async function llmComplete(userMsg,sys,maxTok,timeoutMs){
   if(!r.ready) throw new Error("AI_NOT_CONFIGURED");
   return callOAI(r.base,r.cfg,userMsg,sys,maxTok,timeoutMs);
 }
-/* LLM-фильтр новостных триггеров (v4.10): судит только жёсткие кандидаты БЕЗ вердикта
-   (серверного fh:newsVer или прежнего клиентского). Подтверждён → fact, нет → opinion.
-   Записи не удаляются и не «понижаются» — меняется только класс; детерминированные классы
-   консервативны сами по себе, поэтому сбой LLM не требует отката. */
+/* LLM-фильтр новостных триггеров (v4.10): судит только кандидатов БЕЗ вердикта (серверного
+   fh:newsVer или прежнего клиентского). Записи не удаляются — меняется только класс.
+   v5.0: промпт и разбор — общие с сборщиком (judgePrompt/parseJudge из ⟦NEWS-CORE⟧): судья
+   возвращает {cls, subject, type} по КАЖДОМУ заголовку, ленту ему не сообщаем (именно она путала
+   атрибуцию); impairment/write-down — факт только для ИИ-/серверных/ДЦ-активов компаний корзин.
+   Не вернувшийся в ответе заголовок остаётся без вердикта (а не «мнением») — досудится позже. */
 async function llmVerifyNews(){
   const srv=state.newsVerSrv>0;
   const cap=state.news.capex, bdc=state.news.bdcHard;
   /* v4.12: кандидаты уникальны по заголовку (общая новость capex+BDC судится один раз),
-     вердикт затем применяется ко ВСЕМ записям через classifyNews (якорь-приоритет учтён) */
+     вердикт затем применяется ко ВСЕМ записям через applyVer (спор якоря с отказом учтён) */
   const seenH=new Set();
-  const pend=[...cap.map((n,i)=>({tag:"C"+i,n})),...bdc.map((n,i)=>({tag:"B"+i,n}))]
+  const pend=[...cap.map(n=>({k:"C",n})),...bdc.map(n=>({k:"B",n}))]
     .filter(x=>!(state.newsVer&&state.newsVer.has(x.n.h)))
-    .filter(x=>{if(seenH.has(x.n.h))return false;seenH.add(x.n.h);return true;});
+    .filter(x=>{if(seenH.has(x.n.h))return false;seenH.add(x.n.h);return true;})
+    .slice(0,40).map((x,i)=>({...x,tag:x.k+i}));
   const r=await aiRoute();
   if(!r.ready){ state.newsLLM= srv?"server":"off"; return; }
   if(!pend.length){ state.newsLLM= srv?"server":((cap.length||bdc.length)?"ok":"idle"); return; }
   try{
-    const list=pend.map(x=>x.tag+"|"+x.n.sym+"|"+x.n.h).join("\n");
-    const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
-    const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
-C-заголовки: гиперскейлер СНИЗИЛ капекс/гайденс расходов, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
-B-заголовки: BDC-фонд/его управляющий ВВЁЛ гейт или приостановку выкупа, ОБЪЯВИЛ снижение дивиденда/дистрибуции, СТОЛКНУЛСЯ с волной заявок на выкуп (redemption requests).
-НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may","about to","likely"), вопросы, мнения и модельные портфели аналитиков, обзоры сектора.
-Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
-Заголовки:\n`+list;
-    const txt=await llmComplete(prompt,sys,1500,60000);
-    /* v4.12: ищем именно объект с "confirmed" — reasoning-модели могут выдать {...} в рассуждениях;
-       v4.13.4: последнее совпадение — цитата примера формата из промпта не читается как вердикт */
-    const mm=(txt||"").match(/\{[^{}]*"confirmed"[^{}]*\}/g); if(!mm) throw new Error("no json");
-    const m=[mm[mm.length-1]];
-    const cj=JSON.parse(m[0]);
-    if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string"&&/^[CB]\d+$/.test(x))) throw new Error("bad shape");
-    const ok=new Set(cj.confirmed);
-    pend.forEach(x=>{state.newsVer.set(x.n.h, ok.has(x.tag)?"fact":"opinion");});
+    const txt=await llmComplete(judgePrompt(pend.map(x=>[x.tag,x.n.h])),JUDGE_SYS,4000,60000);
+    const got=parseJudge(txt,pend.map(x=>x.tag));
+    if(!got.size) throw new Error("no json");
+    pend.forEach(x=>{const v=got.get(x.tag); if(v) state.newsVer.set(x.n.h,v);});
     /* переклассификация всех записей: вердикт по заголовку применяется и к дублю в другой корзине */
-    [...cap,...bdc].forEach(n=>{n.cls=classifyNews(n.h,n.src);});
+    [...cap,...bdc].forEach(applyVer);
     state.newsLLM="ok";
   }catch(e){ state.newsLLM="fail"; }   /* v4.12: сбой вкладки не маскируется под «server» — llmTag покажет обе половины статуса */
 }
