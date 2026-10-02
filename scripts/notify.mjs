@@ -2,8 +2,17 @@
 // Telegram-уведомления об изменениях панели.
 //
 // ЖИВЁТ СНАРУЖИ РЕШАЮЩЕГО КОНТУРА: читает уже опубликованное состояние (снимок или живую
-// страницу) и ничего не пишет ни в снимок, ни в решение, ни в состояние сборщика. Отказ
-// уведомлений не должен и не может повлиять на вердикт.
+// страницу) и ничего не пишет ни в снимок, ни в состояние сборщика. Отказ уведомлений не должен
+// и не может повлиять на вердикт.
+//
+// ОДНО ИСКЛЮЧЕНИЕ — ЖУРНАЛ РЕШЕНИЙ (макро-панель, режим page). Исполняемая ступень доли акций
+// зависит от ПАМЯТИ машины ступеней (гистерезис, подтверждение следующей сессией, шаг в одну
+// ступень, заморозка апгрейдов). Раньше память жила только в localStorage браузера, и у каждого
+// устройства, а у headless-прогона уведомлений — на каждом запуске заново, ступень была своя.
+// Теперь прогон уведомлений — единственный ПИСАТЕЛЬ: он передаёт странице прошлую память
+// (window.__RUNG_WRITER), страница сама делает шаг машины, а результат (state.decision.memory)
+// уходит в ветку `ledger`. Решающей логики здесь по-прежнему нет — только перенос памяти,
+// которую посчитала страница. Сайт и все устройства читают ту же ветку (functions/ledger.json.js).
 //
 // Один и тот же файл лежит в ОБОИХ репозиториях побайтово одинаковым — панель определяется
 // по форме данных, а не по правкам в коде. Правишь здесь — копируешь во второй репозиторий.
@@ -22,10 +31,16 @@
 //   NOTIFY_PAGE=<url>       — опубликованный адрес страницы (резерв, отстаёт на цикл публикации);
 //   OPENROUTER_KEY          — ключ для комментариев LLM; без него комментарий берётся из шаблона;
 //   NOTIFY_MODEL            — модель комментатора (по умолчанию бесплатная nemotron);
-//   NOTIFY_MAX=<n>          — предохранитель: больше n событий за прогон → отправляется сводка.
+//   NOTIFY_MAX=<n>          — предохранитель: больше n событий за прогон → отправляется сводка;
+//   NOTIFY_LEDGER_IN=<путь> — прошлый журнал решений из ветки `ledger` (по умолчанию .notify/ledger.json;
+//                             нет файла или в нём `null` — первый прогон, машина сеется от вердикта;
+//                             строка "unreadable" — ветка не прочиталась: ни доли, ни записи журнала);
+//   NOTIFY_LEDGER_OUT=<путь> — куда положить новую версию журнала (по умолчанию .notify/ledger.next.json).
+//                             Файл появляется ТОЛЬКО при существенном изменении (память, смены, дневник) —
+//                             по его наличию шаг воркфлоу решает, коммитить ли ветку `ledger`.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 const DRY = process.env.NOTIFY_DRY_RUN === "1" || !process.env.TELEGRAM_BOT_TOKEN;
 const STATE_PATH = process.env.NOTIFY_STATE || ".notify/state.json";
@@ -34,6 +49,8 @@ const PAGE_URL = process.env.NOTIFY_PAGE || "";
 // Каталог опубликованной страницы в рабочей копии (docs). Если задан — страница поднимается
 // локально, и уведомления видят свежий снимок, не дожидаясь публикации Pages.
 const PAGE_DIR = process.env.NOTIFY_PAGE_DIR || "";
+const LEDGER_IN = process.env.NOTIFY_LEDGER_IN || ".notify/ledger.json";
+const LEDGER_OUT = process.env.NOTIFY_LEDGER_OUT || ".notify/ledger.next.json";
 const MAX_EVENTS = Number(process.env.NOTIFY_MAX || 40);
 const SEND_GAP_MS = Number(process.env.NOTIFY_GAP_MS || 3500); // Telegram: ~20 сообщений/мин в чат
 // Комментатор обязан быть БЕСПЛАТНЫМ. Модель по умолчанию — та же, что уже судит новости на
@@ -460,12 +477,28 @@ const PAGE_EXTRACTOR = `(() => {
     const l = d.last || {};
     out.detectors.push({ id: d.id, name: d.name, state: l.st || "calm", inputs: l.inputs || "", note: d.logic || "" });
   }
-  // Полоса доли капитала. Её проценты и условия возврата страница считает сама и ПЕЧАТАЕТ
-  // («до 85%: композит ≥ +13»), поэтому запас до соседней ступени берём готовым, а не
-  // повторяем правила машины ступеней у себя.
+  // Время снимка, на котором посчитана страница: им помечаются события риска, чтобы повторный
+  // прогон ТОГО ЖЕ снимка не слал их дважды, а настоящий повтор на новом снимке — слал.
+  try { out.snapshot_at = state.lastSnapGen || ""; } catch (e) { out.snapshot_at = ""; }
+  // Закрытия S&P для дневника вердиктов: берём у страницы, а не качаем заново.
+  try {
+    const s = (typeof fredCached === "function" && fredCached("SP500")) || ((state.data || {}).spx || {}).series || [];
+    out.spx_points = s.slice(-15).map(p => ({ d: new Date(p.d ?? p.t).toISOString().slice(0, 10), v: Number(p.v) }));
+  } catch (e) { out.spx_points = []; }
+  // РЕШЕНИЕ — ТОЛЬКО ИЗ state.decision. Видимый текст полосы больше не разбирается: при сбое
+  // данных из фразы «Покрытие < 60%» читалось «60%», и уходили фантомные «85% → 60% → 85%».
+  // Клон через JSON: наружу из страницы уезжает чистый объект, без ссылок на её состояние.
+  let dec = null;
+  try { dec = state.decision ? JSON.parse(JSON.stringify(state.decision)) : null; } catch (e) { dec = null; }
+  out.decision = dec;
+  if (dec) return out;
+  // ПЕРЕХОДНЫЙ РЕЖИМ: страница ещё не публикует state.decision — доля читается по-старому, из
+  // полосы. Процент берётся из крупной цифры полосы, а не из первого «%» в тексте: при сбое данных
+  // там стоит «—», и разбор честно возвращает «доли нет», а не «60%» из сноски о покрытии.
   const strip = document.getElementById("actionStrip");
   const stripText = strip ? (strip.innerText || "").replace(/\\s+/g, " ").trim() : "";
-  const pctMatch = stripText.match(/(\\d{1,3})\\s*%/);
+  const pctEl = strip ? strip.querySelector(".as-pct") : null;
+  const pctMatch = String(pctEl ? pctEl.textContent : stripText).match(/(\\d{1,3})\\s*%/);
   const num = (s) => { const m = String(s).replace(",", ".").match(/-?\\d+(\\.\\d+)?/); return m ? Number(m[0]) : null; };
   // В конце полосы идёт СПРАВОЧНАЯ сноска о правилах исполнения; в ней встречаются те же слова
   // («рубильник — немедленно»), что и в боевых предупреждениях. Разбираем только «живую» часть
@@ -518,7 +551,8 @@ async function serveDir(dir) {
   return { server, url: `http://127.0.0.1:${server.address().port}/` };
 }
 
-async function fromLivePage(url) {
+// writer: { memory } — прошлая память машины ступеней из журнала (null — первый прогон).
+async function fromLivePage(url, { writer = null } = {}) {
   const puppeteer = await import("puppeteer-core");
   const executablePath =
     process.env.CHROME_PATH ||
@@ -534,6 +568,12 @@ async function fromLivePage(url) {
     const page = await browser.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
+    // РЕЖИМ ПИСАТЕЛЯ — ДО навигации. Профиль Chrome здесь каждый раз чистый, а страница
+    // подаётся на случайном порту, поэтому localStorage со ступенью всегда пуст: без этой строки
+    // машина ступеней сеялась от сырого вердикта на каждом прогоне, и ни гистерезис, ни
+    // подтверждение, ни заморозка до Telegram не доходили. С ней страница стартует с памяти из
+    // журнала и не трогает ни localStorage, ни ./ledger.json.
+    if (writer) await page.evaluateOnNewDocument((mem) => { window.__RUNG_WRITER = { memory: mem }; }, writer.memory ?? null);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
     // Страница грузит источники асинхронно и ставит settled=true на ФИНАЛЬНОМ compute цикла.
     // Снимать раньше — значит ловить переходное состояние с недогруженными детекторами.
@@ -541,6 +581,11 @@ async function fromLivePage(url) {
       `(() => { try { return state.settled === true && IND.length > 0; } catch (e) { return false; } })()`,
       { timeout: 180000, polling: 500 }
     );
+    // Решение несёт свой признак устоявшегося compute. Обычно он уже стоит; если нет — короткая
+    // догонка, а не падение прогона: неустоявшееся решение ниже просто не попадёт в журнал.
+    await page
+      .waitForFunction(`(() => { try { return !state.decision || state.decision.settled === true; } catch (e) { return true; } })()`, { timeout: 20000, polling: 250 })
+      .catch(() => console.log("::warning::state.decision не устоялось за 20 с — журнал в этом прогоне не пишется"));
     const raw = await page.evaluate(PAGE_EXTRACTOR);
     if (errors.length) console.error("page errors:", errors.slice(0, 3).join(" | "));
     const indicators = raw.indicators.map((i) => {
@@ -548,13 +593,13 @@ async function fromLivePage(url) {
       const { series, ...rest } = i;
       return { ...rest, scheduled: c.scheduled, revisable: c.revisable, release: c.release, cadence: c.cadence || "", points: compactSeries(series) };
     });
-    return { ...raw, assetWord: "акций", indicators };
+    return { ...raw, source: "page", assetWord: "акций", indicators };
   } finally {
     await browser.close();
   }
 }
 
-async function readPanel() {
+async function readPanel({ writer = null } = {}) {
   const mode = process.env.NOTIFY_SOURCE || "auto";
   if (mode === "page" || (mode === "auto" && (PAGE_DIR || PAGE_URL) && !process.env.NOTIFY_SNAPSHOT)) {
     // Каталог рабочей копии приоритетнее опубликованного адреса: он свежее ровно на один цикл
@@ -563,20 +608,248 @@ async function readPanel() {
       const { server, url } = await serveDir(PAGE_DIR);
       console.log(`страница поднята локально из ${PAGE_DIR}`);
       try {
-        return await fromLivePage(url);
+        return await fromLivePage(url, { writer });
       } finally {
         server.close();
       }
     }
     if (!PAGE_URL) throw new Error("не задан ни NOTIFY_PAGE_DIR, ни NOTIFY_PAGE для режима page");
     console.log(`страница читается по сети: ${PAGE_URL} (данные могут отставать на цикл публикации)`);
-    return fromLivePage(PAGE_URL);
+    return fromLivePage(PAGE_URL, { writer });
   }
   const snap = await readJSON(SNAPSHOT_PATH);
   if (!snap) throw new Error(`снимок не читается: ${SNAPSHOT_PATH}`);
   if (Array.isArray(snap.metrics)) return fromSnapshotJSON(snap);
-  if (PAGE_URL) return fromLivePage(PAGE_URL);
+  if (PAGE_URL) return fromLivePage(PAGE_URL, { writer });
   throw new Error("снимок без metrics[] и без NOTIFY_PAGE — источник не определён");
+}
+
+/* ======================= 2b. КАНОНИЧЕСКАЯ СТУПЕНЬ И ЖУРНАЛ РЕШЕНИЙ =======================
+   Лестница v5 — три ступени: 2 = 100% стратегической нормы акций, 1 = 50%, 0 = 0%. Ступень и её
+   правила исполнения считает СТРАНИЦА (state.decision); здесь только проверка формы, перенос
+   памяти в журнал и сообщение о смене. Контракт описан в README («Журнал решений»).
+
+   Журнал (ветка `ledger`, файл ledger.json) — общий для сайта, Telegram и всех устройств:
+     memory      — что машина ступеней должна помнить до следующего прогона;
+     decision    — краткая сводка последнего решения (для людей и ИИ-снимка);
+     transitions — смены ступени (последние 200): база частот откатов для «насколько устойчиво»;
+     diary       — дневник вердиктов, одна строка на торговую сессию (последние 800). */
+const RUNG_PCT = [0, 50, 100];
+const REGIME_WORD = {
+  crisis: "КРИЗИС · ЗАЩИТА",
+  elevated: "РИСК ПОВЫШЕН",
+  moderate: "РИСК УМЕРЕННЫЙ",
+  low: "РИСК НИЗКИЙ",
+  nodata: "НЕДОСТАТОЧНО ДАННЫХ",
+};
+// Детекторы, замораживающие апгрейд, — человеческими словами (страница отдаёт короткие имена).
+const FREEZE_HUMAN = {
+  "Фондинг": "сигнал нехватки долларов на денежном рынке",
+  "Капекс": "сигнал сокращения инвестиций крупнейших ИТ-компаний",
+  "Стресс BDC": "сигнал стресса фондов прямого кредитования",
+};
+const LEDGER_TRANSITIONS_MAX = 200;
+const LEDGER_DIARY_MAX = 800;
+
+const isDay = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+const isRung = (r) => Number.isInteger(r) && r >= 0 && r <= 2;
+// Память переносится КАК ЕСТЬ: её формат принадлежит странице. Проверяется только то, без чего
+// она бессмысленна, — ступень. Лишние поля будущих версий не срезаются.
+const validMemory = (m) => !!m && typeof m === "object" && !Array.isArray(m) && isRung(m.rung);
+const round = (x, k) => (finite(x) ? Math.round(x * 10 ** k) / 10 ** k : null);
+const signed = (x, k = 1) => (finite(x) ? `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(k).replace(".", ",")}` : "—");
+const regimeWordOf = (a) => a?.regimeWord || REGIME_WORD[a?.regime] || "";
+
+// Прошлый журнал. `null` в файле — честное «ветки ещё нет» (так его пишет воркфлоу); строка
+// "unreadable" — ветка есть, но прочитать её не удалось: это НЕ первый прогон, и сеять ступень
+// заново нельзя (см. canonicalize). Битый файл не роняет прогон: журнал начнётся заново, а прежние
+// версии остаются в истории ветки.
+async function readLedger(path) {
+  let text;
+  try {
+    text = await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
+  try {
+    const j = JSON.parse(text);
+    if (j === null) return null;
+    if (j === "unreadable") return { unreadable: true };
+    if (typeof j !== "object" || Array.isArray(j)) throw new Error("не объект");
+    return j;
+  } catch (e) {
+    console.log(`::warning::журнал решений ${path} не читается (${e.message}) — машина ступеней посеется заново; прежние версии лежат в истории ветки ledger`);
+    return null;
+  }
+}
+
+// Годится ли state.decision как КАНОНИЧЕСКОЕ решение. Каждый отказ назван: молчаливый откат к
+// сиду от вердикта и есть та поломка, которую журнал чинит.
+function decisionStatus(dec) {
+  if (!dec || typeof dec !== "object") return { ok: false, why: "страница не публикует state.decision" };
+  if (!(Number(dec.v) >= 5)) return { ok: false, why: `неизвестная версия решения: ${dec.v}` };
+  if (!isRung(dec.rung) || !validMemory(dec.memory) || dec.memory.rung !== dec.rung) return { ok: false, why: "ступень решения или его память вне 0…2 либо расходятся" };
+  if (dec.settled !== true) return { ok: false, why: "решение снято с неустоявшегося compute (settled=false)" };
+  // Не писатель — значит страница стартовала НЕ с памяти журнала (а с пустого localStorage или
+  // чужого ledger.json): такая ступень посеяна от вердикта и канонической не является.
+  if (dec.source !== "writer") return { ok: false, why: `страница не вошла в режим писателя (source=${dec.source ?? "—"})` };
+  return { ok: true, why: "" };
+}
+
+// Доля капитала из канонического решения. При сбое данных (покрытие < 60%) доли нет вовсе —
+// ступень держится памятью, а «смена» на фоне неполных данных была бы фантомом. Рубильник —
+// исключение: он переводит в защиту немедленно и при любых данных.
+function allocationFromDecision(dec) {
+  if (dec.noData && !dec.override) return null;
+  return {
+    canonical: true,
+    rung: dec.rung,
+    pct: finite(dec.pct) ? dec.pct : RUNG_PCT[dec.rung],
+    regime: dec.regime || "",
+    regimeWord: dec.regimeWord || REGIME_WORD[dec.regime] || "",
+    score: finite(dec.composite) ? dec.composite : null,
+    lead: finite(dec.lead) ? dec.lead : null,
+    triggers: dec.triggers || null,
+    frozen: !!dec.frozen,
+    freezeBy: Array.isArray(dec.freezeBy) ? dec.freezeBy : [],
+    override: !!dec.override,
+    pending: dec.pend != null,
+    pendPct: finite(dec.pendPct) ? dec.pendPct : null,
+    since: isDay(dec.memory?.since) ? dec.memory.since : isDay(dec.since) ? dec.since : "",
+    dataAsOf: isDay(dec.dataAsOf) ? dec.dataAsOf : "",
+    action: typeof dec.action === "string" ? dec.action : "",
+  };
+}
+
+// С чем сравнивать каноническую ступень. Первым — с тем, что уже ОБЪЯВЛЕНО (база состояния
+// уведомлений сдвигается только после удачной рассылки): если Telegram упал, а журнал успел
+// уехать вперёд, смена не потеряется. Нет такой базы (первый канонический прогон, потерянный кэш) —
+// с памятью прошлого журнала. Нет и её — сравнивать не с чем, это первый прогон.
+function canonicalBase(prevState) {
+  const a = prevState.allocation;
+  if (a?.canonical && isRung(a.rung)) return a;
+  const l = prevState.ledger;
+  if (!validMemory(l?.memory)) return null;
+  const d = l.decision && l.decision.rung === l.memory.rung ? l.decision : {};
+  return { canonical: true, rung: l.memory.rung, pct: RUNG_PCT[l.memory.rung], regime: d.regime || "", regimeWord: d.regimeWord || REGIME_WORD[d.regime] || "" };
+}
+
+// Последнее закрытие S&P на дату данных решения или раньше.
+function closeOn(points, day) {
+  let best = null;
+  for (const p of points || []) {
+    if (!isDay(p?.d) || !finite(p?.v) || (isDay(day) && p.d > day)) continue;
+    if (!best || p.d > best.d) best = p;
+  }
+  return best ? best.v : null;
+}
+const snapshotSpx = (snap) =>
+  (snap?.responses?.["fred:SP500"]?.observations || [])
+    .map((o) => ({ d: String(o?.date || ""), v: Number(o?.value) }))
+    .filter((p) => isDay(p.d) && finite(p.v));
+
+// Следующая версия журнала. Смена записывается, когда ступень в памяти ИЗМЕНИЛАСЬ против прошлого
+// журнала; строка дневника — одна на сессию данных, свежий прогон её переписывает.
+function buildLedger(prev, dec, { snapshotAt = "", spx = null, now = Date.now() } = {}) {
+  const prevMem = validMemory(prev?.memory) ? prev.memory : null;
+  const mem = dec.memory;
+  const transitions = (Array.isArray(prev?.transitions) ? prev.transitions : []).filter((t) => isDay(t?.d) && isRung(t.from) && isRung(t.to));
+  if (prevMem && mem.rung !== prevMem.rung) {
+    transitions.push({ d: isDay(mem.since) ? mem.since : dec.dataAsOf, from: prevMem.rung, to: mem.rung, composite: round(dec.composite, 1) });
+  }
+  let diary = (Array.isArray(prev?.diary) ? prev.diary : []).filter((x) => isDay(x?.d));
+  // Сессия без данных в дневник не идёт: её композит посчитан по неполному набору и судить по нему
+  // решения нечестно.
+  if (isDay(dec.dataAsOf) && !dec.noData) {
+    const old = diary.find((x) => x.d === dec.dataAsOf);
+    const row = {
+      d: dec.dataAsOf,
+      c: round(dec.composite, 1),
+      l: round(dec.lead, 1),
+      r: dec.rung,
+      g: dec.regime || "",
+      spx: finite(spx) ? spx : (old?.spx ?? null),
+      p: round(dec.tail?.p, 3),
+    };
+    diary = diary.filter((x) => x.d !== row.d);
+    diary.push(row);
+    diary.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  }
+  const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+  return {
+    v: 1,
+    updated_at: new Date(now).toISOString(),
+    snapshot_at: snapshotAt || "",
+    dataAsOf: isDay(dec.dataAsOf) ? dec.dataAsOf : "",
+    memory: mem,
+    decision: pick(dec, ["regime", "regimeWord", "rung", "pct", "raw", "composite", "lead", "coin", "tail", "override", "frozen"]),
+    transitions: transitions.slice(-LEDGER_TRANSITIONS_MAX),
+    diary: diary.slice(-LEDGER_DIARY_MAX),
+  };
+}
+
+// Существенно ли изменился журнал: память, смены или дневник. Время прогона и сводка решения сами
+// по себе коммита не стоят — иначе ветка получала бы коммит на каждый такт снимка.
+const stableJSON = (x) =>
+  Array.isArray(x) ? `[${x.map(stableJSON).join(",")}]`
+  : x && typeof x === "object" ? `{${Object.keys(x).sort().map((k) => `${JSON.stringify(k)}:${stableJSON(x[k])}`).join(",")}}`
+  : JSON.stringify(x ?? null);
+const ledgerChanged = (prev, next) =>
+  !prev || ["memory", "transitions", "diary"].some((k) => stableJSON(prev[k]) !== stableJSON(next[k]));
+
+// Одна строка — одна запись смены или дневника: дифф коммита в ветке показывает ровно ту сессию,
+// что изменилась, а не перетасовку сотен строк.
+function formatLedger(l) {
+  const rows = (a) => (a.length ? `[\n${a.map((x) => "  " + JSON.stringify(x)).join(",\n")}\n ]` : "[]");
+  const body = Object.entries(l).map(([k, v]) => ` ${JSON.stringify(k)}: ${Array.isArray(v) ? rows(v) : JSON.stringify(v)}`);
+  return `{\n${body.join(",\n")}\n}\n`;
+}
+
+// Журнал смен в форме, которую понимает расчёт устойчивости: проценты нормы и метка времени сессии.
+const ledgerChanges = (transitions) =>
+  (transitions || [])
+    .filter((t) => isDay(t?.d) && isRung(t.from) && isRung(t.to))
+    .map((t) => ({ t: Date.parse(t.d + "T00:00:00Z"), from: RUNG_PCT[t.from], to: RUNG_PCT[t.to] }));
+
+// Решение страницы → доля для уведомлений и следующая версия журнала. Меняет panel на месте.
+// Страница без state.decision (до выхода v5) — переходный режим: доля из полосы, журнал не пишется.
+function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, now = Date.now() } = {}) {
+  const dec = panel.decision;
+  if (!dec) {
+    console.log("::warning::страница не публикует state.decision — доля читается по-старому из полосы, журнал решений не пишется");
+    return { ledger: null, changed: false };
+  }
+  const st = decisionStatus(dec);
+  if (!st.ok) {
+    // Неканоническая ступень хуже молчания: она и есть та, что прыгала без правил исполнения.
+    console.log(`::warning::решение страницы не принято как каноническое: ${st.why} — сообщений о доле и записи журнала в этом прогоне нет`);
+    panel.allocation = null;
+    return { ledger: null, changed: false };
+  }
+  if (prevLedger?.unreadable) {
+    // Память журнала не дошла до страницы — её ступень посеяна от вердикта. Сравнивать её с
+    // объявленной или писать поверх живой истории нельзя; следующий прогон прочитает ветку снова.
+    console.log("::warning::журнал решений не прочитан — сообщений о доле и записи журнала в этом прогоне нет");
+    panel.allocation = null;
+    return { ledger: null, changed: false };
+  }
+  panel.allocation = allocationFromDecision(dec);
+  panel.verdict = { ...(panel.verdict || {}), word: dec.regimeWord || REGIME_WORD[dec.regime] || panel.verdict?.word || "" };
+  const prevMemOk = validMemory(prevLedger?.memory);
+  if (panel.allocation) panel.allocation.changes = ledgerChanges(prevLedger?.transitions);
+  // Сид при сбое данных не коммитится — так же, как страница не коммитила его в localStorage:
+  // иначе после восстановления данных машина уже не пересеялась бы от живого вердикта.
+  if (dec.noData && !prevMemOk) {
+    console.log("журнал: данных нет, прошлой памяти нет — начинать журнал с сида по сбою нельзя, ждём данных");
+    return { ledger: null, changed: false };
+  }
+  if (!isDay(dec.dataAsOf)) {
+    console.log(`::warning::у решения нет даты данных (dataAsOf=${dec.dataAsOf ?? "—"}) — журнал не пишется`);
+    return { ledger: null, changed: false };
+  }
+  const ledger = buildLedger(prevLedger, dec, { snapshotAt, spx, now });
+  if (panel.allocation) panel.allocation.changes = ledgerChanges(ledger.transitions);
+  return { ledger, changed: ledgerChanged(prevLedger, ledger) };
 }
 
 /* ==================================== 3. СОБЫТИЯ ==================================== */
@@ -741,6 +1014,24 @@ function revertStats(changes) {
   return { total: changes.length, reverted, rate: reverted / changes.length };
 }
 
+// Порог ОТКАТА — того, что вернёт прежнюю долю. Откат идёт НАЗАД: после понижения его включает
+// условие повышения (↑), после повышения — условие понижения (↓). Первая версия всегда брала
+// порог понижения и после понижения писала «нужно ухудшиться ещё на N пунктов» там, где доля
+// вернулась бы как раз при УЛУЧШЕНИИ; а строка «вернуть прежнюю долю может» после повышения
+// печатала условие ДАЛЬНЕЙШЕГО повышения.
+// Каноническое решение отдаёт пороги числами (decision.triggers, уже с гистерезисом); у
+// переходного разбора полосы есть только напечатанные фразы, из них порог и вынимается.
+function rollbackOf(prevAlloc, curAlloc) {
+  if (!prevAlloc || !finite(prevAlloc.pct) || !finite(curAlloc?.pct)) return null;
+  const wentDown = curAlloc.pct < prevAlloc.pct;
+  if (curAlloc.canonical) {
+    const trig = (wentDown ? curAlloc.triggers?.up : curAlloc.triggers?.down) || null;
+    return { wentDown, th: finite(trig?.composite) ? trig.composite : null, pct: finite(trig?.pct) ? trig.pct : prevAlloc.pct, text: "" };
+  }
+  const text = (wentDown ? curAlloc.up : curAlloc.down) || "";
+  return { wentDown, th: thresholdFrom(text), pct: null, text };
+}
+
 // Насколько смена доли устойчива: близко ли решающие величины к своим порогам и подтверждена ли
 // смена выдержкой. Отвечает на вопрос «не откатится ли это завтра обратно».
 function stabilityLines(prevAlloc, curAlloc, prevState) {
@@ -762,17 +1053,20 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
     }
   }
 
-  // --- макро-панель: запас до порога берётся из условий, которые страница печатает сама ---
-  // «↓ до 35%: композит ≤ −13» при текущей оценке +9 означает запас 22 пункта. Обе цифры уже
-  // есть на странице, и без этого вердикт для макро-панели был почти всегда «умеренный» без
-  // единого числового довода.
-  if (marginRaw === null && finite(curAlloc.score)) {
-    const th = thresholdFrom(curAlloc.down) ?? thresholdFrom(curAlloc.up);
-    if (finite(th)) {
-      marginRaw = Math.abs(curAlloc.score - th);
-      nearTitle = "";
-    }
+  // --- макро-панель: запас до порога ОТКАТА (см. rollbackOf) ---
+  // «↑ до 100%: композит ≥ −7» после понижения при текущей оценке −14 означает: доле нужно
+  // улучшение на 7 пунктов, чтобы вернуться. Без числа вердикт для макро-панели был почти всегда
+  // «умеренный» без единого довода. Запас со знаком: ноль и меньше — условие отката уже
+  // выполняется и ждёт только подтверждения.
+  // Апгрейд заморожен сработавшим детектором — после понижения числовой запас ничего не значит:
+  // откат не включится, пока детектор не снимется, как бы ни улучшилась оценка.
+  const back = curAlloc.override ? null : rollbackOf(prevAlloc, curAlloc);
+  const blockedBack = !!(back?.wentDown && curAlloc.canonical && curAlloc.frozen);
+  if (marginRaw === null && finite(curAlloc.score) && back && finite(back.th) && !blockedBack) {
+    marginRaw = back.wentDown ? back.th - curAlloc.score : curAlloc.score - back.th;
+    nearTitle = "";
   }
+  const alreadyMet = finite(marginRaw) && marginRaw <= 0 && !blocks.length;
 
   // --- эмпирика: как часто такие решения откатывались и как сильно величина гуляет за сутки ---
   const trend = (prevState.alloc_trend || []).concat(curAlloc.sample ? [curAlloc.sample] : []);
@@ -783,8 +1077,9 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
   const marginDays = finite(marginRaw) && noise ? marginRaw / noise : null;
 
   // Журнал смен: опубликованный панелью (сразу даёт базу) + накопленный самим уведомлением.
-  // Второй нужен там, где панель историю решений не публикует (макро-панель).
-  const changes = mergeChanges(curAlloc.changes, prevState.alloc_changes);
+  // Второй нужен там, где панель историю решений не публикует. У канонической ступени журнал смен
+  // один — ветка `ledger`; собственный здесь велся по пятиступенчатой лестнице и с ней не сводится.
+  const changes = curAlloc.canonical ? (curAlloc.changes || []) : mergeChanges(curAlloc.changes, prevState.alloc_changes);
   const reverts = revertStats(changes);
   const ageH = curAlloc.hold && finite(curAlloc.hold.count) ? curAlloc.hold.count : null;
 
@@ -795,7 +1090,7 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
   // «отката одного не хватит» там, где его как раз хватало.
   let tier = "moderate";
   if (curAlloc.override) tier = "forced";
-  else if ((needFlips !== null && needFlips <= 1) || (marginDays !== null && marginDays < 1) || (reverts && reverts.rate >= 0.34 && (ageH ?? 99) < 24)) tier = "shaky";
+  else if (alreadyMet || (needFlips !== null && needFlips <= 1) || (marginDays !== null && marginDays < 1) || (reverts && reverts.rate >= 0.34 && (ageH ?? 99) < 24)) tier = "shaky";
   else if ((needFlips !== null && needFlips >= 3) || (marginDays !== null && marginDays >= 3)) tier = "firm";
 
   // --- объяснение обычными словами: самые сильные доводы, без механики ---
@@ -809,7 +1104,9 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
     );
     if (holders && holders.length >= 2) reason.push("но и это вернёт долю не полностью, а на одну ступень вверх: против неё работает ещё " + holders.filter((h) => h !== nearTitle)[0]);
   }
-  if (marginDays !== null) {
+  if (alreadyMet) {
+    reason.push("условие отката уже выполняется: доля вернётся, если сигнал удержится до следующей торговой сессии");
+  } else if (marginDays !== null) {
     reason.push(
       marginDays < 1
         ? "до отката осталось меньше, чем обстановка обычно проходит за сутки"
@@ -817,7 +1114,12 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
     );
   } else if (finite(marginRaw) && !nearTitle) {
     // Числовой запас есть, но накопленной истории ещё мало, чтобы перевести его в дни.
-    reason.push(`обстановке нужно ухудшиться ещё на ${fmtPoint(marginRaw)} ${plural(Math.round(marginRaw), "пункт", "пункта", "пунктов")} по шкале от −100 до +100, чтобы доля упала на ступень ниже`);
+    // Направление — по смене: после понижения доле нужно УЛУЧШЕНИЕ, после повышения — ухудшение.
+    // Род — по показанному числу: «7 пунктов», но «8,4 пункта».
+    const pts = `${fmtPoint(marginRaw)} ${plural(Math.round(marginRaw * 100) / 100, "пункт", "пункта", "пунктов")} по шкале от −100 до +100`;
+    reason.push(back?.wentDown
+      ? `обстановке нужно улучшиться на ${pts}, чтобы доля вернулась на ступень выше`
+      : `обстановке нужно ухудшиться ещё на ${pts}, чтобы доля упала на ступень ниже`);
   }
   if (reverts && reverts.total >= 3) {
     reason.push(
@@ -826,8 +1128,17 @@ function stabilityLines(prevAlloc, curAlloc, prevState) {
         : `в прошлом из ${reverts.total} таких смен ${reverts.reverted} ${plural(reverts.reverted, "откатилась", "откатились", "откатились")} обратно в течение двух суток`
     );
   }
-  if (curAlloc.up && tier !== "forced") reason.push(`вернуть прежнюю долю может: ${curAlloc.up.replace(/^апгрейд разблокируется, когда/, "снятие паузы, когда")}`);
-  if (curAlloc.frozen) reason.push("повышение доли пока заморожено сработавшим сигналом риска");
+  if (tier !== "forced" && back) {
+    if (blockedBack) {
+      const by = (curAlloc.freezeBy || []).map((f) => FREEZE_HUMAN[f] || f);
+      reason.push(`вернуть ${prevAlloc.pct}% нормы сейчас нельзя: повышение доли заморожено${by.length ? `, пока не снимется ${by.join(" и ")}` : " сработавшим сигналом риска"}`);
+    } else if (curAlloc.canonical && finite(back.th)) {
+      reason.push(`вернуть ${back.pct}% нормы может ${back.wentDown ? "рост" : "падение"} сводной оценки рынка до ${signed(back.th, Number.isInteger(back.th) ? 0 : 1)} — с подтверждением на следующей торговой сессии`);
+    } else if (back.text) {
+      reason.push(`вернуть прежнюю долю может: ${back.text.replace(/^апгрейд разблокируется, когда/, "снятие паузы, когда")}`);
+    }
+  }
+  if (curAlloc.frozen && !blockedBack) reason.push("повышение доли пока заморожено сработавшим сигналом риска");
   if (curAlloc.pending) reason.push("следующее изменение уже накапливает подтверждение");
   if (curAlloc.quality && curAlloc.quality !== "good") reason.push(`часть входных данных неполна (${curAlloc.quality}) — к оценке стоит относиться осторожнее`);
 
@@ -933,10 +1244,18 @@ function diff(prevState, panel) {
   // это внутренняя кухня. Они собираются как объяснение к единственному внешнему событию о самой
   // панели — смене доли капитала. Исключение: сработавший детектор риска, который долю не сдвинул,
   // уходит коротким отдельным сообщением, потому что это факт о рынке, а не о панели.
-  const prevAlloc = prevState.allocation || null;
+  // Каноническая ступень сравнивается с объявленной (или с журналом — см. canonicalBase), а не с
+  // тем, что страница насчитала в прошлый раз с нуля. Лестницы разных версий (5 ступеней старой
+  // полосы и 3 канонические) между собой не сравниваются: «85% → 100%» на переходе — не смена.
   const curAlloc = panel.allocation || null;
+  const prevAlloc = curAlloc?.canonical
+    ? canonicalBase(prevState)
+    : prevState.allocation?.canonical ? null : prevState.allocation || null;
   const allocMoved =
     prevAlloc && curAlloc && finite(prevAlloc.pct) && finite(curAlloc.pct) && !sameNum(prevAlloc.pct, curAlloc.pct);
+  // Метка прогона: время снимка, на котором посчитана панель. Повтор ТОГО ЖЕ снимка (перезапуск
+  // упавшего прогона) отсекается индексом доставленного, а то же событие на новом снимке — нет.
+  const stamp = panel.snapshot_at || panel.generated_at || "";
   const why = [];
   const detectorMoves = [];
 
@@ -1160,13 +1479,35 @@ function diff(prevState, panel) {
     for (const { d, from, to } of detectorMoves) {
       causes.push(`${detectorHuman(d.name)}: ${DET_LABEL[from] || from} → ${DET_LABEL[to] || to}`);
     }
+    const canon = !!curAlloc.canonical;
+    // Главная причина канонической смены — сама сводная оценка (или рубильник): зоны карточек
+    // выше сравниваются с ПРОШЛЫМ ПРОГОНОМ, а ступень могла взвестись сессией раньше.
+    if (canon) {
+      causes.unshift(curAlloc.override
+        ? "Аварийный переключатель: защита включается немедленно, независимо от оценок"
+        : `Сводная оценка рынка ${signed(curAlloc.score)} по шкале от −100 до +100${finite(curAlloc.lead) ? `, опережающие показатели ${signed(curAlloc.lead)}` : ""}`);
+    }
+    const regimeFrom = canon ? regimeWordOf(prevAlloc) : "";
+    const regimeTo = canon ? regimeWordOf(curAlloc) : "";
     events.push({
       kind: "allocation",
-      key: `alloc:${prevAlloc.pct}->${curAlloc.pct}`,
+      // В ключе — ДАТА смены. Без неё «85→65→85→65» за неделю давали два сообщения из четырёх:
+      // повторный настоящий переход совпадал по ключу с первым и глушился индексом доставленного,
+      // а база при этом сдвигалась. У канонической смены дата — сессия, с которой действует новая
+      // ступень (повтор того же прогона она отсекает, следующую смену — нет).
+      key: canon
+        ? `alloc:${prevAlloc.rung}->${curAlloc.rung}@${curAlloc.since || curAlloc.dataAsOf || stamp}`
+        : `alloc:${prevAlloc.pct}->${curAlloc.pct}@${stamp}`,
       title: `Доля ${panel.assetWord || "рискового актива"} ${dir}`,
-      before: `${prevAlloc.pct}%`,
-      after: `${curAlloc.pct}%`,
-      detail: "",
+      before: canon ? `${prevAlloc.pct}% нормы` : `${prevAlloc.pct}%`,
+      after: canon ? `${curAlloc.pct}% нормы` : `${curAlloc.pct}%`,
+      detail: canon
+        ? [
+            regimeTo ? `Режим: ${regimeFrom && regimeFrom !== regimeTo ? `${regimeFrom} → ` : ""}${regimeTo}` : "",
+            curAlloc.action,
+            `доля стратегической нормы акций${curAlloc.dataAsOf ? ` · по данным торговой сессии ${ruDay(Date.parse(curAlloc.dataAsOf))}` : ""}`,
+          ].filter(Boolean).join("\n")
+        : "",
       causes,
       stability: stabilityLines(prevAlloc, curAlloc, prevState),
       note: "",
@@ -1184,7 +1525,9 @@ function diff(prevState, panel) {
       }
       events.push({
         kind: "risk",
-        key: `risk:${d.id}:${to}`,
+        // Метка снимка в ключе: повторное срабатывание того же детектора на новом снимке — новое
+        // событие (раньше оно глушилось неделю), а перезапуск того же прогона — нет.
+        key: `risk:${d.id}:${to}@${stamp}`,
         title: detectorHuman(d.name),
         before: DET_LABEL[from] || from,
         after: DET_LABEL[to] || to,
@@ -1610,7 +1953,9 @@ async function sendNexusEvent(text, eventId, occurredAt) {
 // сообщений пишется после КАЖДОЙ отправки. Поэтому падение Telegram на середине рассылки не
 // приводит ни к потере хвоста (база осталась старой — события пересчитаются), ни к повтору
 // начала (эти ключи уже в индексе). Ключ включает сами значения: то же событие с другими
-// числами — это новое событие.
+// числами — это новое событие. У смены доли и сигнала риска ключ несёт ещё и дату (сессию смены
+// или время снимка): индекс защищает только от ПОВТОРА того же прогона, а не от настоящего
+// повторения того же перехода через три дня.
 const SENT_TTL_MS = 7 * 24 * 3600 * 1000;
 const sentKey = (ev) => `${ev.key}|${ev.before}→${ev.after}|${(ev.moves || []).map((m) => m.after).join(",")}`;
 
@@ -1689,6 +2034,9 @@ const CHANGES_MAX = 200;
 function appendChanges(prev, panel, prevAlloc) {
   const rows = [...(prev || [])];
   const cur = panel.allocation;
+  // Каноническая ступень ведёт журнал смен в ветке `ledger`; здесь копится только переходная
+  // (старая полоса), и лестницы разных версий в одну запись не смешиваются.
+  if (cur?.canonical || prevAlloc?.canonical) return rows.slice(-CHANGES_MAX);
   if (cur && finite(cur.pct) && prevAlloc && finite(prevAlloc.pct) && !sameNum(prevAlloc.pct, cur.pct)) {
     rows.push({ t: Date.parse(panel.generated_at || "") || Date.now(), from: prevAlloc.pct, to: cur.pct });
   }
@@ -1714,7 +2062,9 @@ function pingMessage(panel) {
     "",
     `Сейчас на панели: <b>${esc(panel.verdict?.word || "—")}</b>`,
     panel.verdict?.extra ? esc(panel.verdict.extra) : "",
-    panel.allocation && finite(panel.allocation.pct) ? `Доля ${panel.assetWord || "рискового актива"} сейчас: <b>${panel.allocation.pct}%</b>` : "",
+    panel.allocation && finite(panel.allocation.pct)
+      ? `Доля ${panel.assetWord || "рискового актива"} сейчас: <b>${panel.allocation.pct}%</b>${panel.allocation.canonical ? " стратегической нормы" : ""}`
+      : "",
     `Показателей под наблюдением: ${(panel.indicators || []).length}`,
     det.length ? `Детекторы не в покое: ${esc(det.map((d) => `${d.name} (${DET_LABEL[d.state] || d.state})`).join(", "))}` : "Все детекторы спокойны",
   ]
@@ -1723,9 +2073,29 @@ function pingMessage(panel) {
 }
 
 async function main() {
-  const panel = await readPanel();
+  const ping = process.env.NOTIFY_PING === "1";
+  // Файл прошлого прогона не должен уехать в ветку шагом коммита ЭТОГО прогона: новая версия
+  // журнала появляется заново только тогда, когда этот прогон её действительно построил.
+  if (!ping) await rm(LEDGER_OUT, { force: true });
+  const prevLedger = await readLedger(LEDGER_IN);
+  const panel = await readPanel({ writer: { memory: validMemory(prevLedger?.memory) ? prevLedger.memory : null } });
 
-  if (process.env.NOTIFY_PING === "1") {
+  let ledgerNext = null;
+  let ledgerDirty = false;
+  if (panel.source === "page") {
+    // Время снимка и закрытие S&P страница обычно отдаёт сама; локальный снимок — запасной путь.
+    const day = panel.decision?.dataAsOf;
+    const snap = !panel.snapshot_at || closeOn(panel.spx_points, day) === null
+      ? await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH)
+      : null;
+    panel.snapshot_at = panel.snapshot_at || snap?.generated_at || "";
+    const spx = closeOn(panel.spx_points, day) ?? closeOn(snapshotSpx(snap), day);
+    ({ ledger: ledgerNext, changed: ledgerDirty } = canonicalize(panel, prevLedger, { snapshotAt: panel.snapshot_at, spx }));
+    const d = panel.decision;
+    if (d) console.log(`решение страницы: ${d.regimeWord || d.regime || "—"} · ступень ${d.rung} (${d.pct}%) · сырая ${d.raw} · данные на ${d.dataAsOf || "—"} · источник ${d.source || "—"} · прошлая ступень журнала ${validMemory(prevLedger?.memory) ? prevLedger.memory.rung : "нет (первый прогон)"}`);
+  }
+
+  if (ping) {
     // Проверка связи проверяет ВСЮ цепочку, включая комментатор: без этого его отказ было не
     // увидеть до первого настоящего события, и он молча простоял в шаблоне весь первый день.
     // Живая карточка панели берётся как повод, чтобы прогнать модель на реальных данных.
@@ -1768,12 +2138,24 @@ async function main() {
     return;
   }
 
+  // Журнал пишется ДО рассылки: каноническая ступень сайта не должна зависеть от здоровья
+  // Telegram. Сообщение о смене при этом не теряется — его база (state.allocation) сдвигается
+  // только после удачной рассылки, см. canonicalBase.
+  if (ledgerNext && ledgerDirty) {
+    await mkdir(dirname(LEDGER_OUT), { recursive: true });
+    await writeFile(LEDGER_OUT, formatLedger(ledgerNext));
+    console.log(`журнал решений: ступень ${ledgerNext.memory.rung}, смен ${ledgerNext.transitions.length}, дневник ${ledgerNext.diary.length} сес. → ${LEDGER_OUT}`);
+  } else if (ledgerNext) {
+    console.log("журнал решений: существенных изменений нет — коммита в ветку не будет");
+  }
+
   const prev = (await readJSON(STATE_PATH)) || {};
   const first = !prev.indicators;
   const now = Date.now();
   const sentIndex = pruneSent(prev.sent, now);
   let revisedSeen = prev.revised_points || {};
-  const all = first ? [] : diff(prev, panel);
+  // Прошлый журнал — второй источник базы для канонической доли (первый — объявленная ступень).
+  const all = first ? [] : diff({ ...prev, ledger: prevLedger }, panel);
   const events = all.filter((ev) => !sentIndex[sentKey(ev)]);
 
   if (first) console.log("первый прогон: зафиксирована база, уведомления начнутся со следующего изменения");
@@ -1829,4 +2211,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE };
+export { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, RUNG_PCT, REGIME_WORD };
