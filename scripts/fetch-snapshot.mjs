@@ -38,9 +38,12 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
    Совпавшие заголовки копятся отдельным слоем fh:newsHit:SYM с 14-дневным окном и слиянием между
    запусками — иначе у гиперскейлеров фон ~90 заголовков/день выталкивает событие из хвоста 120
    за сутки, и «14-дневное окно» детекторов существовало только на бумаге. */
-/* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (CAPEX_NOUN/bdcHard в index.html):
-   правишь клиентский регэксп — проверь, что префильтр покрывает новые токены */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|dividend|distribution|payout|redemption|withdrawal|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
+/* ⚠ HIT_RX обязан быть НАДМНОЖЕСТВОМ клиентских словарей (ядро ⟦NEWS-CORE⟧ в index.html) и
+   побайтово равен клиентской копии — оба условия проверяет scripts/news-test.mjs.
+   v5.0: + force majeure / stargate / ai campus / ai factory / bankrupt / chapter 11 / tender /
+   wrote down — новые формы событий (форс-мажор Oracle 24.09 префильтр пропускал, если в
+   заголовке не было «data center»). */
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -256,27 +259,24 @@ async function main(){
      жёсткие кандидаты собираются для серверного LLM-судьи. */
   let prevSnap=null;
   try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
-  /* регэкспы кандидатов извлекаются из docs/index.html — единый источник истины с клиентом */
+  /* v5.0: ядро сканера исполняется ЦЕЛИКОМ со страницы — блок ⟦NEWS-CORE⟧…⟦/NEWS-CORE⟧ из
+     docs/index.html (кандидаты по клаузам, атрибуция компании по алиасам, якоря, промпт и разбор
+     ответа судьи). v4.13.5 выдирал отдельные регэкспы по шаблонам строк — схема ломалась от
+     любой перестройки словарей, а рукописная копия расходилась с оригиналом. Корзины — те же,
+     что выше из картриджа CYCLE. Сбой извлечения → кандидатов нет, судья пропускается, слой
+     fh:newsHit (HIT_RX ниже) собирается как обычно. */
   const CL=(()=>{
     try{
       const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
-      const g=n=>{const m=page.match(new RegExp("const "+n+"=([^\\n]*?);\\n"));if(!m)throw new Error("нет "+n);return m[1];};
-      const CAPEX_VERBS=eval(g("CAPEX_VERBS")), CAPEX_NOUN=eval(g("CAPEX_NOUN")), MACROSUBJ=eval(g("MACROSUBJ"));
-      /* v4.13.5: САМО ВЫРАЖЕНИЕ capexHard берётся со страницы и вычисляется в этой области
-         видимости — рукописная копия шаблона разошлась с оригиналом при первой же правке
-         словаря (у сборщика не было ни макро-стража, ни границ слова), и сборщик судил
-         заголовки, которых страница кандидатами уже не считает. Единый источник истины. */
-      const capexExpr=page.match(/capexHard:(new RegExp\([\s\S]*?,"i"\)),\n/);
-      if(!capexExpr) throw new Error("нет выражения capexHard");
-      const capexHard=eval(capexExpr[1]);
-      const bdcHard=eval(page.match(/bdcHard:(\/[^\n]+\/i),\n/)[1]);
-      const NEG=eval(page.match(/\nconst NEG=(\/[^\n]+\/i);/)[1]);
-      const trigNoNeg=(h,rx)=>{const m=rx.exec(h);if(!m)return false;return !NEG.test(h.slice(Math.max(0,m.index-35),m.index+m[0].length));};
-      return {capexHard,bdcHard,trigNoNeg};
-    }catch(e){console.log("извлечение клиентских регэкспов не удалось:",String(e&&e.message||e));return null;}
+      const m=page.match(/\/\* ⟦NEWS-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/NEWS-CORE⟧ \*\//);
+      if(!m) throw new Error("нет блока ⟦NEWS-CORE⟧");
+      const core=new Function("CONFIG",m[1]+"\nreturn {newsMatch,judgePrompt,parseJudge,JUDGE_SYS,VER_TTL};")
+        ({CYCLE:{capexTickers:CAPEX_TICKERS,bdcTickers:BDC_TICKERS}});
+      if(typeof core.newsMatch!=="function") throw new Error("ядро без newsMatch");
+      return core;
+    }catch(e){console.log("извлечение ядра сканера не удалось:",String(e&&e.message||e));return null;}
   })();
-  const CAPEX_SET=new Set(CAPEX_TICKERS);             /* капекс-радар — прямо из картриджа CYCLE */
-  const CAND=[];                                       /* жёсткие кандидаты для LLM-судьи */
+  const CAND=[];                                       /* кандидаты для LLM-судьи: {h,kind:"C"|"B",sym,t} */
   let LLM_JUDGED=0;                                    /* рассужено в ЭТОМ прогоне (для meta.llm) */
   if(FINNHUB_KEY){
     const from=iso(new Date(Date.now()-14*864e5)), to=iso(new Date());
@@ -294,8 +294,10 @@ async function main(){
           .filter(n=>{const k=(n.url||n.headline||"")+"|"+(n.datetime||0);if(seen.has(k))return false;seen.add(k);return true;})
           .sort((a,b)=>(b.datetime||0)-(a.datetime||0)).slice(0,400);
         R["fh:newsHit:"+s]=hits;                       /* пишем слой напрямую: valid() к нему не применяем */
-        if(CL) hits.forEach(n=>{const h=n.headline||"";
-          if(CL.trigNoNeg(h,CAPEX_SET.has(s)?CL.capexHard:CL.bdcHard)) CAND.push({sym:s,h,capex:CAPEX_SET.has(s)});});
+        /* v5.0: оба словаря по любой ленте — компанию события называет заголовок (newsMatch держит
+           кандидата без компании корзины только в ленте своей корзины, как и страница) */
+        if(CL) hits.forEach(n=>{const h=n.headline||"";const m=CL.newsMatch(h,[s],n.source||"");
+          if(m.capex||m.bdc) CAND.push({h,kind:m.capex?"C":"B",sym:(m.capex||m.bdc).sym,t:n.datetime||0});});
         return full.slice(0,120);                      /* фон для ленты — как раньше */
       });
     for(const s of ["BIZD","SMH","SPY","RSP"])
@@ -335,41 +337,40 @@ async function main(){
     });
   }
 
-  /* ── серверный LLM-судья кандидатов (fh:newsVer: [заголовок, "fact"|"opinion", tсуда]) ── */
+  /* ── серверный LLM-судья кандидатов ──
+     fh:newsVer: [заголовок, "fact"|"opinion"|"unverified", tсуда, subject, type]; старые записи
+     [h,"fact"|"opinion",t] страница читает как есть (subject нет → атрибуция по алиасам).
+     v5.0: судья возвращает класс, компанию-подлежащее (тикер корзины или "none") и тип события;
+     ленту ему НЕ сообщаем — именно она путала атрибуцию. Отказ («opinion»/«unverified») живёт в
+     кэше 3 суток, факт — всё 14-дневное окно: одна ошибка free-модели больше не немит заголовок
+     на всё окно. Первыми судятся кандидаты с компанией корзины (они двигают порог), затем свежие. */
   {
-    const nowSec=Math.floor(Date.now()/1000), cutSec=nowSec-14*86400;
+    const nowSec=Math.floor(Date.now()/1000);
+    const ttl=(CL&&CL.VER_TTL)||{fact:14*86400,neg:3*86400};
     const prevVer=((prevSnap&&prevSnap.responses&&prevSnap.responses["fh:newsVer"])||[])
-      .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>cutSec);
+      .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>nowSec-(e[1]==="fact"?ttl.fact:ttl.neg));
     const known=new Map(prevVer.map(e=>[e[0],e]));
     const fresh=[]; const seenH=new Set();
-    for(const c of CAND){ if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);} }
+    for(const c of CAND.slice().sort((a,b)=>(!!b.sym-!!a.sym)||((b.t||0)-(a.t||0))))
+      if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);}
     if(OPENROUTER_KEY&&fresh.length&&!late()){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
       try{
-        const list=fresh.slice(0,40).map((c,i)=>(c.capex?"C":"B")+i+"|"+c.sym+"|"+c.h).join("\n");
-        const sys="Ты строгий классификатор финансовых заголовков. Отвечай ТОЛЬКО валидным JSON без пояснений.";
-        const prompt=`Для каждого заголовка реши, сообщает ли он о ФАКТИЧЕСКИ произошедшем/официально объявленном событии.
-C-заголовки: гиперскейлер СНИЗИЛ капекс/гайденс расходов, УКОРОТИЛ срок амортизации серверов/GPU, признал impairment или write-down.
-B-заголовки: BDC-фонд/его управляющий ВВЁЛ гейт или приостановку выкупа, ОБЪЯВИЛ снижение дивиденда/дистрибуции, СТОЛКНУЛСЯ с волной заявок на выкуп (redemption requests).
-НЕ подтверждение: отрицания ("will not cut"), намерения сохранить, спекуляции/прогнозы ("could","may","about to","likely"), вопросы, мнения и модельные портфели аналитиков, обзоры сектора.
-Формат ответа: {"confirmed":["C0","B2"]} — только идентификаторы подтверждённых (может быть пустой список).
-Заголовки:\n`+list;
+        const batch=fresh.slice(0,40), rows=batch.map((c,i)=>[c.kind+i,c.h]);
         const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
-          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:1200,messages:[{role:"system",content:sys},{role:"user",content:prompt}]}),
+          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:4000,messages:[{role:"system",content:CL.JUDGE_SYS},{role:"user",content:CL.judgePrompt(rows)}]}),
           signal:AbortSignal.timeout(late()?30000:90000)});  /* v4.13.4: за дедлайном судья ждёт меньше — кандидаты досудит следующая сборка */
         if(!r.ok) throw new Error("HTTP "+r.status);
         const j=await r.json();
         const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
-        /* v4.12: reasoning-модели пишут {...} в рассуждениях; v4.13.4: берём ПОСЛЕДНЕЕ
-           совпадение — модель может процитировать пример формата из промпта до вердикта */
-        const mm=txt.match(/\{[^{}]*"confirmed"[^{}]*\}/g); if(!mm) throw new Error("нет JSON");
-        const m=[mm[mm.length-1]];
-        const cj=JSON.parse(m[0]);
-        if(!cj||!Array.isArray(cj.confirmed)||!cj.confirmed.every(x=>typeof x==="string")) throw new Error("битая форма");
-        const ok=new Set(cj.confirmed);
-        fresh.slice(0,40).forEach((c,i)=>known.set(c.h,[c.h, ok.has((c.capex?"C":"B")+i)?"fact":"opinion", nowSec]));
-        LLM_JUDGED=Math.min(fresh.length,40);
-        console.log("LLM-судья: рассужено "+LLM_JUDGED+" новых кандидатов ("+OPENROUTER_MODEL+")");
+        /* v4.12/v4.13.4: reasoning-модели пишут {...} в рассуждениях и цитируют пример формата —
+           parseJudge берёт плоские объекты по id и при повторе id — ПОСЛЕДНИЙ */
+        const got=CL.parseJudge(txt,rows.map(x=>x[0]));
+        if(!got.size) throw new Error("нет JSON");
+        batch.forEach((c,i)=>{const v=got.get(c.kind+i);    /* не вернувшийся в ответе — досудится следующей сборкой */
+          if(v) known.set(c.h,v.subject?[c.h,v.cls,nowSec,v.subject,v.type]:[c.h,v.cls,nowSec]);});
+        LLM_JUDGED=got.size;
+        console.log("LLM-судья: рассужено "+LLM_JUDGED+" из "+batch.length+" новых кандидатов ("+OPENROUTER_MODEL+")");
       }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }
     } else if(fresh.length){ console.log("LLM-судья пропущен (нет OPENROUTER_KEY): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
     if(known.size||CAND.length) R["fh:newsVer"]=[...known.values()];
