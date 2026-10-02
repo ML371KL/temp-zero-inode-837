@@ -867,6 +867,15 @@ test("журнал: смена ступени дописывается, стро
   assert.deepEqual(late.diary.map((x) => x.d), ["2026-09-30", "2026-10-01", "2026-10-02"], "дневник идёт по датам");
 });
 
+test("журнал: внутридневная дрожь балла не даёт коммита, значимый сдвиг — даёт", () => {
+  const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45 });
+  const jitter = buildLedger(l0, { ...decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), composite: 18.3, tail: { p: 0.104, base: 0.17 } }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, jitter), false, "сдвиг на 0,6 пт и 0,4 п.п. риска — не повод для коммита");
+  const moved = buildLedger(l0, { ...decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), composite: 19.0 }, { spx: 7666.45 });
+  assert.equal(ledgerChanged(l0, moved), true, "сдвиг на 1,3 пт — новая строка");
+  assert.equal(moved.diary[0].c, 19);
+});
+
 test("журнал: сессия без данных в дневник не идёт", () => {
   const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), {});
   const l1 = buildLedger(l0, decisionOf({ rung: 2, dataAsOf: "2026-10-02", noData: true }), {});

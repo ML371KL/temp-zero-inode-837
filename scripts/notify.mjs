@@ -771,9 +771,16 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, now = Date.now() 
       spx: finite(spx) ? spx : (old?.spx ?? null),
       p: round(dec.tail?.p, 3),
     };
-    diary = diary.filter((x) => x.d !== row.d);
-    diary.push(row);
-    diary.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    // Строка текущей сессии переписывается, только когда изменилось что-то значимое: режим, ступень,
+    // балл на ≥1 пункт или риск просадки на ≥1 п.п. Внутри дня балл дрожит на десятые от
+    // интрадей-котировок, и без порога ветка ledger получала бы коммит почти на каждый такт снимка.
+    const material = !old || old.r !== row.r || old.g !== row.g || !finite(old.c) || Math.abs(old.c - row.c) >= 1
+      || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null);
+    if (material) {
+      diary = diary.filter((x) => x.d !== row.d);
+      diary.push(row);
+      diary.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    }
   }
   const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
   return {
