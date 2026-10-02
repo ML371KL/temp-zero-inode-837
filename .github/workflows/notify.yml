@@ -25,8 +25,11 @@ on:
         type: boolean
         default: false
 
+# write — ради одной ветки `ledger` (журнал решений, см. шаг «Записать журнал решений»). В main
+# этот воркфлоу не пишет ничего. Коммиты под GITHUB_TOKEN не запускают других воркфлоу, а все
+# push-триггеры репозитория и так смотрят только на main — петли нет.
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: notify
@@ -68,6 +71,34 @@ jobs:
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
           npm i --no-save --no-package-lock --no-audit --no-fund puppeteer-core
 
+      # Журнал решений — память машины ступеней, общая для сайта, Telegram и всех устройств. Без
+      # него headless-прогон каждый раз стартовал с пустого localStorage и сеял ступень от сырого
+      # вердикта: ни гистерезис, ни подтверждение следующей сессией до Telegram не доходили.
+      # Нет ветки — `null`: это первый прогон, страница посеет ступень сама. Ветка есть, но не
+      # читается (сеть) — `"unreadable"`, и это НЕ первый прогон: сид от вердикта выдал бы фантомную
+      # «смену» и затёр бы журнал, поэтому прогон молчит о доле и журнал не пишет. Отличает одно от
+      # другого код выхода ls-remote (2 — такой ветки нет). Хэш прочитанной версии запоминается:
+      # следующий шаг строит коммит РОВНО на ней (см. там, зачем).
+      - name: Прочитать журнал решений
+        run: |
+          mkdir -p .notify
+          rm -f .notify/ledger.next.json .notify/ledger.base
+          set +e
+          git ls-remote --exit-code --heads origin ledger > /dev/null
+          rc=$?
+          set -e
+          if [ "$rc" = 2 ]; then
+            echo "ветки ledger ещё нет — журнал начнётся с этого прогона"
+            echo null > .notify/ledger.json
+          elif [ "$rc" = 0 ] && git fetch --no-tags --depth=1 origin ledger:refs/remotes/origin/ledger \
+               && git show refs/remotes/origin/ledger:ledger.json > .notify/ledger.json; then
+            git rev-parse refs/remotes/origin/ledger > .notify/ledger.base
+            echo "прочитан журнал $(cat .notify/ledger.base): $(head -c 240 .notify/ledger.json | tr '\n' ' ')"
+          else
+            echo "::warning::ветка ledger не читается (ls-remote: $rc) — в этом прогоне ни журнала, ни сообщений о доле"
+            echo '"unreadable"' > .notify/ledger.json
+          fi
+
       - name: Разослать изменения
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -81,8 +112,74 @@ jobs:
           # Заодно уведомления перестают зависеть от здоровья Pages.
           NOTIFY_PAGE_DIR: docs
           NOTIFY_STATE: .notify/state.json
+          # Режим писателя: прошлая память уходит странице до навигации, новая — в файл, который
+          # появляется только при существенном изменении журнала (память, смены, дневник).
+          NOTIFY_LEDGER_IN: .notify/ledger.json
+          NOTIFY_LEDGER_OUT: .notify/ledger.next.json
           NOTIFY_PING: ${{ inputs.ping && '1' || '0' }}
           NEXUS_EVENTS_URL: ${{ vars.NEXUS_EVENTS_URL }}
           NEXUS_SOURCE_ID: "837"
           NEXUS_INGEST_TOKEN: ${{ secrets.NEXUS_INGEST_TOKEN }}
         run: node scripts/notify.mjs
+
+      # Коммит журнала в ветку `ledger` — отдельной временной рабочей копией, main не трогается.
+      #
+      # Шаг идёт и после упавшей рассылки (`!cancelled()`): журнал пишется ДО отправки сообщений, и
+      # каноническая ступень сайта не должна зависеть от здоровья Telegram. Сообщение о смене при
+      # этом не теряется: его база в state.json сдвигается только после удачной рассылки.
+      #
+      # Коммит строится ровно на той версии ветки, что была прочитана в начале (ledger.base), а push
+      # идёт БЕЗ force. Если ветка за это время ушла вперёд или чтение в начале тихо не удалось
+      # (тогда здесь строилась бы «первая» версия поверх живой истории), push отвергается как
+      # не-fast-forward — история журнала не перезаписывается никогда. Повтор — только при сетевом
+      # сбое, когда ветка всё ещё на прочитанной версии.
+      #
+      # continue-on-error: сбой записи журнала не должен валить прогон — иначе не сохранится кэш
+      # состояния уведомлений, и следующий прогон разослал бы уже отправленное повторно. Следующий
+      # прогон всё равно построит журнал заново от последней записанной версии.
+      #
+      # Учётные данные push — те, что actions/checkout@v5 оставил в .git/config: временная рабочая
+      # копия разделяет конфиг репозитория.
+      - name: Записать журнал решений в ветку ledger
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          NEXT="$GITHUB_WORKSPACE/.notify/ledger.next.json"
+          # Файла нет — журнал существенно не изменился (или прогон его не построил): коммита нет.
+          if [ ! -s "$NEXT" ]; then echo "журнал решений без существенных изменений — коммита нет"; exit 0; fi
+          BASE="$(cat .notify/ledger.base 2>/dev/null || true)"
+          WT="$RUNNER_TEMP/ledger-wt"
+          git worktree remove --force "$WT" 2>/dev/null || true
+          if [ -n "$BASE" ]; then
+            git worktree add --detach "$WT" "$BASE"
+          else
+            git worktree add --detach "$WT" HEAD
+            git -C "$WT" switch --orphan "ledger-init-$GITHUB_RUN_ID"
+          fi
+          cp "$NEXT" "$WT/ledger.json"
+          git -C "$WT" add ledger.json
+          if git -C "$WT" diff --cached --quiet; then
+            echo "содержимое журнала совпало с веткой — коммита нет"
+            exit 0
+          fi
+          SUMMARY="$(node -e 'const l=require(process.argv[1]);const p=[0,50,100];console.log(`журнал решений: данные на ${l.dataAsOf||"—"} · ступень ${l.memory.rung} (${p[l.memory.rung]}% нормы)${l.memory.pend!=null?` · взведена ${p[l.memory.pend]}%`:""}`)' "$NEXT")"
+          git -C "$WT" -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "$SUMMARY"
+          for attempt in 1 2 3; do
+            if git -C "$WT" push origin HEAD:refs/heads/ledger; then
+              echo "записано: $SUMMARY"
+              git worktree remove --force "$WT" || true
+              exit 0
+            fi
+            REMOTE="$(git ls-remote origin refs/heads/ledger | cut -f1 || true)"
+            if [ -n "$REMOTE" ] && [ "$REMOTE" != "$BASE" ]; then
+              echo "::warning::ветка ledger ушла вперёд ($REMOTE, читали ${BASE:-пустую}) — журнал не перезаписывается, следующий прогон построит его от новой версии"
+              exit 0
+            fi
+            echo "push не прошёл (попытка $attempt) — повтор"
+            sleep $((attempt * 5))
+          done
+          echo "::error::журнал решений не записан в ветку ledger после 3 попыток"
+          exit 1
