@@ -1,13 +1,13 @@
 {
  "v": 1,
- "updated_at": "2026-10-05T00:07:07.166Z",
- "snapshot_at": "2026-10-05T00:06:32.382Z",
+ "updated_at": "2026-10-05T14:47:49.988Z",
+ "snapshot_at": "2026-10-05T14:47:26.162Z",
  "dataAsOf": "2026-10-02",
  "memory": {"v":2,"rung":2,"since":"2026-10-01","pend":null,"pendSession":null,"lastMove":null},
- "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":15.24,"lead":0,"coin":30,"tail":{"p":0.0998,"base":0.17},"override":false,"frozen":false},
+ "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":11.24,"lead":0,"coin":30,"tail":{"p":0.1146,"base":0.17},"override":false,"frozen":false},
  "transitions": [],
  "diary": [
   {"d":"2026-10-01","c":10.2,"l":-3.3,"r":2,"g":"moderate","spx":7666.45,"p":0.119},
-  {"d":"2026-10-02","c":15.2,"l":0,"r":2,"g":"moderate","spx":7722.72,"p":0.1}
+  {"d":"2026-10-02","c":11.2,"l":0,"r":2,"g":"moderate","spx":7722.72,"p":0.115}
  ]
 }
