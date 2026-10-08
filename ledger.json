@@ -1,16 +1,16 @@
 {
  "v": 1,
- "updated_at": "2026-10-08T07:47:06.249Z",
- "snapshot_at": "2026-10-08T07:46:31.575Z",
+ "updated_at": "2026-10-08T16:37:06.664Z",
+ "snapshot_at": "2026-10-08T16:36:37.712Z",
  "dataAsOf": "2026-10-07",
  "memory": {"v":2,"rung":2,"since":"2026-10-01","pend":null,"pendSession":null,"lastMove":null},
- "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":-3.83,"lead":-3.33,"coin":30,"tail":{"p":0.1887,"base":0.17},"override":false,"frozen":false},
+ "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":1.24,"lead":0,"coin":30,"tail":{"p":0.1604,"base":0.17},"override":false,"frozen":false},
  "transitions": [],
  "diary": [
   {"d":"2026-10-01","c":10.2,"l":-3.3,"r":2,"g":"moderate","spx":7666.45,"p":0.119},
   {"d":"2026-10-02","c":11.2,"l":0,"r":2,"g":"moderate","spx":7722.72,"p":0.115},
   {"d":"2026-10-05","c":11.2,"l":0,"r":2,"g":"moderate","spx":7773.95,"p":0.115},
   {"d":"2026-10-06","c":1.2,"l":0,"r":2,"g":"moderate","spx":7818.93,"p":0.16},
-  {"d":"2026-10-07","c":-3.8,"l":-3.3,"r":2,"g":"moderate","spx":7801.77,"p":0.189}
+  {"d":"2026-10-07","c":1.2,"l":0,"r":2,"g":"moderate","spx":7801.77,"p":0.16}
  ]
 }
