@@ -1,8 +1,8 @@
 {
  "v": 1,
- "updated_at": "2026-10-15T13:47:08.127Z",
- "snapshot_at": "2026-10-15T13:46:40.822Z",
- "dataAsOf": "2026-10-14",
+ "updated_at": "2026-10-16T00:06:56.646Z",
+ "snapshot_at": "2026-10-16T00:06:34.699Z",
+ "dataAsOf": "2026-10-15",
  "memory": {"v":2,"rung":2,"since":"2026-10-01","pend":null,"pendSession":null,"lastMove":null},
  "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":-5.22,"lead":-6.67,"coin":30,"tail":{"p":0.1971,"base":0.17},"override":false,"frozen":false},
  "transitions": [],
@@ -16,6 +16,7 @@
   {"d":"2026-10-09","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7811.54,"p":0.197},
   {"d":"2026-10-12","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7807.24,"p":0.197},
   {"d":"2026-10-13","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7805.45,"p":0.197},
-  {"d":"2026-10-14","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7718.94,"p":0.197}
+  {"d":"2026-10-14","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7718.94,"p":0.197},
+  {"d":"2026-10-15","c":-5.2,"l":-6.7,"r":2,"g":"moderate","spx":7744.06,"p":0.197}
  ]
 }
