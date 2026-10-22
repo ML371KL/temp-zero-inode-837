@@ -1,10 +1,10 @@
 {
  "v": 1,
- "updated_at": "2026-10-22T19:56:56.420Z",
- "snapshot_at": "2026-10-22T19:56:29.792Z",
+ "updated_at": "2026-10-22T20:06:56.066Z",
+ "snapshot_at": "2026-10-22T20:06:39.453Z",
  "dataAsOf": "2026-10-21",
  "memory": {"v":2,"rung":1,"since":"2026-10-16","pend":null,"pendSession":null,"lastMove":{"d":"2026-10-16","from":2,"to":1}},
- "decision": {"regime":"elevated","regimeWord":"РИСК ПОВЫШЕН","rung":1,"pct":50,"raw":1,"composite":-13.31,"lead":-16.67,"coin":30,"tail":{"p":0.2516,"base":0.17},"override":false,"frozen":false},
+ "decision": {"regime":"elevated","regimeWord":"РИСК ПОВЫШЕН","rung":1,"pct":50,"raw":2,"composite":-9.97,"lead":-13.33,"coin":30,"tail":{"p":0.228,"base":0.17},"override":false,"frozen":false},
  "transitions": [
   {"d":"2026-10-16","from":2,"to":1,"composite":-14}
  ],
@@ -23,6 +23,6 @@
   {"d":"2026-10-16","c":-3.3,"l":-10,"r":1,"g":"moderate","spx":7659.44,"p":0.186},
   {"d":"2026-10-19","c":-1.2,"l":-6.7,"r":1,"g":"moderate","spx":7690.73,"p":0.174},
   {"d":"2026-10-20","c":-1.2,"l":-6.7,"r":1,"g":"moderate","spx":7712.57,"p":0.174},
-  {"d":"2026-10-21","c":-13.3,"l":-16.7,"r":1,"g":"elevated","spx":7757.17,"p":0.252}
+  {"d":"2026-10-21","c":-10,"l":-13.3,"r":1,"g":"elevated","spx":7757.17,"p":0.228}
  ]
 }
