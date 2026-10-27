@@ -165,5 +165,26 @@ for (const [what, fail] of [["сеть", down], ["502", () => status(502, "bad g
   assert.equal((await call(onRequestGet)).status, 503, "без кэша сбой — всё равно честный 503, а не исключение");
 }
 
+// v5.1: дневник со строками старого формата и с закрытиями фондов (qqq, iwm, rsp, dia) отдаётся
+// как есть — функция форму строк не трогает, и копия на сбой GitHub отдаёт те же строки.
+{
+  globalThis.caches = { default: makeCache() };
+  const mixed = JSON.stringify({ v: 1, updated_at: "2026-10-28T13:00:00.000Z", memory: { v: 2, rung: 1, since: "2026-10-16", pend: null, pendSession: null }, transitions: [],
+    diary: [
+      { d: "2026-10-26", c: 0.4, l: -6.1, r: 1, g: "moderate", spx: 7735.1, p: 0.164 },
+      { d: "2026-10-27", c: 0.0, l: -6.7, r: 1, g: "moderate", spx: 7760.2, qqq: 720.03, iwm: 279.42, rsp: 217.32, dia: 523.53, p: 0.167 },
+    ] });
+  serves(mixed);
+  const res = await call(onRequestGet);
+  assert.equal(res.status, 200);
+  const body = await res.text();
+  assert.equal(body, mixed, "журнал со смешанными строками дневника отдаётся побайтно");
+  const d = JSON.parse(body).diary;
+  assert.equal(d[0].qqq, undefined, "старая строка остаётся без новых полей");
+  assert.deepEqual([d[1].spx, d[1].qqq, d[1].iwm, d[1].rsp, d[1].dia], [7760.2, 720.03, 279.42, 217.32, 523.53]);
+  down();
+  assert.equal(await (await call(onRequestGet)).text(), mixed, "копия на сбой GitHub — те же строки");
+}
+
 console.error = quiet;
 console.log("Ledger function tests OK");

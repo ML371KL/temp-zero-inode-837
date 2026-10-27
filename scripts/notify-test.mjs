@@ -2,7 +2,7 @@
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
 import { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, RUNG_PCT } from "./notify.mjs";
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT } from "./notify.mjs";
 
 let passed = 0;
 const test = (name, fn) => {
@@ -969,6 +969,70 @@ test("закрытие S&P берётся на дату данных решен�
   assert.equal(closeOn([], "2026-10-01"), null);
   const snap = { responses: { "fred:SP500": { observations: [{ date: "2026-10-01", value: "7666.45" }, { date: "2026-09-30", value: "." }] } } };
   assert.deepEqual(snapshotSpx(snap), [{ d: "2026-10-01", v: 7666.45 }], "пропуск FRED «.» отбрасывается");
+});
+
+/* ---- v5.1: закрытия индексных фондов в дневнике ---- */
+
+const FUNDS = { qqq: 612.3449, iwm: 241.07, rsp: 190.5, dia: 455.12 };
+
+test("дневник: закрытия фондов пишутся рядом с spx, короткими полями", () => {
+  const l = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45, funds: FUNDS, now: 0 });
+  assert.deepEqual(l.diary, [{ d: "2026-10-01", c: 17.7, l: -3.6, r: 2, g: "moderate", spx: 7666.45, qqq: 612.34, iwm: 241.07, rsp: 190.5, dia: 455.12, p: 0.1 }]);
+  assert.deepEqual(Object.keys(l.diary[0]), ["d", "c", "l", "r", "g", "spx", "qqq", "iwm", "rsp", "dia", "p"], "поля фондов стоят рядом с spx");
+  assert.deepEqual(Object.keys(DIARY_FUNDS), ["qqq", "iwm", "rsp", "dia"]);
+});
+
+test("дневник: без закрытий фондов строка — в прежнем формате, без пустых полей", () => {
+  for (const funds of [undefined, null, {}, { qqq: null, iwm: NaN, rsp: 0, dia: "455" }]) {
+    const l = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45, funds, now: 0 });
+    assert.deepEqual(l.diary, [{ d: "2026-10-01", c: 17.7, l: -3.6, r: 2, g: "moderate", spx: 7666.45, p: 0.1 }], JSON.stringify(funds));
+  }
+});
+
+test("дневник: старые записи без полей фондов читаются и переносятся как есть", () => {
+  const prev = {
+    v: 1, memory: { v: 2, rung: 2, since: "2026-09-30", pend: null, pendSession: null }, transitions: [],
+    diary: [{ d: "2026-09-30", c: 15, l: -2, r: 2, g: "moderate", spx: 7651.54, p: 0.11 }],
+  };
+  const l = buildLedger(prev, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45, funds: FUNDS, now: 0 });
+  assert.deepEqual(l.diary[0], prev.diary[0], "прошлая сессия не переписывается и полей не получает");
+  assert.equal(l.diary[1].qqq, 612.34);
+  const text = formatLedger(l);
+  assert.deepEqual(JSON.parse(text).diary, l.diary, "журнал со смешанными строками читается обратно");
+});
+
+test("дневник: первое появление закрытий фондов переписывает строку сессии, дальше — не стирает", () => {
+  const l0 = buildLedger(null, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45 });
+  assert.equal(l0.diary[0].qqq, undefined);
+  const l1 = buildLedger(l0, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45, funds: FUNDS });
+  assert.equal(ledgerChanged(l0, l1), true, "строка без фондов дополняется, как прежде дополнялся spx");
+  assert.equal(l1.diary[0].iwm, 241.07);
+  const l2 = buildLedger(l1, decisionOf({ rung: 2, dataAsOf: "2026-10-01" }), { spx: 7666.45, funds: {} });
+  assert.equal(ledgerChanged(l1, l2), false, "прогон без закрытий фондов не повод для коммита");
+  const l3 = buildLedger(l1, decisionOf({ rung: 2, dataAsOf: "2026-10-01", composite: 25 }), { spx: 7666.45, funds: { qqq: 600 } });
+  assert.deepEqual([l3.diary[0].qqq, l3.diary[0].iwm, l3.diary[0].dia], [600, 241.07, 455.12], "известное закрытие не стирается прогоном, у которого его нет");
+});
+
+test("закрытия фондов: из страницы, иначе из снимка, на дату данных решения", () => {
+  const ts = (d) => Date.parse(d + "T13:30:00Z") / 1000;
+  const snap = { responses: {
+    "yix:QQQ": [[ts("2026-09-30"), 600, 599], [ts("2026-10-01"), 612.34, 611], [ts("2026-10-02"), 620, 619]],
+    "yix:IWM": [[ts("2026-10-01"), 241.07, 240], ["битая", 1, 1], [ts("2026-10-02"), 0, 0]],
+    "yix:RSP": "не массив",
+  } };
+  const sf = snapshotFunds(snap);
+  assert.deepEqual(sf.qqq.map((p) => p.d), ["2026-09-30", "2026-10-01", "2026-10-02"], "дата бара — дата сессии США");
+  assert.deepEqual(sf.iwm, [{ d: "2026-10-01", v: 241.07 }], "битые строки отбрасываются");
+  assert.deepEqual([sf.rsp, sf.dia], [[], []]);
+  const page = { qqq: [{ d: "2026-10-01", v: 613 }], iwm: [], rsp: [], dia: [] };
+  assert.deepEqual(fundClosesOn(page, sf, "2026-10-01"), { qqq: 613, iwm: 241.07, rsp: null, dia: null }, "страница первична, снимок — запасной путь, бар после даты данных не берётся");
+  assert.deepEqual(fundClosesOn(undefined, snapshotFunds(null), "2026-10-01"), { qqq: null, iwm: null, rsp: null, dia: null });
+});
+
+test("каноническое решение передаёт закрытия фондов в дневник", () => {
+  const p = { source: "page", decision: decisionOf({ rung: 2, dataAsOf: "2026-10-01" }) };
+  const r = mute(() => canonicalize(p, null, { spx: 7666.45, funds: FUNDS, now: 0 }));
+  assert.equal(r.ledger.diary[0].dia, 455.12);
 });
 
 test("проверка связи называет долю в долях нормы", () => {

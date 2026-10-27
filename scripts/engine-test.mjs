@@ -84,6 +84,23 @@ try {
     assert.ok(!/Сигнал сокращать/.test(t), "статичный «сигнал сокращать» вернулся");
     assert.ok(!/ПОКУПАТЬ|ДОКУПАТЬ ВЫБОРОЧНО/.test(t), "глагольные вердикты вернулись");
   });
+  await test("блок «Индексы»: строка S&P совпадает с карточками, блок вне ИИ-разбора и покрытия", async () => {
+    const r = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll("#card_indices tbody tr")].map(tr => [...tr.children].map(td => td.textContent));
+      const snap = buildSnapshot();
+      return { rows, vTail: document.getElementById("vTail").textContent, spxDelta: (state.data.spx || {}).delta || "",
+        cover: state.decision.coverage, total: IND.filter(i => !i.optional && !i.info).length,
+        ai: Object.keys(snap.block_scores).some(t => /^Индексы/.test(t)) || snap.indicators.some(i => /^Индексы/.test(i.block)),
+        flagHidden: document.getElementById("idxFlag").hidden };
+    });
+    assert.deepEqual(r.rows.map(x => x[0]), ["S&P 500", "Dow Jones", "Nasdaq-100", "Russell 2000", "S&P равновзв."]);
+    assert.equal(r.rows[0][3], r.vTail, "риск −10% строки S&P = карточка риска вердикта");
+    const m = /^([+−-]?)(\d+,\d)%/.exec(r.spxDelta);
+    if (m) assert.equal(r.rows[0][2].replace("−", "-"), (m[1] === "+" ? "+" : m[1] ? "-" : "") + m[2] + "%", "к 200-дн. строки S&P = карточка тренда");
+    for (const row of r.rows) assert.ok(row.slice(1).every(c => c === "—" || /^[+−]?\d+(,\d)?%$/.test(c)), "формат чисел: " + row.join(" | "));
+    assert.equal(r.cover.total, r.total, "блок не меняет покрытие");
+    assert.equal(r.ai, false, "блок «Индексы» не должен попадать в ИИ-разбор");
+  });
   await page.close();
 
   // машина ступеней: режим писателя, балл двигается подменой зон, сессии — новыми датами рыночных рядов

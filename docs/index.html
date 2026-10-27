@@ -230,6 +230,18 @@
   .c-prov{display:inline-flex;align-items:baseline;gap:8px;white-space:nowrap}
   .c-kind{white-space:nowrap;padding:1px 7px;border-radius:9px;border:1px dashed var(--ink-soft)}
   .c-kind.lead{color:var(--tension);border-color:var(--lead-edge);background:var(--tension-bg)}
+  /* v5.1: блок «Индексы» — одна таблица; на широком экране занимает две колонки сетки (на узком их одна) */
+  .idx-card{min-height:0}
+  @media (min-width:680px){.idx-card{grid-column:span 2}}
+  .idx-tab{width:100%;border-collapse:collapse;margin-top:2px}
+  .idx-tab th{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink-soft);text-align:right;white-space:nowrap;padding:0 0 4px 10px;border-bottom:1px dotted var(--line)}
+  .idx-tab td{font-family:var(--mono);font-size:13px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding:4px 0 3px 10px;color:var(--ink)}
+  .idx-tab th:first-child,.idx-tab td:first-child{text-align:left;padding-left:6px}
+  .idx-tab td:first-child{font-family:var(--sans);white-space:normal}
+  .idx-tab td.pos{color:var(--calm)} .idx-tab td.warn{color:var(--tension)} .idx-tab td.neg{color:var(--fault)}
+  .card.loading .idx-tab td+td{color:var(--line)}
+  .idx-flag{font-size:12px;color:var(--ink-soft);line-height:1.45;padding-left:6px}
+  .idx-flag b{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--on-brand);background:var(--tension);padding:1px 7px;border-radius:9px;margin-right:4px;white-space:nowrap}
   .c-kind.coin{color:var(--ink-soft)}
   .c-meta a{text-decoration:none;border-bottom:1px dotted var(--ink-soft)}
   .stale{color:var(--tension)}
@@ -321,7 +333,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.0.0 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.1.0 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -422,7 +434,8 @@
     <p><b>Ритм использования.</b> Почти все ряды T+1, балансы ФРС — еженедельно: смотреть чаще раза в день бессмысленно. Спокойная фаза: один взгляд вечером (по Москве — когда вышли вчерашние данные США и дневные операции ФРС), 2–3 минуты — режим, доля, блок «Что изменит решение», состояния детекторов; чуть внимательнее в четверг–пятницу (H.4.1, заявки, NFCI) и по календарю: первая пятница месяца (пейроллы), середина месяца (CPI), февраль/май/август/ноябрь (SLOOS), дни FOMC. Если под режимом горит «Повышенное внимание» — дважды в день. Смена доли приходит и в Telegram — та же, что на сайте.</p>
     <p><b>Горизонты опережения.</b> Быстрый слой (дни): иена, SRF, SOFR−IORB, термструктура VIX — сигналы «уже происходит». Средний (2 недели — 2 месяца): вола ставок (исторически ломается за 2–3 недели до кредита), HY-импульс (2007: спреды поехали за 3–4 месяца до пика акций; 2020: за дни), путь ФРС, биткоин-канарейка, чистая ликвидность. Медленный (1–2 квартала): SLOOS, бычье раскручивание кривой. Sahm и пейроллы — подтверждение уже идущей рецессии: калибровка фазы, не прогноз.</p>
     <p><b>Контекст (справочно, вне балла).</b> Позиционирование CFTC, подразумеваемая корреляция CBOE, срочная премия Kim–Wright, потоки TIC и кастодия ФРС, карта режима CFNAI × базовый CPI — из сравнения с Capital Flows Research (v4.15): эти ряды улучшали 2003–2026, но не держались на 1990–2002, поэтому в балл не включены. С v5.0 там же: <b>расслоение кредита CCC−BB</b> (агрегатный HY не видит стресса нижнего слоя; у FRED сейчас лишь три года истории CCC/BB — проверить сигнал на длинной истории нечем), <b>цена ставки на ИИ</b> (корзина капекса против S&amp;P: относительная доходность за 3 месяца, просадки от пика, доля ниже 200-дневной) и <b>частный кредит</b> (корзина BDC против S&amp;P и сколько из них снизили выплаты за год). Узкие радары-детекторы видят события и забывают их через 14–45 дней; цены носителей ставки помнят всё.</p>
-    <p><b>Дневник решений.</b> Ведётся на сервере вместе со ступенью: одна запись на торговую сессию — режим, доля, риск просадки, S&amp;P; рядом реализованное движение рынка за 21 и 63 дня и сверка прогноза риска с фактом (в конце этого раздела). Общий для всех устройств.</p>
+    <p><b>Другие индексы (блок «Индексы», справочно, вне балла).</b> Балл почти целиком (≈93% веса) — общие для всего рынка макро, кредит и ликвидность, поэтому доля по сигналу панели применима к любому широкому индексу США. От системных кризисов она защищает все индексы (2000–02, 2008, 2020: падения срезаны в 2–6 раз), от «своих» медведей — нет: Nasdaq (ставки, 2022), малые компании (кредит и прибыли: 2011, 2015–16, 2018, 2025). Худшая просадка 2003–2026 с долей панели: S&amp;P −18,7%, Dow −16,2%, равновзвешенный −21,7%, Nasdaq-100 −29,6%, Russell 2000 −27,5% (без панели −53…−60%). 100% нормы в Russell 2000 ≈ 1,3 риска S&amp;P (волатильность 24% против 19%), в Nasdaq-100 ≈ 1,15, в равновзвешенном ≈ 1,06, в Dow ≈ 0,94. Риск падения на 10%+ по индексу — та же модель, что у S&amp;P, с коэффициентами своего индекса (2000–2026, равновзвешенный — с 10.2003): Dow 1,720 и 0,0379, Nasdaq-100 1,084 и 0,0365, Russell 2000 1,148 и 0,0267, равновзвешенный 1,660 и 0,0375. Строка S&amp;P — ряд FRED, остальные — закрытия фондов DIA, QQQ, IWM, RSP на ту же дату. «Узкий рынок» — S&amp;P в пределах 2% от годового максимума, а Russell 2000 ниже 200-дневной: риск падения выше, ожидаемая доходность не хуже; на долю не влияет.</p>
+    <p><b>Дневник решений.</b> Ведётся на сервере вместе со ступенью: одна запись на торговую сессию — режим, доля, риск просадки, S&amp;P и закрытия фондов QQQ, IWM, RSP, DIA; рядом реализованное движение рынка за 21 и 63 дня и сверка прогноза риска с фактом (в конце этого раздела). Общий для всех устройств.</p>
     <p><b>Смена цикла — как пересадить панель на новую ставку, не ломая двигатель.</b> Панель двухэтажна: <b>шасси</b> (водопровод ликвидности, кредит-против-акций, кривая, путь ФРС, труд, доллар, семьи, опережающие, триада-как-жанр, фазовая модель) — макро-физика, не привязанная к ИИ; <b>картридж</b> (блок CYCLE в начале скрипта) — всё, что привязано к текущей ставке: её формулировка и тикеры двух узких радаров. Когда ставка отыграет: 1) сформулируйте новую ставку одним предложением и впишите в CYCLE.bet; 2) замените capexTickers на 4–6 эмитентов, чьи расходы несут новую ставку, и bdcTickers — на публичные канарейки её самого непрозрачного канала финансирования; серверный сборщик и ценовые карточки корзин подхватят их сами, а в словарь имён компаний для новостей (CO_NAMES рядом со сканером) впишите названия новых эмитентов — сам тикер там уже учтён; 3) проверьте серверный префильтр новостей (HIT_RX в scripts/fetch-snapshot.mjs) — его словарь должен покрывать лексику событий новой ставки; 4) убедитесь, что триада всё ещё осмыслена: «фондинговый стресс» вечен, а два новостных детектора должны смотреть на каналы новой ставки. Ничего за пределами CYCLE и порогов не трогать.</p>
     <p><b>Годовой ритуал обслуживания</b> (напоминание — в подвале страницы): обновить запасную константу ВВП (CONFIG.GDP_FALLBACK_BN); взглянуть на режимо-зависимый порог безубыточности пейроллов (иммиграционная политика); свериться с P₂ᵧ-перцентилями на HY/IG/VIX — если «спокойные» абсолютные зоны системно сидят в хвостах двухлетнего распределения, режим сместился; проверить, живы ли первоисточники (сбои каскадов видны по подписям «резерв» на карточках). Нефть и иена с v5.0 и v4.15 меряются относительно собственной истории и в ритуал не входят.</p>
     <p><b>Данные и что за бортом.</b> Лаги: официальный ряд WTI до ~5 дней (EIA), но поверх него — как и поверх VIX и USD/JPY — панель кладёт внутридневную котировку (≈15-мин задержка, пометка «интрадей»). У валют котировка заменяет дневную точку того же дня (там это утренний фиксинг ECB), а официальное закрытие VIX котировкой не перекрывается (утром CBOE отдаёт внебиржевую цену с датой прошлой сессии). BIZD показывается по полной доходности — в экс-дивидендные даты он больше не рисует ложный «обвал». Чистая ликвидность считается по недельному среднему кассы Минфина (как в бэктесте), а не по шумному дневному остатку. Резерв SRF — FRED RPONTTLD (все виды обеспечения); если первоисточник лёг, свежий резерв из того же снимка больше не заслоняется устаревшей копией первоисточника. Дыра в ряду CPI за октябрь 2025 закрывается серединой соседних месяцев. Машинно не измеряется (нет бесплатных источников): полноценный MOVE и CDX-базис, мультипликаторы прибыли и ERP, внутридневная ширина — эти слои смотрите руками. Панель — монитор одной поименованной ставки, не универсальный кризис-радар: чужой кризис (CRE, Европа, сырьё) она увидит через общие ноги — фондирование, кредит, доллар — позже узкого радара, но не пропустит. У критичных карточек — каскады источников (валюты ECB→FRED H.10 · RRP NY Fed→FRED · SRF NY Fed→FRED · TGA Минфин→FRED · крипто и золото CoinGecko→Binance→Yahoo/Stooq · Sahm→расчёт из UNRATE · ВВП→встроенная оценка); активный резерв подписан на карточке. Перцентильный скоринг и PCA отклонены осознанно ради полной трассируемости каждого балла (таблица ниже).</p>
@@ -972,6 +985,15 @@
        (корзина BDC и срезки выплат за год) — справочно;
      · ИНТЕРФЕЙС: четыре числа (общий балл, куда клонится, условия сейчас, риск −10%), «что влияет» по
        семьям в пунктах балла, «Спросить ИИ» свёрнут, ИИ объясняет решение панели и знает оговорки.
+   ═ v5.1.0 (исследование «панель и другие индексы», 27.10.2026; в балле, доле, режиме, уведомлениях и
+     ИИ-разборе ничего не менялось):
+     · блок «Индексы» вне композита (BLOCKS.indices, ctx + ref): S&P, Dow, Nasdaq-100, Russell 2000,
+       равновзвешенный — от 52-нед. максимума, к 200-дневной, риск −10% за 3 мес. по логиту своего индекса
+       при том же балле; отметка «узкий рынок». Таблица — не карточки IND: в покрытие, ИИ-снимок и
+       извлечение уведомителя не попадает. Сборщик: ключи yix:DIA/QQQ/IWM/RSP (Yahoo, 2 года → 300 сессий);
+     · формула риска S&P вынесена в IDX[0] (те же коэффициенты) — строка S&P блока равна карточке риска;
+     · дневник решений: поля qqq, iwm, rsp, dia (закрытия фондов) рядом с spx;
+     · методология: правило чтения для держателей других индексов.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -1250,8 +1272,11 @@ async function fred(series){
 }
 const fredCached=s=>FREDCACHE[s]?FREDCACHE[s].obs:null; /* синхронный доступ для детекторов */
 /* v5.0: годовая история закрытий из снимка (ypx:SYM = [[ts, close, adjclose]]); живого режима нет — справочный слой */
-const ypx=sym=>{const r=SNAP&&SNAP.responses&&SNAP.responses["ypx:"+sym];
+const yrows=k=>{const r=SNAP&&SNAP.responses&&SNAP.responses[k];
   return Array.isArray(r)&&r.length>20?r.map(x=>({d:new Date(x[0]*1000),c:+x[1],a:+x[2]})).filter(x=>x.c>0&&x.a>0):null;};
+const ypx=sym=>yrows("ypx:"+sym);
+/* v5.1: ~300 сессий закрытий индексных фондов (yix:SYM, та же форма) — справочный блок «Индексы» */
+const yix=sym=>yrows("yix:"+sym);
 /* перцентиль текущего значения в 2-летнем окне — контекст к абсолютным порогам */
 const pctOf=(s,v)=>{const w=s.slice(-520).map(p=>p.v);if(w.length<120)return null;
   return Math.round(w.filter(x=>x<v).length/w.length*100);};
@@ -2173,8 +2198,71 @@ const BLOCKS={
      цена ставок, трансграничные потоки, квадрант режима. Ни одна карточка не даёт балла: на реплике
      1990–2026 эти ряды улучшают 2003–2026 и не держатся на доткомах (тот же приговор, что новым
      индикаторам в аудите); их место — контекст к вердикту, а не сам вердикт. */
+  /* v5.1: справочный блок по другим индексам — одна таблица, не карточки IND: в покрытие, ИИ-разбор и
+     уведомления не попадает; ctx:true — compute() и aggregate() пропускают блок, как «Контекст» */
+  indices:{title:"Индексы · Dow, Nasdaq-100, Russell 2000, равновзвешенный",w:0,ctx:true,ref:true,desc:"справочно · в композит не входит"},
   context:{title:"Контекст · позиционирование, потоки, карта режима",w:0,ctx:true,desc:"справочно · в композит не входит"}
 };
+
+/* ---------- ИНДЕКСЫ (v5.1, вне композита) ----------
+   Исследование 27.10.2026: реплика движка v5 на 2000–2026 и восьми индексах. Панель индекс-агностична
+   (≈93% веса балла — общие макро, кредит и ликвидность), отдельные пороги и версии под индексы проверены и
+   отвергнуты. Здесь только справка: где каждый индекс относительно максимума и 200-дневной и каков его риск
+   падения на 10%+ за 3 мес. при ТОМ ЖЕ общем балле. Логит по баллу подогнан на каждом индексе отдельно
+   (равновзвешенный — с 10.2003 по RSP); строка S&P — та же модель, что карточка риска в вердикте.
+   Строка S&P — FRED SP500 (тот же ряд, что карточка тренда), остальные — закрытия фондов DIA/QQQ/IWM/RSP
+   без поправки на дивиденды (так ближе к цене индекса: IWM к 200-дн. −0,48% при Russell −0,53%,
+   с поправкой −0,10%) на ту же дату, что строка S&P. «Узкий рынок»: S&P в пределах 2% от максимума за
+   252 сессии и Russell 2000 ниже 200-дневной — 26 эпизодов с 1988 года, падение S&P на 10%+ за 3 мес.
+   в 16% случаев против 6% при широком максимуме. Ядро ниже исполняет и scripts/indices-test.mjs. */
+/* ⟦INDICES-CORE⟧ */
+const IDX=[
+  {k:"spx",n:"S&P 500",A:1.6074,B:0.03888,avg:17},
+  {k:"dia",n:"Dow Jones",fund:"DIA",A:1.7203,B:0.03794,avg:16},
+  {k:"qqq",n:"Nasdaq-100",fund:"QQQ",A:1.0841,B:0.03647,avg:24},
+  {k:"iwm",n:"Russell 2000",fund:"IWM",A:1.1476,B:0.02674,avg:23},
+  {k:"rsp",n:"S&P равновзв.",fund:"RSP",A:1.6600,B:0.03753,avg:14}];
+/* P(закрытие на 10%+ ниже текущего в ближайшие 63 сессии) по общему баллу */
+const tailOf=(x,score)=>1/(1+Math.exp(x.A+x.B*score));
+/* ряд [{d,v}] по возрастанию даты → от максимума за 252 сессии и к 200-дневной, на дату asOf включительно */
+const trendOf=(s,asOf)=>{
+  const w=(s||[]).filter(p=>p&&p.v>0&&(!asOf||p.d.toISOString().slice(0,10)<=asOf));
+  if(w.length<200) return null;
+  const px=w[w.length-1].v, sma=w.slice(-200).reduce((a,p)=>a+p.v,0)/200;
+  return {d:w[w.length-1].d,to200:(px/sma-1)*100,fromHi:w.length>=252?(px/Math.max(...w.slice(-252).map(p=>p.v))-1)*100:null};
+};
+const narrowOf=(spx,iwm)=> spx&&iwm&&spx.fromHi!=null? (spx.fromHi>=-2&&iwm.to200<0) : null;
+/* ⟦/INDICES-CORE⟧ */
+function indexRows(){
+  const spx=fredCached("SP500"), asOf=spx&&spx.length?iso(last(spx).d):null;
+  return IDX.map(x=>({...x,st:trendOf(x.fund?(yix(x.fund)||[]).map(p=>({d:p.d,v:p.c})):spx,asOf)}));
+}
+function indicesCardHTML(){
+  return `<div class="c-top"><div class="c-name">Тренд и риск падения по индексам</div>${scoreBadge(null,true)}</div>
+    <table class="idx-tab"><thead><tr><th></th><th title="от максимума за 52 недели (252 сессии)">от макс.</th><th title="к 200-дневной средней">к 200-дн.</th><th title="вероятность закрыться на 10%+ ниже текущего уровня в ближайшие 3 месяца — по общему баллу панели и истории индекса 2000–2026">риск −10%</th></tr></thead><tbody>${
+      IDX.map(x=>`<tr id="idx_${x.k}"><td title="${x.fund?"по фонду "+x.fund:"FRED SP500 — ряд карточки «S&amp;P 500 против 200-дневной»"}">${esc(x.n)}</td><td>···</td><td>···</td><td title="в среднем ${x.avg}% (2000–2026)">···</td></tr>`).join("")}</tbody></table>
+    <div class="idx-flag" id="idxFlag" hidden></div>
+    <div class="c-meta"><span class="obs">—</span><span class="c-prov"><span class="c-kind" title="не входит в композит">справочно</span><a href="https://finance.yahoo.com/quote/IWM/" target="_blank" rel="noopener">источник ↗</a></span></div>`;
+}
+function paintIndices(score,noData){
+  const c=$("card_indices"); if(!c) return;
+  const rows=indexRows(), byK=Object.fromEntries(rows.map(r=>[r.k,r]));
+  const pc=v=>v==null||!isFinite(v)?"—":(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),1)+"%";
+  rows.forEach(r=>{
+    const tr=$("idx_"+r.k); if(!tr) return;
+    const td=tr.querySelectorAll("td"), p=noData?null:tailOf(r,score);
+    td[1].textContent=pc(r.st&&r.st.fromHi); td[2].textContent=pc(r.st&&r.st.to200);
+    td[3].textContent=p==null?"—":Math.round(p*100)+"%";
+    td[3].className=p==null?"":p>=0.30?"neg":p>=0.20?"warn":p<=0.12?"pos":"";
+  });
+  const nar=narrowOf(byK.spx.st,byK.iwm.st), fl=$("idxFlag");
+  fl.hidden=nar!==true;
+  if(nar===true) fl.innerHTML='<b>узкий рынок</b> S&amp;P у максимума, Russell 2000 ниже 200-дневной: '
+    +'<span title="26 эпизодов с 1988 года; при широком максимуме — 6%. На долю не влияет">падение S&amp;P на 10%+ за 3 мес. — в 16% случаев против 6%</span>';
+  const d=byK.spx.st?byK.spx.st.d:rows.map(r=>r.st&&r.st.d).filter(Boolean).sort((a,b)=>b-a)[0];
+  c.querySelector(".obs").textContent=d?"набл.: "+iso(d):"";
+  c.classList.remove("loading");
+}
 
 /* ============ НОВОСТНОЙ СКАНЕР (Finnhub, 14 дней) ============ */
 /* v4.9 (техаудит): словари переработаны — закрыты словоформы глаголов, носитель капекса расширен
@@ -2900,7 +2988,7 @@ function renderBlocks(){
   for(const bid in BLOCKS){
     const b=BLOCKS[bid];
     const sec=document.createElement("section");sec.className="block";
-    sec.innerHTML=`<div class="block-head"><h2>${b.title}</h2><span class="bw">${b.ctx?b.desc:b.desc+" · вес "+b.w+"%"}</span><span class="bscore" id="bs_${bid}"${b.ctx?' style="visibility:hidden"':""}>—</span></div><div class="grid" id="grid_${bid}"></div>`;
+    sec.innerHTML=`<div class="block-head"><h2>${b.title}</h2><span class="bw">${b.ctx?b.desc:b.desc+" · вес "+b.w+"%"}</span><span class="bscore" id="bs_${bid}"${b.ctx?' style="display:none"':""}>—</span></div><div class="grid" id="grid_${bid}"></div>`;
     root.appendChild(sec);
     IND.filter(i=>i.block===bid).forEach(ind=>{
       const c=document.createElement("article");c.className="card s-na loading";c.id="card_"+ind.id;
@@ -2911,6 +2999,11 @@ function renderBlocks(){
         <div class="c-meta"><span class="obs">—</span><span class="c-prov"><span class="c-kind ${ind.info?"":ind.lead?"lead":"coin"}" title="${ind.info?"не входит в композит":ind.lead?"балл идёт в шкалу ОПЕРЕЖАЮЩИХ (куда клонится) — гейт покупки/защиты":"балл идёт в шкалу ПОДТВЕРЖДАЮЩИХ (условия сейчас)"}">${ind.info?"справочно":ind.lead?"→ опережающий":"◆ подтверждающий"}</span><a href="${ind.link}" target="_blank" rel="noopener">источник ↗</a></span></div>`;
       $("grid_"+bid).appendChild(c);
     });
+    if(bid==="indices"){                                  /* v5.1: одна таблица вместо карточек IND */
+      const c=document.createElement("article");c.className="card s-na idx-card loading";c.id="card_indices";
+      c.innerHTML=indicesCardHTML();
+      $("grid_"+bid).appendChild(c);
+    }
   }
 }
 async function loadOne(ind){
@@ -3109,7 +3202,7 @@ function compute(){
   /* риск просадки: P(S&P закроется на 10%+ ниже текущего в ближайшие 63 сессии) — логистическая модель по
      общему баллу, 2000–2026, вне выборки лучше базовой частоты в обеих половинах (Brier skill 0,09 и 0,22);
      средняя частота таких падений за 2000–2026 — 17% */
-  const tailP= noData?null: 1/(1+Math.exp(1.6074+0.03888*score)), TAIL_BASE=0.17;
+  const tailP= noData?null: tailOf(IDX[0],score), TAIL_BASE=0.17;   /* IDX[0] — S&P: 1/(1+e^(1,6074+0,03888·балл)) */
 
   $("vWord").textContent=REG[regime].w; $("vWord").style.color=REG[regime].c;
   const nearEdge=(v,edges)=>edges.some(e=>Math.round(v)===e&&v!==e);
@@ -3233,6 +3326,9 @@ function compute(){
     regime,regimeWord:REG[regime].w,raw,rung:cur,pct:cur==null?null:PCT[cur],since,pend,pendPct:pend==null?null:PCT[pend],pendSession,
     override:!!override,frozen:holdNote==="frozen",freezeBy:frozenFor(cur??2),triggers:trig,
     tail:tailP==null?null:{p:+tailP.toFixed(4),base:TAIL_BASE},action:act,source,memory,coverage:{got,total}};
+
+  /* v5.1: справочный блок «Индексы» — после решения и в обёртке: сбой справки не должен задеть долю */
+  try{ paintIndices(score,noData); }catch(e){ dbg("блок «Индексы»",String(e&&e.message||e)); }
 
   /* ── дневник решений: ведётся на сервере (ledger), страница только показывает ──
      одна запись на торговую сессию; рядом — реализованное движение S&P и сравнение прогноза риска с фактом */
@@ -3463,7 +3559,7 @@ function buildSnapshot(){
   const dts=n=>n.t?new Date(n.t*1000).toISOString().slice(0,10):"";
   const news={
     detector_triggers:taggedTriggers().slice(0,10).map(n=>"["+n.tag+"] "+n.sym+" "+dts(n)+": "+n.h)};
-  const blockScores={}; for(const bid in BLOCKS) blockScores[BLOCKS[bid].title]=$("bs_"+bid).textContent;
+  const blockScores={}; for(const bid in BLOCKS) if(!BLOCKS[bid].ref) blockScores[BLOCKS[bid].title]=$("bs_"+bid).textContent;  /* v5.1: блок «Индексы» в ИИ-разбор не идёт */
   /* v4.9: модели явно сообщается, ЧТО выпало (раньше отсутствующие индикаторы молча
      исчезали из списка), плюс короткий хвост истории композита этой вкладки — динамика
      «куда двигался балл» вместо одного статичного среза */

@@ -166,6 +166,7 @@ function valid(key,j){
   if(key.startsWith("fh:news")) return Array.isArray(j);
   if(key.startsWith("ydiv:"))   return Array.isArray(j)&&j.length>=5;  /* клиентской ноге нужно >=5 */
   if(key.startsWith("ypx:"))    return Array.isArray(j)&&j.length>=150&&j.every(r=>Array.isArray(r)&&r.length===3&&r[1]>0); /* v5.0: год дневных закрытий */
+  if(key.startsWith("yix:"))    return Array.isArray(j)&&j.length>=260&&j.every(r=>Array.isArray(r)&&r.length===3&&r[0]>0&&r[1]>0&&r[2]>0); /* v5.1: ≥260 сессий — 52-нед. максимум и 200-дневная */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
   return true;
@@ -324,16 +325,31 @@ async function main(){
      ставки помнит всё: просадка от пика, доля бумаг ниже 200-дневной, относительная доходность против
      S&P. BIZD здесь же — его дневное изменение по полной доходности не рисует ложный «обвал» в
      экс-дивидендные даты. Справочный слой: в балл не идёт. */
+  const closesOf=r=>{                                   /* [[ts, close, adjclose]] из ответа chart */
+    const ts=r.timestamp||[], q=(r.indicators&&r.indicators.quote&&r.indicators.quote[0])||{};
+    const adj=(r.indicators&&r.indicators.adjclose&&r.indicators.adjclose[0]&&r.indicators.adjclose[0].adjclose)||[];
+    const out=[];
+    for(let i=0;i<ts.length;i++){ const c=q.close&&q.close[i], a=adj[i]; if(c>0) out.push([ts[i],+c.toFixed(4),+(a>0?a:c).toFixed(4)]); }
+    return out;
+  };
   for(const s of [...CAPEX_TICKERS,...BDC_TICKERS,"BIZD","SPY"]){
     await sleep(300+Math.random()*500);
     await put("ypx:"+s,async()=>{
-      const r=await yahooChart(s,"1y","1d");
-      const ts=r.timestamp||[], q=(r.indicators&&r.indicators.quote&&r.indicators.quote[0])||{};
-      const adj=(r.indicators&&r.indicators.adjclose&&r.indicators.adjclose[0]&&r.indicators.adjclose[0].adjclose)||[];
-      const out=[];
-      for(let i=0;i<ts.length;i++){ const c=q.close&&q.close[i], a=adj[i]; if(c>0) out.push([ts[i],+c.toFixed(4),+(a>0?a:c).toFixed(4)]); }
+      const out=closesOf(await yahooChart(s,"1y","1d"));
       if(out.length<150) throw new Error("мало точек ("+out.length+")");
       return out;
+    });
+  }
+  /* ── v5.1: справочный блок «Индексы» (вне балла) — дневные закрытия индексных фондов за ~300 сессий:
+     от 52-недельного максимума и к 200-дневной. Dow — DIA, Nasdaq-100 — QQQ, Russell 2000 — IWM,
+     равновзвешенный S&P — RSP; строку S&P страница считает по FRED SP500, как карточку тренда.
+     Котировки самих индексов в публичный снимок не кладём. */
+  for(const s of ["DIA","QQQ","IWM","RSP"]){
+    await sleep(300+Math.random()*500);
+    await put("yix:"+s,async()=>{
+      const out=closesOf(await yahooChart(s,"2y","1d"));
+      if(out.length<260) throw new Error("мало точек ("+out.length+")");
+      return out.slice(-300);
     });
   }
 
@@ -425,7 +441,7 @@ async function main(){
         const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
         const age=Date.now()-origin;
         const cap=k.startsWith("ydiv:")?45*86400e3:
-                  k.startsWith("ypx:")?3*86400e3:                                     /* v5.0: цены корзин — как интрадей, 3 сут. */                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
+                  (k.startsWith("ypx:")||k.startsWith("yix:"))?3*86400e3:             /* v5.0: цены корзин и (v5.1) индексных фондов — как интрадей, 3 сут. */                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
                   (k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
         if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
         if(prev.responses&&prev.responses[k]!==undefined&&R[k]===undefined){

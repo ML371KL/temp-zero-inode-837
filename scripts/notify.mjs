@@ -485,6 +485,16 @@ const PAGE_EXTRACTOR = `(() => {
     const s = (typeof fredCached === "function" && fredCached("SP500")) || ((state.data || {}).spx || {}).series || [];
     out.spx_points = s.slice(-15).map(p => ({ d: new Date(p.d ?? p.t).toISOString().slice(0, 10), v: Number(p.v) }));
   } catch (e) { out.spx_points = []; }
+  // v5.1: закрытия индексных фондов для дневника — из того же снимка, на котором посчитана страница.
+  out.fund_points = {};
+  for (const sym of ["QQQ", "IWM", "RSP", "DIA"]) {
+    try {
+      const r = (SNAP && SNAP.responses && SNAP.responses["yix:" + sym]) || [];
+      out.fund_points[sym.toLowerCase()] = (Array.isArray(r) ? r : []).slice(-15)
+        .filter(x => Array.isArray(x) && Number(x[0]) > 0)
+        .map(x => ({ d: new Date(Number(x[0]) * 1000).toISOString().slice(0, 10), v: Number(x[1]) }));
+    } catch (e) { out.fund_points[sym.toLowerCase()] = []; }
+  }
   // РЕШЕНИЕ — ТОЛЬКО ИЗ state.decision. Видимый текст полосы больше не разбирается: при сбое
   // данных из фразы «Покрытие < 60%» читалось «60%», и уходили фантомные «85% → 60% → 85%».
   // Клон через JSON: наружу из страницы уезжает чистый объект, без ссылок на её состояние.
@@ -748,9 +758,25 @@ const snapshotSpx = (snap) =>
     .map((o) => ({ d: String(o?.date || ""), v: Number(o?.value) }))
     .filter((p) => isDay(p.d) && finite(p.v));
 
+// v5.1: закрытия индексных фондов рядом с S&P — живая проверка детектора капекса по индексам.
+// Короткие поля по образцу spx; строка без них (старые записи, сбой источника) читается как раньше,
+// поэтому неизвестное значение в строку не пишется вовсе, а не пишется null.
+const DIARY_FUNDS = { qqq: "QQQ", iwm: "IWM", rsp: "RSP", dia: "DIA" };
+const snapshotFunds = (snap) =>
+  Object.fromEntries(Object.entries(DIARY_FUNDS).map(([k, sym]) => {
+    const rows = snap?.responses?.["yix:" + sym];
+    return [k, (Array.isArray(rows) ? rows : [])
+      .filter((r) => Array.isArray(r) && finite(r[0]) && r[0] > 0)
+      .map((r) => ({ d: new Date(r[0] * 1000).toISOString().slice(0, 10), v: Number(r[1]) }))
+      .filter((p) => isDay(p.d) && finite(p.v) && p.v > 0)];
+  }));
+// Закрытия фондов на дату данных: сначала то, что отдала страница, затем локальный снимок.
+const fundClosesOn = (pagePoints, snapPoints, day) =>
+  Object.fromEntries(Object.keys(DIARY_FUNDS).map((k) => [k, closeOn(pagePoints?.[k], day) ?? closeOn(snapPoints?.[k], day)]));
+
 // Следующая версия журнала. Смена записывается, когда ступень в памяти ИЗМЕНИЛАСЬ против прошлого
 // журнала; строка дневника — одна на сессию данных, свежий прогон её переписывает.
-function buildLedger(prev, dec, { snapshotAt = "", spx = null, now = Date.now() } = {}) {
+function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, now = Date.now() } = {}) {
   const prevMem = validMemory(prev?.memory) ? prev.memory : null;
   const mem = dec.memory;
   const transitions = (Array.isArray(prev?.transitions) ? prev.transitions : []).filter((t) => isDay(t?.d) && isRung(t.from) && isRung(t.to));
@@ -769,13 +795,17 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, now = Date.now() 
       r: dec.rung,
       g: dec.regime || "",
       spx: finite(spx) ? spx : (old?.spx ?? null),
+      ...Object.fromEntries(Object.keys(DIARY_FUNDS)
+        .map((k) => [k, finite(funds?.[k]) && funds[k] > 0 ? round(funds[k], 2) : old?.[k]])
+        .filter(([, v]) => finite(v))),
       p: round(dec.tail?.p, 3),
     };
     // Строка текущей сессии переписывается, только когда изменилось что-то значимое: режим, ступень,
     // балл на ≥1 пункт или риск просадки на ≥1 п.п. Внутри дня балл дрожит на десятые от
     // интрадей-котировок, и без порога ветка ledger получала бы коммит почти на каждый такт снимка.
     const material = !old || old.r !== row.r || old.g !== row.g || !finite(old.c) || Math.abs(old.c - row.c) >= 1
-      || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null);
+      || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null)
+      || Object.keys(DIARY_FUNDS).some((k) => !finite(old[k]) && finite(row[k]));
     if (material) {
       diary = diary.filter((x) => x.d !== row.d);
       diary.push(row);
@@ -820,7 +850,7 @@ const ledgerChanges = (transitions) =>
 
 // Решение страницы → доля для уведомлений и следующая версия журнала. Меняет panel на месте.
 // Страница без state.decision (до выхода v5) — переходный режим: доля из полосы, журнал не пишется.
-function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, now = Date.now() } = {}) {
+function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, funds = null, now = Date.now() } = {}) {
   const dec = panel.decision;
   if (!dec) {
     console.log("::warning::страница не публикует state.decision — доля читается по-старому из полосы, журнал решений не пишется");
@@ -854,7 +884,7 @@ function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, now = Da
     console.log(`::warning::у решения нет даты данных (dataAsOf=${dec.dataAsOf ?? "—"}) — журнал не пишется`);
     return { ledger: null, changed: false };
   }
-  const ledger = buildLedger(prevLedger, dec, { snapshotAt, spx, now });
+  const ledger = buildLedger(prevLedger, dec, { snapshotAt, spx, funds, now });
   if (panel.allocation) panel.allocation.changes = ledgerChanges(ledger.transitions);
   return { ledger, changed: ledgerChanged(prevLedger, ledger) };
 }
@@ -2092,12 +2122,14 @@ async function main() {
   if (panel.source === "page") {
     // Время снимка и закрытие S&P страница обычно отдаёт сама; локальный снимок — запасной путь.
     const day = panel.decision?.dataAsOf;
-    const snap = !panel.snapshot_at || closeOn(panel.spx_points, day) === null
+    const fundsGap = Object.keys(DIARY_FUNDS).some((k) => closeOn(panel.fund_points?.[k], day) === null);
+    const snap = !panel.snapshot_at || closeOn(panel.spx_points, day) === null || fundsGap
       ? await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH)
       : null;
     panel.snapshot_at = panel.snapshot_at || snap?.generated_at || "";
     const spx = closeOn(panel.spx_points, day) ?? closeOn(snapshotSpx(snap), day);
-    ({ ledger: ledgerNext, changed: ledgerDirty } = canonicalize(panel, prevLedger, { snapshotAt: panel.snapshot_at, spx }));
+    const funds = fundClosesOn(panel.fund_points, snapshotFunds(snap), day);
+    ({ ledger: ledgerNext, changed: ledgerDirty } = canonicalize(panel, prevLedger, { snapshotAt: panel.snapshot_at, spx, funds }));
     const d = panel.decision;
     if (d) console.log(`решение страницы: ${d.regimeWord || d.regime || "—"} · ступень ${d.rung} (${d.pct}%) · сырая ${d.raw} · данные на ${d.dataAsOf || "—"} · источник ${d.source || "—"} · прошлая ступень журнала ${validMemory(prevLedger?.memory) ? prevLedger.memory.rung : "нет (первый прогон)"}`);
   }
@@ -2219,4 +2251,4 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
 }
 
 export { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, RUNG_PCT, REGIME_WORD };
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD };
