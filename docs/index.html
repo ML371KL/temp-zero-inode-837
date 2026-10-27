@@ -263,7 +263,7 @@
   .st-good .det-state{background:var(--calm);color:var(--on-brand)}
   .det-inputs{font-family:var(--mono);font-size:12px;padding-left:6px;color:var(--ink);overflow-wrap:anywhere} /* v4.13.4: длинный id LLM-модели переносится, а не обрезается */
   #contribWrap{overflow-x:auto} /* v4.13.4: таблица вкладов на 375px скроллится внутри, не двигая страницу */
-  .tbl-scroll{overflow-x:auto} /* v5.1.1: так же таблица «Проверка на истории» — раньше на 375px сдвигался весь раздел методологии */
+  .tbl-scroll{overflow-x:auto} /* v5.1.1: так же таблицы «Проверка на истории» и дневника — раньше на 375px сдвигался весь раздел методологии */
   @media print{.det-state,.zone.act,.c-score,.bscore{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   .det-logic{font-size:11.5px;color:var(--ink-soft);line-height:1.45;padding-left:6px}
   .det-pts{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
@@ -995,8 +995,8 @@
      · формула риска S&P вынесена в IDX[0] (те же коэффициенты) — строка S&P блока равна карточке риска;
      · дневник решений: поля qqq, iwm, rsp, dia (закрытия фондов) рядом с spx;
      · методология: правило чтения для держателей других индексов.
-   ═ v5.1.1: таблица «Проверка на истории» прокручивается в своём контейнере (.tbl-scroll), как таблица
-     вкладов: на 375 px раскрытый раздел методологии больше не сдвигается вбок целиком.
+   ═ v5.1.1: таблицы «Проверка на истории» и «Дневник решений» прокручиваются в своём контейнере
+     (.tbl-scroll), как таблица вкладов: на 375 px раскрытый раздел методологии не сдвигается вбок целиком.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -3352,7 +3352,7 @@ function compute(){
         const rows=D.slice(-10).reverse().map(x=>"<tr><td>"+esc(x.d)+"</td><td>"+(RW[x.g]||esc(x.g))+"</td><td>"+(x.r!=null?PCT[x.r]+"%":"—")+"</td><td>"+(x.p!=null?Math.round(x.p*100)+"%":"—")+"</td><td>"+(x.spx?fmt(x.spx,0):"—")+"</td>"+cell(at(x.d,21))+cell(at(x.d,63))+"</tr>").join("");
         el.innerHTML="<h3>Дневник решений</h3>Записей: "+D.length+" (с "+esc(D[0].d)+", одна на торговую сессию, общий для всех устройств)"
           +(n?" · за закрытые 3-месячные окна: средний прогноз риска падения на 10%+ — "+Math.round(ps/n*100)+"%, фактически такие падения были после "+hits+" из "+n+" записей":" · прогноз риска можно будет сверить с фактом через 63 торговых дня после первой записи")
-          +"<table><tr><th>день</th><th>режим</th><th>доля</th><th>риск −10%</th><th>S&amp;P</th><th>Δ21 дн.</th><th>Δ63 дн.</th></tr>"+rows+"</table>";
+          +"<div class=\"tbl-scroll\"><table><tr><th>день</th><th>режим</th><th>доля</th><th>риск −10%</th><th>S&amp;P</th><th>Δ21 дн.</th><th>Δ63 дн.</th></tr>"+rows+"</table></div>";
       }
     }
   }
