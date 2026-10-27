@@ -101,6 +101,26 @@ try {
     assert.equal(r.cover.total, r.total, "блок не меняет покрытие");
     assert.equal(r.ai, false, "блок «Индексы» не должен попадать в ИИ-разбор");
   });
+  await test("полосы блоков: Σ пунктов + детекторы = общий балл, баллы блоков = плашкам разделов", async () => {
+    const r = await page.evaluate(() => {
+      const bd = state.breakdown, el = document.getElementById("blockBars");
+      return { total: bd.total, blocksSum: bd.blocksSum, det: bd.det, detPts: state.detPts, agg: aggregate({}).composite, comp: state.decision.composite, tw: bd.tw,
+        rows: bd.rows.map(x => ({ id: x.id, score: x.score, pts: x.pts, w: x.w, famPts: x.fams.reduce((a, f) => a + f.pts, 0), badge: document.getElementById("bs_" + x.id).textContent })),
+        names: [...el.querySelectorAll(".ax > .n")].map(n => n.textContent), sum: el.querySelector(".bars-sum").textContent,
+        shown: [...el.querySelectorAll(".ax > b.c")].map(b => b.textContent) };
+    });
+    assert.ok(Math.abs(r.blocksSum - r.agg) < 1e-9, `Σ блоков ${r.blocksSum} ≠ композит движка ${r.agg}`);
+    assert.ok(Math.abs(r.det - r.detPts) < 1e-9, "детекторы ≠ state.detPts");
+    assert.ok(Math.abs(Math.max(-100, Math.min(100, r.total)) - r.comp) < 0.006, `итог ${r.total} ≠ решение ${r.comp}`);
+    for (const x of r.rows) {
+      if (x.score == null) { assert.equal(x.badge, "нет данных"); continue; }
+      assert.equal(Number(x.badge.replace("+", "")), Math.round(x.score) + 0,`${x.id}: плашка ${x.badge} ≠ балл ${x.score}`);
+      assert.ok(Math.abs(x.pts - x.score * x.w / r.tw) < 1e-9 && Math.abs(x.famPts - x.pts) < 1e-9, x.id);
+    }
+    assert.deepEqual(r.names, ["Ликвидность", "Кредит", "Рынок", "Макро", "Режимы", "Детекторы"]);
+    assert.match(r.sum, /^(Блоки [+−]?\d+,\d · детекторы [+−]?\d+,\d → общий балл [+−]?\d+,\d|Рубильник|Данных недостаточно)/);
+    assert.ok(r.shown.every(s => s === "—" || /^[+−]?\d+,\d$/.test(s)), "числа полос: " + r.shown.join(" "));
+  });
   await page.close();
 
   // машина ступеней: режим писателя, балл двигается подменой зон, сессии — новыми датами рыночных рядов

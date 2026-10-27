@@ -19,6 +19,7 @@ on:
       - "scripts/engine-test.mjs"
       - "scripts/news-test.mjs"
       - "scripts/indices-test.mjs"
+      - "scripts/breakdown-test.mjs"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
   workflow_dispatch:
@@ -73,6 +74,11 @@ jobs:
         # тренд, «узкий рынок». Ключи yix:* проверяются НАСТОЯЩЕЙ функцией valid() сборщика (урок v4.15:
         # проверка копией условия пропустила строковый ключ, и прод упал). Без сети.
         run: node scripts/indices-test.mjs
+
+      - name: Проверить раскладку общего балла по блокам
+        # Ядро ⟦BREAKDOWN-CORE⟧ и aggregate() движка исполняются из страницы: Σ пунктов блоков + детекторы =
+        # общий балл до обрезки (1e-9) на контрольном снимке, при выпавшем блоке, обрезке и в переборе. Без сети.
+        run: node scripts/breakdown-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,

@@ -124,8 +124,27 @@
   .vn span{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.6px}
   .v-why{padding:18px 24px}
   .v-why h4{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--ink-soft);margin-bottom:9px}
-  .why-row{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:4px 0;border-bottom:1px dotted var(--line)}
-  .why-row .val{font-family:var(--mono);white-space:nowrap}
+  /* v5.2: полосы блоков (приём 838): имя | дорожка −100…+100 | балл | пункты; семьи и детекторы — в той же сетке */
+  .bars-sum{font-size:13px;line-height:1.45;margin-bottom:10px}
+  .ax{display:grid;grid-template-columns:auto minmax(70px,1fr) auto auto;gap:5px 12px;align-items:center;font-size:13px}
+  .ax .h{font-family:var(--mono);font-size:10px;color:var(--ink-soft);text-align:right}
+  .ax .n{font-weight:650}
+  .ax .v,.ax .c{font-family:var(--mono);font-size:12px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .ax b.c{font-size:13px}
+  .ax .st{grid-column:1/-1;font-size:11.5px;color:var(--ink-soft);margin-top:-3px}
+  .ax .f{grid-column:1/3;padding-left:12px;font-size:12.5px;color:var(--ink-soft);min-width:0;overflow-wrap:anywhere}
+  .ax .f b{color:var(--ink);font-weight:500}
+  .ax .f.z{grid-column:1/-1;font-size:11.5px}
+  .ax .pos{color:var(--calm)} .ax .neg{color:var(--fault)}
+  .trk{position:relative;height:12px;border-radius:6px}
+  .trk i{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink-soft);font-style:normal;opacity:.6}
+  .trk u{position:absolute;top:0;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--ink);border:2px solid var(--card);transition:left .6s}
+  .trk u.z-f{background:var(--fault)} .trk u.z-t{background:var(--tension)} .trk u.z-c{background:var(--calm)}
+  .trk.h{height:13px}
+  .trk.h i{background:none;width:auto;top:0;bottom:auto;opacity:1;transform:translateX(-50%);font-family:var(--mono);font-size:10px;line-height:13px;color:var(--ink-soft)}
+  .trk.h i.l{transform:translateX(calc(-100% - 2px))} .trk.h i.r{transform:translateX(2px)}
+  @media (max-width:560px){.ax{gap:5px 8px}.trk.h i{font-size:9px}}
+  @media (prefers-reduced-motion:reduce){.trk u{transition:none}}
   .phase{margin-top:12px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
   .phase b{color:var(--ink)}
   .phase p{margin:0 0 7px}
@@ -334,7 +353,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.1.1 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.0 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -366,8 +385,8 @@
       <div class="phase" id="vPhase"></div>
     </div>
     <div class="v-why">
-      <h4>Что влияет на оценку (пункты общего балла)</h4>
-      <div id="whyList"></div>
+      <h4>Общий балл по блокам · пункты</h4>
+      <div id="blockBars"></div>
     </div>
   </div>
   <div class="action-strip" id="actionStrip"></div>
@@ -417,7 +436,8 @@
     <p><b>Режимы риска и доля акций (v5.0).</b> Общий балл (−100…+100) переводится в четыре режима и три ступени доли: <b>РИСК НИЗКИЙ</b> — балл ≥ +30 и опережающие ≥ +10, доля 100%; <b>РИСК УМЕРЕННЫЙ</b> — балл ≥ −10, доля 100% без плеча; <b>РИСК ПОВЫШЕН</b> — балл от −30 до −10, доля 50%; <b>КРИЗИС · ЗАЩИТА</b> — балл ниже −30 при опережающих ≤ −10 (если опережающие не подтверждают, остаётся 50%), а также при срабатывании рубильника — доля 0%, остаток в коротких облигациях и кэше. На истории 2000–2026 режимы честно различают риск глубокой просадки: вероятность, что S&amp;P за 3 месяца упадёт на 10% и больше, — 3% в «низком», 11% в «умеренном», 36% в «повышенном» и 47% в «кризисе» (доля времени 11 / 65 / 16 / 9%); форвардная доходность следующих 3 месяцев — +11%, +13%, +2,5% и −6% годовых. Видно и главное ограничение: доходность в «низком» и «умеренном» режимах почти одинакова — балл не прогнозирует рост, он отделяет нормальный рынок от опасного.</p>
     <p><b>Правила исполнения доли.</b> Шаг — одна ступень за раз. Смена требует пробоя границы соседней ступени с запасом ≥ 3 пункта (запас действует и по шкале опережающих) и подтверждения на <b>следующей торговой сессии</b> — то есть на новых рыночных данных, а не на смене дня на часах устройства: в выходные доля не меняется. Повышения доли на паузе, пока сработал детектор ставки (фондинговый стресс — на любой ступени, новостные капекс и BDC — пока доля выше нуля); активная «Триада разворота» паузу снимает. Рубильник переводит в 0% немедленно. Ступень <b>одна для всех</b>: её исполняет сервер после каждого снимка данных (ветка <code>ledger</code> репозитория), а сайт, уведомления в Telegram и любое устройство показывают одно и то же; память браузера — только запасной вариант, если сервер недоступен. Раньше ступень жила в браузере, и при визитах реже раза в 4 дня машина не двигалась вовсе, а Telegram получал сырой вердикт без гистерезиса.</p>
     <p><b>Риск падения на 10%+ за 3 месяца.</b> Вероятность, что S&amp;P 500 в ближайшие 63 торговых дня хотя бы раз закроется на 10% и более ниже сегодняшнего уровня. Логистическая модель по общему баллу, обученная на 2000–2026: p = 1 / (1 + e<sup>1,607 + 0,0389·балл</sup>); при балле +30 — 6%, 0 — 17%, −10 — 23%, −30 — 39%. Средняя частота таких падений за 2000–2026 — 17% (за 1950–2026 — 13%). Проверка вне выборки: модель, обученная на одной половине истории, точнее базовой частоты на другой (Brier skill 0,09 и 0,22). Просадка от максимума и VIX точности не добавили — оставлен один признак, чтобы не подгонять.</p>
-    <p><b>Скоринг.</b> Каждый индикатор попадает в одну из зон с баллом −2…+2 (зонная шкала на карточке, активная зона подсвечена; у HY/IG/VIX в строке динамики дан P₂ᵧ — перцентиль за два года). Родственные индикаторы объединены в «семьи» (уровень + импульс HY; тренд + импульс S&amp;P; количественные меры ликвидности; цена фондирования: SOFR−IORB, SRF, вола ставок): семья голосует в блоке один раз. Балл блока = среднее семейств × 50; общий балл = взвешенное по блокам (25/25/20/15/15) плюс поправки автодетекторов. Блок «Контекст» и карточки с пометкой «справочно» в балл не входят. При покрытии данных ниже 60% решение не ставится. «Что влияет на оценку» показывает вклад семей и детекторов в пунктах общего балла — те же единицы, что у самого балла.</p>
+    <p><b>Скоринг.</b> Каждый индикатор попадает в одну из зон с баллом −2…+2 (зонная шкала на карточке, активная зона подсвечена; у HY/IG/VIX в строке динамики дан P₂ᵧ — перцентиль за два года). Родственные индикаторы объединены в «семьи» (уровень + импульс HY; тренд + импульс S&amp;P; количественные меры ликвидности; цена фондирования: SOFR−IORB, SRF, вола ставок): семья голосует в блоке один раз. Балл блока = среднее семейств × 50; общий балл = взвешенное по блокам (25/25/20/15/15) плюс поправки автодетекторов. Блок «Контекст» и карточки с пометкой «справочно» в балл не входят. При покрытии данных ниже 60% решение не ставится. «Общий балл по блокам» в карточке вердикта раскладывает балл на пункты блоков, семей и детекторов — те же единицы, что у самого балла.</p>
+    <p><b>Полосы блоков.</b> Точка на дорожке — балл блока: каким был бы общий балл, если бы все блоки были как этот; пороги на шкале те же, что у общего балла (−30, −10, +30). Пункты блока = балл блока × вес / сумма весов блоков с данными; пункты семей в сумме дают пункты блока; пункты блоков плюс поправки детекторов = общий балл (до обрезки ±100).</p>
     <p><b>Два измерения.</b> Индикаторы разделены на <b>подтверждающие</b> («условия сейчас»: уровни спредов, тренд, вола, резервы — по своей природе зелёные до самой вершины цикла) и <b>опережающие</b> («куда клонится»: импульсы кредита и волы ставок, канарейки ликвидности, кривая после инверсии, путь ФРС, SLOOS, заявки, валюты и сырьё). Опережающие решают две вещи: «риск низкий» требует их ≥ +10, а полная защита (0%) — их ≤ −10; иначе режим смягчается на ступень. Расхождение шкал — признак стадии: «условия сильны, опережающие остыли» = поздняя фаза роста. Проверка 2003–2026: гейт −10 на нижней ступени лучше вариантов без гейта и с гейтом 0.</p>
     <p><b>Автодетекторы и рубильник.</b> Семь детекторов с двумя уровнями (НАБЛЮДЕНИЕ — ранние признаки, малая поправка; СРАБОТАЛ/АКТИВЕН — полная). Фондинговый стресс: SRF устойчиво &gt;$25 млрд (≥2 дня из трёх) или разово вне окон балансовой косметики (конец квартала, конец месяца, середина месяца), SOFR−IORB &gt;15 б.п. вне этих окон, или средний спред за 3 дня &gt;10 б.п.; неполный день SRF (до второй операции, 13:30 ET) в счёт не идёт. Капекс гиперскейлеров и стресс BDC — сканер заголовков за 14 дней с LLM-судьёй и данные о выплатах BDC; в балл идут только подтверждённые факты (СРАБОТАЛ −15 при событиях у ≥2 разных компаний корзины). С v5.0 компания события — та, о которой заголовок, а не лента, в которой он лежит (раньше одна новость в двух лентах изображала «две компании» и давала −15); перепечатки склеиваются; вопросы, листиклы и модальные заголовки фактом не становятся; отказ судьи сильнее «якоря»; распознаются форс-мажор и задержки строек дата-центров, гейты выкупа BDC, глубокие срезки и приостановки выплат. На размеченной батарее из 76 заголовков ошибок 0 против 37 у прежнего сканера (из них 12 ложных «фактов»). Нефтяной шок — по цене WTI относительно её средней за год. Инфляционный узел — базовый CPI × динамика зарплат. Разворот ФРС даёт плюс только при упорядоченном смягчении; «Триада разворота» (+10) механизирует вход после стресса. <b>Рубильник</b> — защита независимо от суммы баллов: (устойчивый фондинговый стресс или фондинг при жёстком рыночном подтверждении) + капекс или BDC; или капекс + BDC при ≥1 жёстком рыночном подтверждении; или фондинг при ≥2 подтверждениях. С v5.0 однодневный принт фондинга в связке с одним заголовком рубильник не включает.</p>
     <p><b>Фазы (нелинейны) — диагноз, а не команда.</b> 0 (рост) → 0-поздняя → 1 «проверка кэшем» (падает почти всё, включая будущих победителей) → 2 «ответ политики» (первое снижение ставки исторически — не сигнал к покупке; вход — по триаде разворота) → 3 (дебейсмент: слабый доллар, золото лидирует). Стагфляционный узел (растущие брейк-ивены на падающем рынке) приоритетнее Фазы 2. С v5.0 строка «Что происходит» только описывает фазу; что делать — говорит доля, и только она. Прежние тексты фаз несли собственные указания по доле и противоречили ей (осенью 2026 фаза писала «сигнал сокращать» при доле 85% и совете докупать); «повышенное внимание» теперь показывается живым списком того, что горит, с пометкой, что на долю он не влияет.</p>
@@ -997,6 +1017,13 @@
      · методология: правило чтения для держателей других индексов.
    ═ v5.1.1: таблицы «Проверка на истории» и «Дневник решений» прокручиваются в своём контейнере
      (.tbl-scroll), как таблица вкладов: на 375 px раскрытый раздел методологии не сдвигается вбок целиком.
+   ═ v5.2.0 (приём 838 «полосы блоков»; движок, пороги, лестница, заморозка, рубильник, ИИ-снимок и уведомления
+     не менялись):
+     · в карточке вердикта список «Что влияет на оценку» заменён полосами блоков: балл блока на общей шкале
+       −100…+100 с зонами T2/T1/+30 из констант движка, пункты блоков, ненулевые семьи, детекторы, итоговая строка;
+     · раскладка ⟦BREAKDOWN-CORE⟧ (breakdownOf) — та же арифметика, что в compute(): пункты = балл × вес / сумма
+       весов блоков с данными; она же питает «Поддерживают… / Давят…» (раньше — округлённый вес карточки);
+     · LOW/LOWLEAD — именованные пороги «риска низкого» (+30 / +10), значения прежние.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -2192,11 +2219,11 @@ addInd({id:"quadrant",block:"context",info:true,txt:true,staleDays:75,name:"Ка
  }});
 
 const BLOCKS={
-  plumb:{title:"I · Водопровод ликвидности",w:25,desc:"резервы, RRP, фондинг, NFCI · TGA справочно"},
-  credit:{title:"II · Кредит: публичные цены против марок",w:25,desc:"HY/IG, SLOOS, BDC"},
-  market:{title:"III · Рынок и внутренности",w:20,desc:"тренд, импульс, вола, ширина"},
-  macro:{title:"IV · Макро-цикл",w:15,desc:"найм и увольнения, кривая, реальные ставки, путь ФРС"},
-  regime:{title:"V · Режим-детекторы",w:15,desc:"кэрри, доллар, дебейсмент, канарейки"},
+  plumb:{title:"I · Водопровод ликвидности",short:"Ликвидность",w:25,desc:"резервы, RRP, фондинг, NFCI · TGA справочно"},
+  credit:{title:"II · Кредит: публичные цены против марок",short:"Кредит",w:25,desc:"HY/IG, SLOOS, BDC"},
+  market:{title:"III · Рынок и внутренности",short:"Рынок",w:20,desc:"тренд, импульс, вола, ширина"},
+  macro:{title:"IV · Макро-цикл",short:"Макро",w:15,desc:"найм и увольнения, кривая, реальные ставки, путь ФРС"},
+  regime:{title:"V · Режим-детекторы",short:"Режимы",w:15,desc:"кэрри, доллар, дебейсмент, канарейки"},
   /* v4.15 (сравнение с Capital Flows): контекстный блок ВНЕ композита — позиционирование, корреляция,
      цена ставок, трансграничные потоки, квадрант режима. Ни одна карточка не даёт балла: на реплике
      1990–2026 эти ряды улучшают 2003–2026 и не держатся на доткомах (тот же приговор, что новым
@@ -2265,6 +2292,79 @@ function paintIndices(score,noData){
   const d=byK.spx.st?byK.spx.st.d:rows.map(r=>r.st&&r.st.d).filter(Boolean).sort((a,b)=>b-a)[0];
   c.querySelector(".obs").textContent=d?"набл.: "+iso(d):"";
   c.classList.remove("loading");
+}
+
+/* ---------- ПОЛОСЫ БЛОКОВ (v5.2, карточка вердикта) ----------
+   Раскладка общего балла на пункты — та же арифметика, что в compute(): балл блока = среднее семей / 2 × 100
+   (число плашки раздела), пункты блока = балл × вес / сумма весов блоков с данными, пункты семьи = балл семьи /
+   2 × 100 / число семей × вес / сумма весов (в сумме — пункты блока), детекторы — своими поправками.
+   Σ пунктов блоков + детекторы = общий балл до обрезки ±100. Справочные карточки и блоки ctx не участвуют.
+   Ядро исполняет и scripts/breakdown-test.mjs. */
+/* ⟦BREAKDOWN-CORE⟧ */
+const breakdownOf=(blocks,ind,data,scoreOf,dets)=>{
+  const rows=[], has=i=>!!(data[i.id]&&data[i.id].zi!=null);
+  for(const bid in blocks){ if(blocks[bid].ctx) continue;
+    const cards=ind.filter(i=>i.block===bid&&!i.info), fams=[], byF={};
+    cards.filter(has).forEach(i=>{const k=i.family||i.id; if(!byF[k]) fams.push(byF[k]={key:k,cards:[]}); byF[k].cards.push(i);});
+    fams.forEach(f=>{f.mean=f.cards.reduce((a,i)=>a+scoreOf(i,data[i.id]),0)/f.cards.length;});
+    rows.push({id:bid,w:blocks[bid].w,fams,score:fams.length?fams.reduce((a,f)=>a+f.mean,0)/fams.length/2*100:null,
+      missing:cards.filter(i=>!i.optional&&!has(i))});
+  }
+  const tw=rows.reduce((a,r)=>a+(r.score==null?0:r.w),0);
+  rows.forEach(r=>{ r.pts=r.score==null||!tw?0:r.score*r.w/tw;
+    r.fams.forEach(f=>{f.pts=tw?f.mean/2*100/r.fams.length*r.w/tw:0;}); });
+  const dl=(dets||[]).map(d=>({...d,pts:+d.pts||0})), det=dl.reduce((a,d)=>a+d.pts,0), blocksSum=rows.reduce((a,r)=>a+r.pts,0);
+  return {rows,tw,dets:dl,det,blocksSum,total:blocksSum+det};
+};
+/* ⟦/BREAKDOWN-CORE⟧ */
+const FAMNAME={"plumb|price":"цена фондирования (SOFR, SRF, вола ставок)","plumb|qty":"объём ликвидности (баланс ФРС, резервы, RRP)",
+  "credit|hy":"HY-спред (уровень и импульс)","market|spx":"тренд S&P 500"};
+const shortName=n=>String(n).replace(/\s*\(.*?\)\s*/g," ").replace(/\s+/g," ").trim();
+const famLabel=(bid,f)=>FAMNAME[bid+"|"+f.key]||shortName(f.cards[0].name);
+const FREEZE_DET={d_fund:"Фондинг",d_capex:"Капекс",d_bdc:"Стресс BDC"};
+const DET_WORD={fired:"сработал",watch:"наблюдение",good:"активен",calm:"спокоен"};
+/* o: {score — общий балл после обрезки, lead, T1, T2, LOW, LOWLEAD, override, noData, got, total, cur, raw, pend, holdNote, frozen[], PCT} */
+function renderBars(BD,o){
+  const el=$("blockBars"); if(!el) return;
+  const X=v=>Math.max(0,Math.min(100,(v+100)/2));
+  const sn=(v,d)=>{const a=Math.abs(v), z=a<0.5*Math.pow(10,-d); return (z?"":v>0?"+":"−")+fmt(z?0:a,d);};
+  const fsc=v=>Number.isInteger(v)?sn(v,0):sn(v,1);
+  const zc=v=>v<o.T2?"z-f":v<o.T1?"z-t":v>=o.LOW?"z-c":"";
+  const zw=v=>v<o.T2?"кризис":v<o.T1?"повышенный риск":v>=o.LOW?"низкий риск":"умеренный риск";
+  const a=X(o.T2),b=X(o.T1),c=X(o.LOW);
+  const bg=`linear-gradient(90deg,var(--fault-bg) 0 ${a}%,var(--tension-bg) ${a}% ${b}%,var(--neutral-bg) ${b}% ${c}%,var(--calm-bg) ${c}% 100%)`;
+  const marks=[o.T2,o.T1,o.LOW].map(m=>`<i style="left:${X(m)}%"></i>`).join("");
+  const track=v=>`<div class="trk" style="background:${bg}">${marks}${v==null?"":`<u class="${zc(v)}" style="left:${X(v)}%"></u>`}</div>`;
+  const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+  let sum;
+  if(o.override) sum="Рубильник: доля 0% независимо от суммы баллов";
+  else if(o.noData) sum="Данных недостаточно: "+o.got+" из "+o.total+" показателей — вывод не ставится";
+  else{
+    const zone= o.raw===0?"кризис": o.raw===1?"повышенный риск": (o.score>=o.LOW&&o.lead>=o.LOWLEAD)?"низкий риск":"умеренный риск";
+    sum="Блоки "+sn(BD.blocksSum,1)+" · детекторы "+sn(BD.det,1)+" → общий балл "+sn(o.score,1)
+      +(Math.abs(BD.total)>100?" (сумма "+sn(BD.total,1)+", шкала ±100)":"")+" · зона «"+zone+"»";
+    if(o.cur!==o.raw) sum+= o.holdNote==="frozen"?"; доля удержана на "+o.PCT[o.cur]+"%: заморозка повышения ("+o.frozen.join(", ")+")"
+      : o.pend!=null?"; доля "+o.PCT[o.cur]+"% до подтверждения на следующей сессии"
+      : o.holdNote==="hyst"?"; доля "+o.PCT[o.cur]+"%: сдвиг в пределах запаса ±3":"";
+  }
+  let h=`<p class="bars-sum">${esc(sum)}</p><div class="ax"><span></span><div class="trk h"><i class="l" style="left:${a}%">${sn(o.T2,0)}</i><i style="left:${b}%">${sn(o.T1,0)}</i><i class="r" style="left:${c}%">${sn(o.LOW,0)}</i></div><span class="h">балл</span><span class="h">пункты</span>`;
+  for(const r of BD.rows){
+    const live=r.fams.filter(f=>f.mean!==0), zero=r.fams.length-live.length;
+    const wTxt="вес "+r.w+"%"+(r.score!=null&&BD.tw&&BD.tw!==100?" ("+Math.round(r.w/BD.tw*100)+"% без выпавших блоков)":"");
+    h+=`<span class="n">${esc(BLOCKS[r.id].short||BLOCKS[r.id].title)}</span>${track(r.score)}<b class="c">${r.score==null?"—":sn(r.score,1)}</b><b class="c">${r.score==null?"—":sn(r.pts,1)}</b>`
+      +`<span class="st">${r.score==null?"нет данных":"зона «"+zw(r.score)+"»"} · ${wTxt}${r.missing.length?" · нет данных: "+esc(r.missing.map(i=>shortName(i.name)).join(", ")):""}</span>`;
+    for(const f of live){
+      const vals=f.cards.map(i=>{const v=o.data[i.id];return String(v.value??"")+(i.unit?" "+i.unit:"");}).join(" · ");
+      h+=`<span class="f">${esc(cap(famLabel(r.id,f)))} · <b>${esc(vals)}</b></span><span class="v ${f.mean>0?"pos":"neg"}">${fsc(f.mean)}</span><span class="c">${sn(f.pts,1)}</span>`;
+    }
+    if(zero) h+=`<span class="f z">ещё ${plural(zero,"семья","семьи","семей")} с баллом 0</span>`;
+  }
+  const frozenIds=o.cur<2?Object.keys(FREEZE_DET).filter(id=>o.frozen.includes(FREEZE_DET[id])):[];
+  const on=BD.dets.filter(d=>d.pts||frozenIds.includes(d.id)), rest=BD.dets.filter(d=>!(d.pts||frozenIds.includes(d.id)));
+  h+=`<span class="n">Детекторы</span><span></span><span></span><b class="c">${sn(BD.det,1)}</b>`;
+  for(const d of on) h+=`<span class="f">${esc(d.name)} · <b>${DET_WORD[d.st]||esc(d.st)}</b>${frozenIds.includes(d.id)?" · замораживает повышение доли":""}</span><span></span><span class="c ${d.pts>0?"pos":d.pts<0?"neg":""}">${sn(d.pts,1)}</span>`;
+  if(rest.length) h+=`<span class="f z">ещё ${rest.length} ${rest.every(d=>d.st==="calm")?(rest.length===1?"спокоен":"спокойны"):"без поправки"}</span>`;
+  el.innerHTML=h+"</div>";
 }
 
 /* ============ НОВОСТНОЙ СКАНЕР (Finnhub, 14 дней) ============ */
@@ -3149,7 +3249,7 @@ function compute(){
      и гейт −10 — прежние границы вердиктов, не подогнанные: они лежат в середине плато (−14…−8 по верхней
      границе), а «лучшие» точки одной половины выборки на другой не держались. Цена профиля — более глубокая
      просадка в затяжном медвежьем рынке: в 2000–2002 −23% против −14% у прежней лестницы. */
-  const T1=-10, T2=-30, G=-10, HYST=3, PCT=[0,50,100];
+  const T1=-10, T2=-30, G=-10, HYST=3, PCT=[0,50,100], LOW=30, LOWLEAD=10;   /* LOW/LOWLEAD — «риск низкий»: балл ≥ +30 и опережающие ≥ +10 */
   const rungFrom=(c,l)=> c>=T1?2: c>=T2?1: (l<=G?0:1);
   const raw= override?0: rungFrom(score,leadScore);
   /* торговая сессия данных: подтверждение ждёт НОВЫХ рыночных данных, а не смены дня на часах устройства —
@@ -3199,7 +3299,7 @@ function compute(){
   /* режим риска (слово вердикта): по сигналу с учётом гистерезиса — пока сдвиг не прошёл запас ±3, слово
      не дёргается; когда прошёл, слово уже новое, а доля меняется после подтверждения */
   const sigRung= override?0: (raw!==cur&&((raw>cur&&passUp(score,leadScore,cur))||(raw<cur&&passDn(score,leadScore,cur))))?raw:cur;
-  const regime= noData?"nodata": sigRung===0?"crisis": sigRung===1?"elevated": (score>=30&&leadScore>=10)?"low":"moderate";
+  const regime= noData?"nodata": sigRung===0?"crisis": sigRung===1?"elevated": (score>=LOW&&leadScore>=LOWLEAD)?"low":"moderate";
   const REG={low:{w:"РИСК НИЗКИЙ",c:"var(--calm)"},moderate:{w:"РИСК УМЕРЕННЫЙ",c:"var(--calm)"},elevated:{w:"РИСК ПОВЫШЕН",c:"var(--tension)"},
              crisis:{w:"КРИЗИС · ЗАЩИТА",c:"var(--fault)"},nodata:{w:"НЕДОСТАТОЧНО ДАННЫХ",c:"var(--neutral)"}};
   /* риск просадки: P(S&P закроется на 10%+ ниже текущего в ближайшие 63 сессии) — логистическая модель по
@@ -3226,16 +3326,17 @@ function compute(){
   else ob.classList.remove("show");
 
   /* ── «почему» простым языком: что происходит · что делать · что изменит решение ── */
-  const FAMNAME={"plumb|price":"цена фондирования (SOFR, SRF, вола ставок)","plumb|qty":"объём ликвидности (баланс ФРС, резервы, RRP)",
-    "credit|hy":"HY-спред (уровень и импульс)","market|spx":"тренд S&P 500"};
-  const shortName=n=>String(n).replace(/\s*\(.*?\)\s*/g," ").replace(/\s+/g," ").trim();
   /* в середине фразы — со строчной, аббревиатуры (IG, HY, VIX, S&P…) не трогаем */
   const lc=n=>/^[А-ЯЁ][а-яё]/.test(n)?n.charAt(0).toLowerCase()+n.slice(1):n;
   const sn=(v,d=0)=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v),d);
-  /* вклады по семьям в пунктах общего балла (балл/2 × вес) — та же арифметика, что у композита */
-  const famPts={};
-  contrib.forEach(r=>{const k=r.fam; (famPts[k]=famPts[k]||{name:FAMNAME[k]||shortName(r.name),pts:0,n:0}); famPts[k].pts+=r.score/2*r.w; famPts[k].n++;});
-  const famList=Object.entries(famPts).map(([k,x])=>({name:x.n>1?(FAMNAME[k]||x.name):x.name,pts:x.pts}));
+  /* v5.2: вклады семей в пунктах общего балла — точная раскладка (breakdownOf) на сумму весов блоков с данными;
+     раньше брался округлённый вес карточки (toFixed(1)) без пересчёта на выпавшие блоки */
+  let BD=null;
+  try{ BD=breakdownOf(BLOCKS,IND,state.data,scoreOf,DETECTORS.map(d=>({id:d.id,name:d.name,st:(d.last||{}).st||"calm",pts:(d.last||{}).pts||0}))); }
+  catch(e){ dbg("раскладка по блокам",String(e&&e.message||e)); }
+  state.breakdown=BD;
+  const famList=[];
+  if(BD) BD.rows.forEach(r=>r.fams.forEach(f=>famList.push({name:famLabel(r.id,f),pts:f.pts})));
   detLines.forEach(d=>famList.push({name:d.name.replace(/^Детектор: /,"детектор «")+(d.name.startsWith("Детектор: ")?"»":""),pts:d.score}));
   const ups=famList.filter(x=>x.pts>0.5).sort((a,b)=>b.pts-a.pts), downs=famList.filter(x=>x.pts<-0.5).sort((a,b)=>a.pts-b.pts);
   let what;
@@ -3303,13 +3404,10 @@ function compute(){
     +(watch.length?'<p class="watch"><b>Повышенное внимание</b> (на долю не влияет, смотрите дважды в день): '+watch.join(" · ")+'.</p>':"")
     +(coverage<1&&!noData?'<p class="watch">Данные неполные: '+got+' из '+total+' показателей — вывод чуть менее надёжен.</p>':"");
 
-  /* «что тянет»: семьи и детекторы в пунктах общего балла — одни единицы для всех строк */
-  const row=r=>`<div class="why-row"><span>${esc(r.name.charAt(0).toUpperCase()+r.name.slice(1))}</span><span class="val" style="color:${r.pts>0?"var(--calm)":"var(--fault)"}">${sn(r.pts,1)} пт</span></div>`;
-  $("whyList").innerHTML=
-    '<div style="font-size:10.5px;letter-spacing:.7px;color:var(--calm);text-transform:uppercase;margin:2px 0 2px">Поддерживают</div>'
-    +(ups.slice(0,4).map(row).join("")||"<div class='why-row'><span>—</span></div>")
-    +'<div style="font-size:10.5px;letter-spacing:.7px;color:var(--fault);text-transform:uppercase;margin:8px 0 2px">Давят</div>'
-    +(downs.slice(0,4).map(row).join("")||"<div class='why-row'><span>значимых негативов нет</span></div>");
+  /* v5.2: полосы блоков вместо списка «что тянет» — балл каждого блока на общей шкале и пункты в общий балл;
+     в обёртке: сбой витрины не должен задеть решение (state.decision пишется ниже) */
+  try{ if(BD) renderBars(BD,{score,lead:leadScore,T1,T2,LOW,LOWLEAD,override,noData,got,total,cur,raw,pend,holdNote,frozen:frozenFor(cur),PCT,data:state.data}); }
+  catch(e){ dbg("полосы блоков",String(e&&e.message||e)); }
 
   /* ── полоса «доля акций»: исполненная ступень, одна на все устройства ── */
   {
