@@ -353,7 +353,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.0 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.1 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -1024,6 +1024,8 @@
      · раскладка ⟦BREAKDOWN-CORE⟧ (breakdownOf) — та же арифметика, что в compute(): пункты = балл × вес / сумма
        весов блоков с данными; она же питает «Поддерживают… / Давят…» (раньше — округлённый вес карточки);
      · LOW/LOWLEAD — именованные пороги «риска низкого» (+30 / +10), значения прежние.
+   ═ v5.2.1: в полосах блоков у отрицательных значений карточек — знак минуса вместо дефиса (сами карточки
+     не менялись); тест движка проверяет режим по сигнальной ступени — заморозка и ожидание подтверждения законны.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -2354,7 +2356,8 @@ function renderBars(BD,o){
     h+=`<span class="n">${esc(BLOCKS[r.id].short||BLOCKS[r.id].title)}</span>${track(r.score)}<b class="c">${r.score==null?"—":sn(r.score,1)}</b><b class="c">${r.score==null?"—":sn(r.pts,1)}</b>`
       +`<span class="st">${r.score==null?"нет данных":"зона «"+zw(r.score)+"»"} · ${wTxt}${r.missing.length?" · нет данных: "+esc(r.missing.map(i=>shortName(i.name)).join(", ")):""}</span>`;
     for(const f of live){
-      const vals=f.cards.map(i=>{const v=o.data[i.id];return String(v.value??"")+(i.unit?" "+i.unit:"");}).join(" · ");
+      /* v5.2.1: знак минуса вместо дефиса у отрицательных значений карточек (fmt отдаёт дефис ru-RU) — только здесь */
+      const vals=f.cards.map(i=>{const v=o.data[i.id];return String(v.value??"").replace(/(^|[\s(])-(?=\d)/g,"$1−")+(i.unit?" "+i.unit:"");}).join(" · ");
       h+=`<span class="f">${esc(cap(famLabel(r.id,f)))} · <b>${esc(vals)}</b></span><span class="v ${f.mean>0?"pos":"neg"}">${fsc(f.mean)}</span><span class="c">${sn(f.pts,1)}</span>`;
     }
     if(zero) h+=`<span class="f z">ещё ${plural(zero,"семья","семьи","семей")} с баллом 0</span>`;

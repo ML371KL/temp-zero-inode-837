@@ -18,6 +18,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const DIR = process.env.ENGINE_TEST_DIR || "docs";
+const PAGE = readFileSync(join(DIR, "index.html"), "utf-8").replace(/\r\n/g, "\n");
 const CHROME = process.env.CHROME_PATH;
 if (!CHROME) { console.error("нужен CHROME_PATH"); process.exit(2); }
 let puppeteer;
@@ -28,7 +29,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".json": "application/json"
 const server = http.createServer((req, res) => {
   const path = decodeURIComponent(req.url.split("?")[0]);
   const file = join(DIR, path === "/" ? "index.html" : path);
-  if (!file.startsWith(DIR) || !existsSync(file)) { res.writeHead(404); res.end(); return; }
+  if (!file.startsWith(join(DIR)) || !existsSync(file)) { res.writeHead(404); res.end(); return; }  /* join: абсолютный путь Windows со слэшами */
   res.writeHead(200, { "Content-Type": TYPES[extname(file)] || "application/octet-stream" });
   res.end(readFileSync(file));
 });
@@ -61,14 +62,30 @@ try {
     assert.deepEqual(errors, []);
   });
   const d = await page.evaluate(() => state.decision);
+  // Точные балл и опережающие (в решении они округлены до сотых): та же арифметика, что в compute().
+  const exact = await page.evaluate(() => ({ score: Math.max(-100, Math.min(100, aggregate({}).composite + state.detPts)), lead: state.leadScore }));
   await test("решение на месте и согласовано", async () => {
     assert.equal(d.v, 5);
     assert.equal(d.settled, true);
     assert.ok([0, 50, 100].includes(d.pct), "доля " + d.pct);
     assert.ok(["low", "moderate", "elevated", "crisis", "nodata"].includes(d.regime));
-    if (!d.noData && d.pend == null && !d.override) {
-      const byRung = { 0: ["crisis"], 1: ["elevated"], 2: ["low", "moderate"] };
-      assert.ok(byRung[d.rung].includes(d.regime), `режим ${d.regime} при ступени ${d.rung} без кандидата`);
+    // v5.2.1: правило страницы — режим считается по СИГНАЛЬНОЙ ступени: сырая, если сдвиг к ней прошёл запас ±HYST,
+    // иначе исполненная. Исполненная может отставать от сигнальной законно — при заморозке повышения или ожидании
+    // подтверждения на следующей сессии; прежняя проверка «режим по исполненной ступени» ложно падала на настоящем
+    // журнале прода (50% при «умеренном» из-за заморозки). Пороги — из страницы, само правило записано здесь заново.
+    const m = PAGE.match(/const T1=(-?\d+), T2=(-?\d+), G=(-?\d+), HYST=(\d+), PCT=\[[^\]]*\], LOW=(\d+), LOWLEAD=(\d+);/);
+    assert.ok(m, "на странице нет строки порогов лестницы");
+    const [T1, T2, G, HYST, LOW, LOWLEAD] = m.slice(1).map(Number);
+    const rungFrom = (c, l) => (c >= T1 ? 2 : c >= T2 ? 1 : l <= G ? 0 : 1);
+    if (!d.noData) {
+      const { score, lead } = exact, cur = d.rung;
+      assert.equal(d.raw, d.override ? 0 : rungFrom(score, lead), "сырая ступень не по порогам");
+      const passes = (d.raw > cur && rungFrom(score - HYST, lead - HYST) > cur) || (d.raw < cur && rungFrom(score + HYST, lead + HYST) < cur);
+      const sig = d.override ? 0 : passes ? d.raw : cur;
+      const want = sig === 0 ? "crisis" : sig === 1 ? "elevated" : score >= LOW && lead >= LOWLEAD ? "low" : "moderate";
+      assert.equal(d.regime, want, `режим ${d.regime} при исполненной ступени ${cur}, сырой ${d.raw}, сигнальной ${sig}`);
+      if (sig !== cur) assert.ok(d.pend != null || d.frozen || (d.freezeBy || []).length,
+        `доля ${d.pct}% отстаёт от сигнальной ступени ${sig} без кандидата и без заморозки`);
     }
     assert.ok(d.tail == null || (d.tail.p > 0 && d.tail.p < 1), "риск просадки вне (0, 1)");
     assert.ok(typeof d.action === "string" && d.action.length > 10, "нет текста действия");
