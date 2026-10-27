@@ -353,7 +353,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.1 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.2 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -1026,6 +1026,9 @@
      · LOW/LOWLEAD — именованные пороги «риска низкого» (+30 / +10), значения прежние.
    ═ v5.2.1: в полосах блоков у отрицательных значений карточек — знак минуса вместо дефиса (сами карточки
      не менялись); тест движка проверяет режим по сигнальной ступени — заморозка и ожидание подтверждения законны.
+   ═ v5.2.2: знак минуса «−» вместо дефиса на карточках (значение, строка динамики, примечание, «балл −1»), в карточках
+     детекторов, таблице вкладов и дневнике — только в отрисовке (typoMinus); state.data, ИИ-снимок и уведомления прежние.
+     Плитки вердикта и плашки разделов не тронуты: их текст читают уведомитель и ИИ-снимок.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -1086,6 +1089,10 @@ const $=id=>document.getElementById(id);
 const plural=(n,one,few,many)=>{const d=n%10,h=n%100;return n+" "+(d===1&&h!==11?one:(d>=2&&d<=4&&(h<12||h>14)?few:many));};
 const fmt=(v,d=2)=>(v==null||isNaN(v))?"—":v.toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d});
 const sign=v=>v>0?"+":"";
+/* v5.2.2: знак минуса «−» вместо дефиса перед числом — ТОЛЬКО в отрисовке карточек и таблиц. Значения в state.data,
+   ИИ-снимок и уведомления остаются как были (fmt/ru-RU отдаёт дефис); плитки вердикта и плашки разделов не трогаем —
+   их текст читают уведомитель и ИИ-снимок. Дефис внутри слов и дат («26-нед.», «2026-10-23») не меняется. */
+const typoMinus=s=>String(s??"").replace(/(^|[\s(])-(?=\d)/g,"$1−");
 const today=()=>new Date();
 const daysBetween=(a,b)=>Math.round((b-a)/864e5);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -2357,7 +2364,7 @@ function renderBars(BD,o){
       +`<span class="st">${r.score==null?"нет данных":"зона «"+zw(r.score)+"»"} · ${wTxt}${r.missing.length?" · нет данных: "+esc(r.missing.map(i=>shortName(i.name)).join(", ")):""}</span>`;
     for(const f of live){
       /* v5.2.1: знак минуса вместо дефиса у отрицательных значений карточек (fmt отдаёт дефис ru-RU) — только здесь */
-      const vals=f.cards.map(i=>{const v=o.data[i.id];return String(v.value??"").replace(/(^|[\s(])-(?=\d)/g,"$1−")+(i.unit?" "+i.unit:"");}).join(" · ");
+      const vals=f.cards.map(i=>{const v=o.data[i.id];return typoMinus(v.value)+(i.unit?" "+i.unit:"");}).join(" · ");
       h+=`<span class="f">${esc(cap(famLabel(r.id,f)))} · <b>${esc(vals)}</b></span><span class="v ${f.mean>0?"pos":"neg"}">${fsc(f.mean)}</span><span class="c">${sn(f.pts,1)}</span>`;
     }
     if(zero) h+=`<span class="f z">ещё ${plural(zero,"семья","семьи","семей")} с баллом 0</span>`;
@@ -3023,8 +3030,8 @@ function evalDetectors(){
     const el=$("det_"+d.id);
     el.className="det st-"+r.st;
     el.querySelector(".det-state").textContent=STATE_LABEL[r.st];
-    el.querySelector(".det-inputs").textContent=r.inputs;
-    el.querySelector(".det-pts").textContent= r.pts?("поправка к баллу: "+(r.pts>0?"+":"")+r.pts):"поправки нет";
+    el.querySelector(".det-inputs").textContent=typoMinus(r.inputs);
+    el.querySelector(".det-pts").textContent= r.pts?("поправка к баллу: "+(r.pts>0?"+":"−")+Math.abs(r.pts)):"поправки нет";
     /* v4.9: ключ ранжирования «тянут вверх/вниз» = score×w; у карточек он равен 2× вклада
        в композит (балл/2×вес), поэтому у детекторов w=|pts|×2 — масштабы сопоставимы */
     /* v4.13.4: в «Тянут вверх/вниз» детектор показывает ФАКТИЧЕСКУЮ поправку (−15), а не ±1;
@@ -3033,7 +3040,7 @@ function evalDetectors(){
   });
   state.detPts=pts; state.triadFired=firedTriad;
   const b=$("bs_det");
-  b.textContent="поправка: "+(pts>0?"+":"")+pts;
+  b.textContent="поправка: "+(pts>0?"+":pts<0?"−":"")+Math.abs(pts);
   b.className="bscore "+(pts>0?"pos":pts<0?"neg":"");
   return linesShown;
 }
@@ -3084,7 +3091,7 @@ function scoreBadge(sc,info){
   if(info) return '<span class="c-score sc-neutral">справочно</span>';
   if(sc==null) return '<span class="c-score sc-neutral">нет данных</span>';
   const cls= sc>=1?"sc-calm": sc<=-1?"sc-fault":"sc-tension";
-  return `<span class="c-score ${cls}">балл ${sc>0?"+":""}${sc}</span>`;
+  return `<span class="c-score ${cls}">балл ${sc>0?"+":sc<0?"−":""}${Math.abs(sc)}</span>`;
 }
 function zonesHTML(ind,zi){
   return `<div class="zones">${ind.zones.map((z,i)=>`<span class="zone${i===zi?" act z"+z.s:""}">${z.l}</span>`).join("")}</div>`;
@@ -3153,10 +3160,10 @@ function paintCard(ind,res,err){
     return;
   }
   const val=c.querySelector(".c-val");
-  val.innerHTML=res.value+(ind.unit?`<small>${ind.unit}</small>`:"");
+  val.innerHTML=typoMinus(res.value)+(ind.unit?`<small>${ind.unit}</small>`:"");
   val.classList.toggle("txt",!!ind.txt);
-  c.querySelector(".c-delta").textContent=res.delta||"";
-  c.querySelector(".c-note").textContent=res.note||"";
+  c.querySelector(".c-delta").textContent=typoMinus(res.delta||"");
+  c.querySelector(".c-note").textContent=typoMinus(res.note||"");
   const stale=res.date?daysBetween(res.date,today())>(ind.staleDays||9):false;
   c.querySelector(".obs").innerHTML=res.date?("набл.: "+res.date.toISOString().slice(0,10)+(stale?' <span class="stale">задержка</span>':"")):"";
   if(res.series&&res.series.length>3)spark(c.querySelector("canvas"),res.series,sc,ind.id);
@@ -3449,7 +3456,7 @@ function compute(){
         let n=0,ps=0,hits=0;
         D.forEach(x=>{const m=minFwd(x.d,63); if(m!=null&&x.p!=null){n++;ps+=x.p;hits+=m<=-10?1:0;}});
         const RW={low:"низкий",moderate:"умеренный",elevated:"повышен",crisis:"кризис",nodata:"нет данных"};
-        const cell=v=>v==null?"<td>·</td>":"<td class=\""+(v>0?"pos":"neg")+"\">"+(v>0?"+":"")+fmt(v,1)+"%</td>";
+        const cell=v=>v==null?"<td>·</td>":"<td class=\""+(v>0?"pos":"neg")+"\">"+typoMinus((v>0?"+":"")+fmt(v,1))+"%</td>";
         const rows=D.slice(-10).reverse().map(x=>"<tr><td>"+esc(x.d)+"</td><td>"+(RW[x.g]||esc(x.g))+"</td><td>"+(x.r!=null?PCT[x.r]+"%":"—")+"</td><td>"+(x.p!=null?Math.round(x.p*100)+"%":"—")+"</td><td>"+(x.spx?fmt(x.spx,0):"—")+"</td>"+cell(at(x.d,21))+cell(at(x.d,63))+"</tr>").join("");
         el.innerHTML="<h3>Дневник решений</h3>Записей: "+D.length+" (с "+esc(D[0].d)+", одна на торговую сессию, общий для всех устройств)"
           +(n?" · за закрытые 3-месячные окна: средний прогноз риска падения на 10%+ — "+Math.round(ps/n*100)+"%, фактически такие падения были после "+hits+" из "+n+" записей":" · прогноз риска можно будет сверить с фактом через 63 торговых дня после первой записи")
@@ -3459,8 +3466,8 @@ function compute(){
   }
 
   $("contribWrap").innerHTML=contrib.length?`<table class="contrib"><tr><th>Индикатор</th><th>Тип</th><th>Значение</th><th class="num">Балл (−2…+2)</th><th class="num">Вес, %</th></tr>${
-    contrib.map(r=>`<tr><td>${r.name}</td><td>${r.lead?"→ опереж.":"◆ подтв."}</td><td>${r.val}</td><td class="num">${r.score>0?"+":""}${r.score}</td><td class="num">${r.w}</td></tr>`).join("")
-  }</table><p style="margin-top:8px">Композит = Σ(балл/2 × 100 × вес) / Σвесов присутствующих блоков${state.detPts?(" · детекторы событий: "+(state.detPts>0?"+":"")+state.detPts):""}. Итог: <b>${fmtScore(score,[-10,-30])}</b>. Колонка «Тип»: те же баллы, агрегированные по семьям, дают две шкалы шапки — опережающих («куда клонится», гейт) и подтверждающих («условия сейчас»).</p>`:"<p>Нет данных.</p>";
+    contrib.map(r=>`<tr><td>${r.name}</td><td>${r.lead?"→ опереж.":"◆ подтв."}</td><td>${typoMinus(r.val)}</td><td class="num">${r.score>0?"+":r.score<0?"−":""}${Math.abs(r.score)}</td><td class="num">${r.w}</td></tr>`).join("")
+  }</table><p style="margin-top:8px">Композит = Σ(балл/2 × 100 × вес) / Σвесов присутствующих блоков${state.detPts?(" · детекторы событий: "+(state.detPts>0?"+":"−")+Math.abs(state.detPts)):""}. Итог: <b>${fmtScore(score,[-10,-30])}</b>. Колонка «Тип»: те же баллы, агрегированные по семьям, дают две шкалы шапки — опережающих («куда клонится», гейт) и подтверждающих («условия сейчас»).</p>`:"<p>Нет данных.</p>";
 
   const hl=state.history[state.history.length-1];   /* v4.6: без дублей одинаковых точек */
   if(!hl||hl.s!==score||Date.now()-hl.t>60000) state.history.push({t:Date.now(),s:score});
