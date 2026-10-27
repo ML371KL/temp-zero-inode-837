@@ -161,6 +161,8 @@
   /* полоса «что делать сейчас» (вердикт -> % нормы акций); фон прозрачный, как у тела карточки */
   .action-strip{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px 26px;padding:12px 24px 11px;border-top:1.5px solid var(--line)}
   .action-strip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--asAccent,var(--calm))}
+  /* v5.2.4: полоса доли — в левой колонке вердикта, под «что происходит / что делать»: отдельной карточкой в рамке */
+  .v-scale .action-strip{margin-top:12px;border:1.5px solid var(--line);border-radius:5px;overflow:hidden;padding:12px 16px 11px 20px;gap:8px 22px}
   .as-lead{display:flex;flex-direction:column;gap:3px;min-width:158px}
   .as-eyebrow{font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-soft)}
   .as-pctrow{display:flex;align-items:flex-end;gap:11px}
@@ -353,7 +355,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.3 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.4 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -383,13 +385,13 @@
         <div class="vn hid"><b id="vCover">—</b></div><div class="vn hid"><b id="vDet">0</b></div>
       </div>
       <div class="phase" id="vPhase"></div>
+      <div class="action-strip" id="actionStrip"></div>
     </div>
     <div class="v-why">
       <h4>Общий балл по блокам · пункты</h4>
       <div id="blockBars"></div>
     </div>
   </div>
-  <div class="action-strip" id="actionStrip"></div>
   <details class="ai-box" id="aiBox"><summary>Спросить ИИ — разбор ситуации простыми словами</summary>
   <div class="ai-strip">
     <select id="aiProvider" class="ai-sel" title="Провайдер ИИ"></select>
@@ -1032,6 +1034,8 @@
    ═ v5.2.3: «−» и в плитках вердикта (балл, куда клонится, условия сейчас, детекторы) и плашках разделов. Прежний
      машинный вид («-7») — в state.tiles и state.blockBadges: их читают ИИ-снимок и уведомитель, поэтому их вход,
      баллы, журнал и сообщения не меняются; у страницы без state.tiles уведомитель разбирает текст с любым минусом.
+   ═ v5.2.4: полоса «доля акций сейчас» перенесена из-под карточки вердикта в левую колонку, под «что происходит /
+     что делать» — на место, освободившееся после полос блоков; «Спросить ИИ» — по-прежнему на всю ширину.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
