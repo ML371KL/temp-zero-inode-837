@@ -456,10 +456,17 @@ const PAGE_EXTRACTOR = `(() => {
     const m = String(v ?? "").replace(/[−–—]/g, "-").replace(/[\\s\\u00a0]/g, "").replace(",", ".").match(/-?\\d+(\\.\\d+)?/);
     return m ? Number(m[0]) : null;
   };
-  out.verdict = { word: g("vWord").trim(), score: g("vScore").trim(),
-    extra: [g("vLead").trim() && ("опережающие " + g("vLead").trim()),
-            g("vCoin").trim() && ("подтверждающие " + g("vCoin").trim()),
-            g("vDet").trim() && ("детекторы " + g("vDet").trim())].filter(Boolean).join(" · ") };
+  // v5.2.3: плитки вердикта рисуются со знаком «−» (U+2212). Прежний машинный вид («-7», «+0») страница кладёт в
+  // state.tiles — его и берём, так текст сообщений не меняется. У страницы без state.tiles текст плитки
+  // приводится к тому же виду: любой минус (−, –, —) → «-».
+  const tile = (k, id) => {
+    try { if (state.tiles && state.tiles[k] != null) return String(state.tiles[k]); } catch (e) {}
+    return g(id).trim().replace(/[−–—]/g, "-");
+  };
+  out.verdict = { word: g("vWord").trim(), score: tile("score", "vScore"),
+    extra: [tile("lead", "vLead") && ("опережающие " + tile("lead", "vLead")),
+            tile("coin", "vCoin") && ("подтверждающие " + tile("coin", "vCoin")),
+            tile("det", "vDet") && ("детекторы " + tile("det", "vDet"))].filter(Boolean).join(" · ") };
   for (const i of IND) {
     const r = (state.data || {})[i.id];
     if (!r || r.zi == null) continue;
@@ -509,15 +516,16 @@ const PAGE_EXTRACTOR = `(() => {
   const stripText = strip ? (strip.innerText || "").replace(/\\s+/g, " ").trim() : "";
   const pctEl = strip ? strip.querySelector(".as-pct") : null;
   const pctMatch = String(pctEl ? pctEl.textContent : stripText).match(/(\\d{1,3})\\s*%/);
-  const num = (s) => { const m = String(s).replace(",", ".").match(/-?\\d+(\\.\\d+)?/); return m ? Number(m[0]) : null; };
+  // v5.2.3: один разбор чисел на всё извлечение — тот же, что у значений карточек (понимает «−», «-», «+», запятую).
+  const num = numFromLabel;
   // В конце полосы идёт СПРАВОЧНАЯ сноска о правилах исполнения; в ней встречаются те же слова
   // («рубильник — немедленно»), что и в боевых предупреждениях. Разбираем только «живую» часть
   // до сноски, иначе аварийный режим определяется по описанию аварийного режима.
   const live = stripText.split("правила исполнения")[0];
   out.allocation = pctMatch ? {
     pct: Number(pctMatch[1]),
-    score: num(g("vScore")),
-    lead: num(g("vLead")),
+    score: num(tile("score", "vScore")),
+    lead: num(tile("lead", "vLead")),
     up: (live.split("↑")[1] || "").split("↓")[0].trim().slice(0, 200),
     down: (live.split("↓")[1] || "").trim().slice(0, 200),
     frozen: /на паузе|заморож/i.test(live),
@@ -2251,4 +2259,4 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
 }
 
 export { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD };
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };

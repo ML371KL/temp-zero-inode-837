@@ -2,7 +2,7 @@
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
 import { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT } from "./notify.mjs";
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR } from "./notify.mjs";
 
 let passed = 0;
 const test = (name, fn) => {
@@ -1033,6 +1033,44 @@ test("каноническое решение передаёт закрытия 
   const p = { source: "page", decision: decisionOf({ rung: 2, dataAsOf: "2026-10-01" }) };
   const r = mute(() => canonicalize(p, null, { spx: 7666.45, funds: FUNDS, now: 0 }));
   assert.equal(r.ledger.diary[0].dia, 455.12);
+});
+
+/* ---- v5.2.3: плитки вердикта со знаком «−» — настоящее извлечение со страницы на подставном DOM ---- */
+
+// Исполняется ТОТ ЖЕ текст PAGE_EXTRACTOR, что уходит в Chrome; глобали страницы подставлены параметрами.
+const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы" }) => {
+  const els = {
+    ...Object.fromEntries(Object.entries(dom).map(([id, t]) => [id, { textContent: t }])),
+    actionStrip: { innerText: strip, querySelector: (s) => (s === ".as-pct" ? { textContent: "50%" } : null) },
+  };
+  const document = { getElementById: (id) => els[id] || null };
+  const state = { data: {}, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
+  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, [], state, [], null, undefined);
+};
+const TILES = { score: "+0", lead: "-7", coin: "+35", det: "-19" };
+const EXTRA = "опережающие -7 · подтверждающие +35 · детекторы -19";
+
+test("плитки: новая страница — текст сообщений из state.tiles, как раньше", () => {
+  const out = extractFrom({ tiles: TILES, dom: { vWord: "РИСК УМЕРЕННЫЙ", vScore: "+0", vLead: "−7", vCoin: "+35", vDet: "−19" }, decision: decisionOf({ rung: 1 }) });
+  assert.equal(out.verdict.extra, EXTRA);
+  assert.equal(out.verdict.score, "+0");
+});
+
+test("плитки: страница без state.tiles — «−7» и старое «-7» читаются одинаково", () => {
+  for (const [lead, det] of [["−7", "−19"], ["-7", "-19"], ["–7", "—19"]]) {
+    const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ", vScore: "+0", vLead: lead, vCoin: "+35", vDet: det }, decision: decisionOf({ rung: 1 }) });
+    assert.equal(out.verdict.extra, EXTRA, lead);
+  }
+});
+
+test("плитки: переходный режим разбирает балл и опережающие с любым минусом", () => {
+  for (const [shown, want] of [["−7", -7], ["-7", -7], ["−0,5", -0.5], ["+3", 3], ["0", 0], ["+12,4", 12.4]]) {
+    const viaText = extractFrom({ dom: { vScore: shown, vLead: shown } });
+    assert.deepEqual([viaText.allocation.score, viaText.allocation.lead], [want, want], "текст плитки " + shown);
+    const viaState = extractFrom({ tiles: { score: shown, lead: shown }, dom: { vScore: "мусор", vLead: "мусор" } });
+    assert.deepEqual([viaState.allocation.score, viaState.allocation.lead], [want, want], "state.tiles " + shown);
+  }
+  assert.equal(extractFrom({ dom: { vScore: "—", vLead: "—" } }).allocation.lead, null, "прочерк — числа нет");
 });
 
 test("проверка связи называет долю в долях нормы", () => {

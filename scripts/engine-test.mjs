@@ -131,12 +131,28 @@ try {
     assert.ok(Math.abs(Math.max(-100, Math.min(100, r.total)) - r.comp) < 0.006, `итог ${r.total} ≠ решение ${r.comp}`);
     for (const x of r.rows) {
       if (x.score == null) { assert.equal(x.badge, "нет данных"); continue; }
-      assert.equal(Number(x.badge.replace("+", "")), Math.round(x.score) + 0,`${x.id}: плашка ${x.badge} ≠ балл ${x.score}`);
+      assert.equal(Number(x.badge.replace("+", "").replace("−", "-")), Math.round(x.score) + 0, `${x.id}: плашка ${x.badge} ≠ балл ${x.score}`);
       assert.ok(Math.abs(x.pts - x.score * x.w / r.tw) < 1e-9 && Math.abs(x.famPts - x.pts) < 1e-9, x.id);
     }
     assert.deepEqual(r.names, ["Ликвидность", "Кредит", "Рынок", "Макро", "Режимы", "Детекторы"]);
     assert.match(r.sum, /^(Блоки [+−]?\d+,\d · детекторы [+−]?\d+,\d → общий балл [+−]?\d+,\d|Рубильник|Данных недостаточно)/);
     assert.ok(r.shown.every(s => s === "—" || /^[+−]?\d+,\d$/.test(s)), "числа полос: " + r.shown.join(" "));
+  });
+  await test("плитки и плашки: на экране «−», ИИ-снимок получает прежний вид из state", async () => {
+    const r = await page.evaluate(() => {
+      const ids = { score: "vScore", lead: "vLead", coin: "vCoin", det: "vDet" }, s = buildSnapshot();
+      return { tiles: state.tiles, shown: Object.fromEntries(Object.entries(ids).map(([k, id]) => [k, document.getElementById(id).textContent])),
+        ai: { score: s.composite_score, lead: s.leading_score, coin: s.confirming_score, det: s.detectors_adjustment }, aiBlocks: s.block_scores,
+        badges: Object.fromEntries(Object.keys(BLOCKS).filter(b => !BLOCKS[b].ref).map(b => [BLOCKS[b].title, [state.blockBadges[b], document.getElementById("bs_" + b).textContent]])),
+        lead: state.leadScore, score: state.decision.composite };
+    });
+    for (const k of ["score", "lead", "coin", "det"]) {
+      assert.match(r.tiles[k], /^[+-]?\d+(,\d)?$/, `state.tiles.${k} — прежний машинный вид`);
+      assert.equal(r.shown[k], r.tiles[k].replace("-", "−"), `плитка ${k} на экране`);
+      assert.equal(r.ai[k], r.tiles[k], `ИИ-снимок ${k}`);
+    }
+    for (const [t, [ascii, shown]] of Object.entries(r.badges)) { assert.equal(shown, ascii.replace("-", "−"), t); assert.equal(r.aiBlocks[t], ascii, "ИИ: " + t); }
+    assert.ok(Math.abs(Number(r.tiles.lead.replace(",", ".")) - r.lead) <= 0.5, `плитка «куда клонится» ${r.tiles.lead} ≠ опережающие ${r.lead}`);
   });
   await page.close();
 

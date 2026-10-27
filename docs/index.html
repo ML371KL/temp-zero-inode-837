@@ -353,7 +353,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.2 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.3 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -1029,6 +1029,9 @@
    ═ v5.2.2: знак минуса «−» вместо дефиса на карточках (значение, строка динамики, примечание, «балл −1»), в карточках
      детекторов, таблице вкладов и дневнике — только в отрисовке (typoMinus); state.data, ИИ-снимок и уведомления прежние.
      Плитки вердикта и плашки разделов не тронуты: их текст читают уведомитель и ИИ-снимок.
+   ═ v5.2.3: «−» и в плитках вердикта (балл, куда клонится, условия сейчас, детекторы) и плашках разделов. Прежний
+     машинный вид («-7») — в state.tiles и state.blockBadges: их читают ИИ-снимок и уведомитель, поэтому их вход,
+     баллы, журнал и сообщения не меняются; у страницы без state.tiles уведомитель разбирает текст с любым минусом.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -3198,12 +3201,16 @@ function aggregate(over){
 function compute(){
   const detLines=evalDetectors();
   const contrib=[];let totalW=0,acc=0;
+  /* v5.2.3: плашки разделов рисуются со знаком «−»; прежний машинный вид («-5», «нет данных») — в state.blockBadges,
+     его и читает ИИ-снимок */
+  state.blockBadges={};
+  const badge=(be,bid,t)=>{state.blockBadges[bid]=t; be.textContent=typoMinus(t);};
   for(const bid in BLOCKS){
     const be=$("bs_"+bid);
-    if(BLOCKS[bid].ctx){be.textContent="справочно";be.className="bscore";continue;}   /* v4.15: контекстный блок не участвует в композите и в весах */
+    if(BLOCKS[bid].ctx){badge(be,bid,"справочно");be.className="bscore";continue;}   /* v4.15: контекстный блок не участвует в композите и в весах */
     const inds=IND.filter(i=>i.block===bid);
     const scored=inds.map(i=>({i,r:state.data[i.id]})).filter(x=>x.r&&x.r.zi!=null&&!x.i.info);
-    if(!scored.length){be.textContent="нет данных";be.className="bscore";continue;}
+    if(!scored.length){badge(be,bid,"нет данных");be.className="bscore";continue;}
     /* семейная агрегация: индикаторы одной серии/латентной переменной усредняются внутри семьи,
        блок = среднее семейств → одна переменная не считается дважды */
     const fams={};
@@ -3213,7 +3220,7 @@ function compute(){
     const avg=famKeys.reduce((a,k)=>a+famMean(k),0)/famKeys.length;
     const bScore=avg/2*100;
     acc+=bScore*BLOCKS[bid].w;totalW+=BLOCKS[bid].w;
-    be.textContent=(bScore>0?"+":"")+Math.round(bScore);
+    badge(be,bid,(bScore>0?"+":"")+Math.round(bScore));
     be.className="bscore "+(bScore>10?"pos":bScore<-10?"neg":"");
     famKeys.forEach(k=>fams[k].forEach(x=>contrib.push({name:x.i.name,val:x.r.value+(x.i.unit?" "+x.i.unit:""),fam:bid+"|"+k,
       lead:!!x.i.lead,score:scoreOf(x.i,x.r),w:+(BLOCKS[bid].w/famKeys.length/fams[k].length).toFixed(1)})));
@@ -3320,12 +3327,15 @@ function compute(){
   $("vWord").textContent=REG[regime].w; $("vWord").style.color=REG[regime].c;
   const nearEdge=(v,edges)=>edges.some(e=>Math.round(v)===e&&v!==e);
   const fmtScore=(v,edges)=>(v>0?"+":"")+(nearEdge(v,edges)?fmt(v,1):Math.round(v));
-  $("vScore").textContent=fmtScore(score,[T1,T2]);
+  /* v5.2.3: плитки рисуются со знаком «−»; прежний машинный вид («-7», «+0») — в state.tiles: его читают
+     ИИ-снимок и уведомитель, поэтому их вход не меняется */
+  state.tiles={score:fmtScore(score,[T1,T2]),lead:fmtScore(leadScore,[G]),coin:(coinScore>0?"+":"")+Math.round(coinScore),det:(state.detPts>0?"+":"")+state.detPts};
+  $("vScore").textContent=typoMinus(state.tiles.score);
   $("vCover").textContent=got+"/"+total;
-  $("vDet").textContent=(state.detPts>0?"+":"")+state.detPts;
-  $("vLead").textContent=fmtScore(leadScore,[G]);
+  $("vDet").textContent=typoMinus(state.tiles.det);
+  $("vLead").textContent=typoMinus(state.tiles.lead);
   $("vLead").style.color= leadScore>=10?"var(--calm)":leadScore<=-10?"var(--fault)":"var(--ink)";
-  $("vCoin").textContent=(coinScore>0?"+":"")+Math.round(coinScore);
+  $("vCoin").textContent=typoMinus(state.tiles.coin);
   $("vCoin").style.color= coinScore>=10?"var(--calm)":coinScore<=-10?"var(--fault)":"var(--ink)";
   $("vTail").textContent= tailP==null?"—":Math.round(tailP*100)+"%";
   $("vTail").style.color= tailP==null?"var(--ink)": tailP>=0.30?"var(--fault)": tailP>=0.20?"var(--tension)": tailP<=0.12?"var(--calm)":"var(--ink)";
@@ -3467,7 +3477,7 @@ function compute(){
 
   $("contribWrap").innerHTML=contrib.length?`<table class="contrib"><tr><th>Индикатор</th><th>Тип</th><th>Значение</th><th class="num">Балл (−2…+2)</th><th class="num">Вес, %</th></tr>${
     contrib.map(r=>`<tr><td>${r.name}</td><td>${r.lead?"→ опереж.":"◆ подтв."}</td><td>${typoMinus(r.val)}</td><td class="num">${r.score>0?"+":r.score<0?"−":""}${Math.abs(r.score)}</td><td class="num">${r.w}</td></tr>`).join("")
-  }</table><p style="margin-top:8px">Композит = Σ(балл/2 × 100 × вес) / Σвесов присутствующих блоков${state.detPts?(" · детекторы событий: "+(state.detPts>0?"+":"−")+Math.abs(state.detPts)):""}. Итог: <b>${fmtScore(score,[-10,-30])}</b>. Колонка «Тип»: те же баллы, агрегированные по семьям, дают две шкалы шапки — опережающих («куда клонится», гейт) и подтверждающих («условия сейчас»).</p>`:"<p>Нет данных.</p>";
+  }</table><p style="margin-top:8px">Композит = Σ(балл/2 × 100 × вес) / Σвесов присутствующих блоков${state.detPts?(" · детекторы событий: "+(state.detPts>0?"+":"−")+Math.abs(state.detPts)):""}. Итог: <b>${typoMinus(fmtScore(score,[-10,-30]))}</b>. Колонка «Тип»: те же баллы, агрегированные по семьям, дают две шкалы шапки — опережающих («куда клонится», гейт) и подтверждающих («условия сейчас»).</p>`:"<p>Нет данных.</p>";
 
   const hl=state.history[state.history.length-1];   /* v4.6: без дублей одинаковых точек */
   if(!hl||hl.s!==score||Date.now()-hl.t>60000) state.history.push({t:Date.now(),s:score});
@@ -3670,7 +3680,9 @@ function buildSnapshot(){
   const dts=n=>n.t?new Date(n.t*1000).toISOString().slice(0,10):"";
   const news={
     detector_triggers:taggedTriggers().slice(0,10).map(n=>"["+n.tag+"] "+n.sym+" "+dts(n)+": "+n.h)};
-  const blockScores={}; for(const bid in BLOCKS) if(!BLOCKS[bid].ref) blockScores[BLOCKS[bid].title]=$("bs_"+bid).textContent;  /* v5.1: блок «Индексы» в ИИ-разбор не идёт */
+  /* v5.2.3: числа плашек и плиток — из state (прежний вид «-7»), а не из текста: на экране они со знаком «−» */
+  const TL=state.tiles||{}, BB=state.blockBadges||{}, tileOr=(k,id)=>TL[k]!=null?TL[k]:$(id).textContent;
+  const blockScores={}; for(const bid in BLOCKS) if(!BLOCKS[bid].ref) blockScores[BLOCKS[bid].title]=BB[bid]!=null?BB[bid]:$("bs_"+bid).textContent;  /* v5.1: блок «Индексы» в ИИ-разбор не идёт */
   /* v4.9: модели явно сообщается, ЧТО выпало (раньше отсутствующие индикаторы молча
      исчезали из списка), плюс короткий хвост истории композита этой вкладки — динамика
      «куда двигался балл» вместо одного статичного среза */
@@ -3683,9 +3695,9 @@ function buildSnapshot(){
       tail_risk:d.tail?Math.round(d.tail.p*100)+"% (в среднем "+Math.round(d.tail.base*100)+"%)":"—",
       action:d.action||"", what_changes:(($("vPhase").innerText.match(/Что изменит решение\.\s*([^\n]+)/)||[])[1]||""),
       ladder:"100% при общем балле ≥ −10 · 50% при −30…−10 · 0% ниже −30 при опережающих ≤ −10; запас ±3, подтверждение следующей сессией; рубильник — сразу 0%"};})(),
-    verdict:$("vWord").textContent, composite_score:$("vScore").textContent, block_scores:blockScores,
-    leading_score:$("vLead").textContent, confirming_score:$("vCoin").textContent,
-    detectors_adjustment:$("vDet").textContent, data_coverage:$("vCover").textContent,
+    verdict:$("vWord").textContent, composite_score:tileOr("score","vScore"), block_scores:blockScores,
+    leading_score:tileOr("lead","vLead"), confirming_score:tileOr("coin","vCoin"),
+    detectors_adjustment:tileOr("det","vDet"), data_coverage:$("vCover").textContent,
     phase_and_gate:$("vPhase").innerText.replace(/\s+/g," "),
     llm_news_filter:llmTag().replace(/^ · /,""),
     news_class_rules:"компания события — та, о которой заголовок (не лента, где он лежит); перепечатки одной новости склеиваются; в общий балл идут только ФАКТЫ (подтверждение LLM-судьи или однозначная форма пресс-релиза без отказа судьи): −15 при событиях у ≥2 разных компаний корзины, −5/−4 при одной; НЕПОДТВЕРЖДЁННЫЕ — НАБЛЮДЕНИЕ при ≥2 компаниях; мнения, вопросы, листиклы и «вне корзины» — справочный контекст с нулевым весом",
