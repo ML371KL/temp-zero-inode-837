@@ -612,15 +612,22 @@ async function fromLivePage(url, { writer = null } = {}) {
       .catch(() => console.log("::warning::state.decision не устоялось за 20 с — журнал в этом прогоне не пишется"));
     const raw = await page.evaluate(PAGE_EXTRACTOR);
     if (errors.length) console.error("page errors:", errors.slice(0, 3).join(" | "));
-    const indicators = raw.indicators.map((i) => {
-      const c = MACRO_CADENCE[i.id] || { scheduled: true, revisable: false, release: "", cadence: "" };
-      const { series, ...rest } = i;
-      return { ...rest, scheduled: c.scheduled, revisable: c.revisable, release: c.release, cadence: c.cadence || "", points: compactSeries(series) };
-    });
-    return { ...raw, source: "page", assetWord: "акций", indicators };
+    return fromPageRaw(raw);
   } finally {
     await browser.close();
   }
+}
+
+// Снятое со страницы (PAGE_EXTRACTOR) → общая форма панели: календарь публикации из MACRO_CADENCE,
+// ряд — в компактную карту точек. Отдельно от браузера — чтобы тесты и реплей истории снимков шли
+// той же проекцией, что и бой.
+function fromPageRaw(raw) {
+  const indicators = raw.indicators.map((i) => {
+    const c = MACRO_CADENCE[i.id] || { scheduled: true, revisable: false, release: "", cadence: "" };
+    const { series, ...rest } = i;
+    return { ...rest, scheduled: c.scheduled, revisable: c.revisable, release: c.release, cadence: c.cadence || "", points: compactSeries(series) };
+  });
+  return { ...raw, source: "page", assetWord: "акций", indicators };
 }
 
 async function readPanel({ writer = null } = {}) {
@@ -2793,13 +2800,24 @@ function pingMessage(panel) {
     .join("\n");
 }
 
-async function main() {
-  const ping = process.env.NOTIFY_PING === "1";
+// io — швы для прогона без браузера, сети и диска (тесты, воспроизведение на истории снимков):
+//   panel      — готовая проекция панели вместо чтения страницы (см. fromPageRaw);
+//   ledger     — прошлый журнал решений вместо файла NOTIFY_LEDGER_IN (null — «ветки ещё нет»);
+//   saveLedger — куда отдать новую версию журнала вместо файла NOTIFY_LEDGER_OUT;
+//   snapshot   — снимок для запасных закрытий S&P и фондов вместо docs/snapshot.json;
+//   state      — состояние прошлого запуска вместо файла (null — «состояния нет»);
+//   saveState  — куда отдать состояние вместо записи файла;
+//   deliver    — получатель готового сообщения вместо Telegram и NEXUS. С ним прогон идёт БОЕВОЙ
+//                веткой (индекс доставленного, запись состояния после каждой отправки), но ни
+//                токен, ни сеть не нужны.
+// В бою main() вызывается без аргументов.
+async function main(io = {}) {
+  const ping = process.env.NOTIFY_PING === "1" && !io.panel;
   // Файл прошлого прогона не должен уехать в ветку шагом коммита ЭТОГО прогона: новая версия
   // журнала появляется заново только тогда, когда этот прогон её действительно построил.
-  if (!ping) await rm(LEDGER_OUT, { force: true });
-  const prevLedger = await readLedger(LEDGER_IN);
-  const panel = await readPanel({ writer: { memory: validMemory(prevLedger?.memory) ? prevLedger.memory : null } });
+  if (!ping && !io.saveLedger) await rm(LEDGER_OUT, { force: true });
+  const prevLedger = io.ledger !== undefined ? io.ledger : await readLedger(LEDGER_IN);
+  const panel = io.panel || (await readPanel({ writer: { memory: validMemory(prevLedger?.memory) ? prevLedger.memory : null } }));
 
   let ledgerNext = null;
   let ledgerDirty = false;
@@ -2808,7 +2826,7 @@ async function main() {
     const day = panel.decision?.dataAsOf;
     const fundsGap = Object.keys(DIARY_FUNDS).some((k) => closeOn(panel.fund_points?.[k], day) === null);
     const snap = !panel.snapshot_at || closeOn(panel.spx_points, day) === null || fundsGap
-      ? await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH)
+      ? (io.panel ? io.snapshot ?? null : await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH))
       : null;
     panel.snapshot_at = panel.snapshot_at || snap?.generated_at || "";
     const spx = closeOn(panel.spx_points, day) ?? closeOn(snapshotSpx(snap), day);
@@ -2860,14 +2878,18 @@ async function main() {
   // Telegram. Сообщение о смене при этом не теряется — его база (state.allocation) сдвигается
   // только после удачной рассылки, см. canonicalBase.
   if (ledgerNext && ledgerDirty) {
-    await mkdir(dirname(LEDGER_OUT), { recursive: true });
-    await writeFile(LEDGER_OUT, formatLedger(ledgerNext));
-    console.log(`журнал решений: ступень ${ledgerNext.memory.rung}, смен ${ledgerNext.transitions.length}, дневник ${ledgerNext.diary.length} сес. → ${LEDGER_OUT}`);
+    if (io.saveLedger) await io.saveLedger(ledgerNext);
+    else {
+      await mkdir(dirname(LEDGER_OUT), { recursive: true });
+      await writeFile(LEDGER_OUT, formatLedger(ledgerNext));
+    }
+    console.log(`журнал решений: ступень ${ledgerNext.memory.rung}, смен ${ledgerNext.transitions.length}, дневник ${ledgerNext.diary.length} сес. → ${io.saveLedger ? "io" : LEDGER_OUT}`);
   } else if (ledgerNext) {
     console.log("журнал решений: существенных изменений нет — коммита в ветку не будет");
   }
 
-  const prev = (await readJSON(STATE_PATH)) || {};
+  const prev = io.state !== undefined ? io.state || {} : (await readJSON(STATE_PATH)) || {};
+  const dry = io.deliver ? false : DRY;
   const first = !prev.indicators;
   const now = Date.now();
   const sentIndex = pruneSent(prev.sent, now);
@@ -2892,8 +2914,10 @@ async function main() {
   // доступе уходят в канал ошибок в конце прогона.
   const llmWeek = prev.llm_week && typeof prev.llm_week === "object" && !Array.isArray(prev.llm_week) ? prev.llm_week : {};
   const persist = async () => {
+    const state = { ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen, llm_spend: llmSpend, llm_week: llmWeek };
+    if (io.saveState) return io.saveState(state);
     await mkdir(dirname(STATE_PATH), { recursive: true });
-    await writeFile(STATE_PATH, JSON.stringify({ ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen, llm_spend: llmSpend, llm_week: llmWeek }, null, 1));
+    await writeFile(STATE_PATH, JSON.stringify(state, null, 1));
   };
 
   let sent = 0;
@@ -2909,33 +2933,38 @@ async function main() {
       const ev = capped[i];
       const comment = (llm && llm[i]) || templateComment(ev);
       const text = renderMessage(ev, comment);
-      if (DRY) {
+      if (dry) {
         const plain = text
           .replace(/<[^>]+>/g, "")
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
         console.log("\n--- сообщение " + (i + 1) + " ---\n" + plain);
       } else {
-        await sendTelegram(text);
-        await sendNexusEvent(text, sentKey(ev), panel.generated_at);
+        if (io.deliver) await io.deliver(text, ev);
+        else {
+          await sendTelegram(text);
+          await sendNexusEvent(text, sentKey(ev), panel.generated_at);
+        }
         console.log(`  → отправлено: ${KIND[ev.kind]?.label || ev.kind} · ${ev.title}${ev.before || ev.after ? ` (${ev.before || "—"} → ${ev.after || "—"})` : ""} · комментарий: ${llm && llm[i] ? "модель" : "шаблон"}`);
         sent++;
         sentIndex[sentKey(ev)] = new Date().toISOString();
         if (ev.revisedPoints) revisedSeen = rememberRevised(revisedSeen, [ev], now);
         for (const id of ev.ruleNotes || []) ruleNotesSeen = { ...ruleNotesSeen, [id]: new Date().toISOString() };
         await persist(); // индекс доставленного — сразу на диск, база сдвинется в конце
-        if (i < capped.length - 1) await sleep(SEND_GAP_MS);
+        if (i < capped.length - 1 && !io.deliver) await sleep(SEND_GAP_MS);
       }
     }
   }
 
-  if (DRY) revisedSeen = rememberRevised(revisedSeen, events.filter((e) => e.revisedPoints), now);
+  if (dry) revisedSeen = rememberRevised(revisedSeen, events.filter((e) => e.revisedPoints), now);
   baseline = snapshotState(panel);
   await persist();
-  console.log(DRY ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);
+  console.log(dry ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);
   // Учёт ИИ-разборов (блок 5б): тревога при отказе API по доступу и строка за прошлую неделю — в канал
   // ошибок. Каждым прогоном: неделя без событий — тоже неделя, а недоставленное уйдёт следующим.
-  if (!DRY) {
-    const out = await guardOpsTick(llmWeek, now, "837", guardSendOps, "секрет ANTHROPIC_API_KEY в настройках репозитория (Actions).");
+  // Сухой прогон и прогон через io.deliver (тесты, реплей) в канал ошибок не пишут; тесты подставляют io.sendOps.
+  const sendOps = io.sendOps || (dry || io.deliver ? null : guardSendOps);
+  if (sendOps) {
+    const out = await guardOpsTick(llmWeek, now, "837", sendOps, "секрет ANTHROPIC_API_KEY в настройках репозитория (Actions).");
     if (out.length) {
       console.log(`канал ошибок: ${out.join("; ")}`);
       await persist();
@@ -2950,5 +2979,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
+export { main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };
