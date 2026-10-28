@@ -59,7 +59,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # опционально: серверный LLM-судья новостей (Claude)
           JUDGE_MODEL: ${{ vars.JUDGE_MODEL }}                  # пусто — claude-sonnet-5-5
           JUDGE_EFFORT: ${{ vars.JUDGE_EFFORT }}                # пусто — xhigh
-          JUDGE_DAILY_MAX: ${{ vars.JUDGE_DAILY_MAX }}          # пусто — 40 запросов в московские сутки
+          JUDGE_DAILY_MAX: ${{ vars.JUDGE_DAILY_MAX }}          # пусто — 20 запросов в московские сутки
         run: node scripts/fetch-snapshot.mjs
       - name: Публикация снимка
         id: commit

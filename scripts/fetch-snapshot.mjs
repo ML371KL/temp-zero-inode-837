@@ -21,8 +21,8 @@ const JUDGE_MODEL =(process.env.JUDGE_MODEL ||"").trim()||"claude-sonnet-5-5";
 const JUDGE_EFFORT=(process.env.JUDGE_EFFORT||"").trim()||"xhigh";
 /* суточный предел ЗАПРОСОВ судьи (московские сутки): отказ модели не должен превращаться в запрос
    на каждой сборке — при такте 10–20 минут это 72–99 запросов в сутки (аудит 28.10.2026, D8).
-   Счётчик живёт в самом снимке, рядом с кэшем вердиктов (fh:llmDay). Пустое или негодное — 40. */
-const JUDGE_DAILY_MAX=(v=>/^\d+$/.test(v)?Number(v):40)(String(process.env.JUDGE_DAILY_MAX??"").trim());
+   Счётчик живёт в самом снимке, рядом с кэшем вердиктов (fh:llmDay). Пустое или негодное — 20 (обычный расход — около трёх в сутки). */
+const JUDGE_DAILY_MAX=(v=>/^\d+$/.test(v)?Number(v):20)(String(process.env.JUDGE_DAILY_MAX??"").trim());
 const OUT        = process.env.OUT || "docs/snapshot.json";
 /* v4.13.3: состав корзин извлекается из картриджа CYCLE клиента (docs/index.html) — единый
    источник истины: смена цикла правится в одном месте. При сбое извлечения — зашитый резерв. */
