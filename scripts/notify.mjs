@@ -497,7 +497,9 @@ const PAGE_EXTRACTOR = `(() => {
   }
   for (const d of DETECTORS) {
     const l = d.last || {};
-    out.detectors.push({ id: d.id, name: d.name, state: l.st || "calm", inputs: l.inputs || "", note: d.logic || "" });
+    // v5.4.1: co — компании и тип отступления у новостных детекторов (для дневника и таблицы эпизодов)
+    out.detectors.push({ id: d.id, name: d.name, state: l.st || "calm", inputs: l.inputs || "", note: d.logic || "",
+      co: Array.isArray(l.co) ? l.co.slice(0, 8).map(String) : null });
   }
   // Время снимка, на котором посчитана страница: им помечаются события риска, чтобы повторный
   // прогон ТОГО ЖЕ снимка не слал их дважды, а настоящий повтор на новом снимке — слал.
@@ -785,6 +787,23 @@ const snapshotSpx = (snap) =>
 // Короткие поля по образцу spx; строка без них (старые записи, сбой источника) читается как раньше,
 // поэтому неизвестное значение в строку не пишется вовсе, а не пишется null.
 const DIARY_FUNDS = { qqq: "QQQ", iwm: "IWM", rsp: "RSP", dia: "DIA" };
+/* v5.4.1: состояния семи детекторов за сессию — строка из семи символов в порядке DIARY_DETS:
+   «.» спокойно · «+» активен (позитивный) · «w» наблюдение · «F» сработал · «?» нет данных. За сессию держится
+   максимум: детектор, сработавший днём и успокоившийся к закрытию, в дневнике остаётся сработавшим.
+   xc / xb — компании и тип отступления у капекса и BDC («MSFT/cut,META/dc»), объединение за сессию. */
+const DIARY_DETS = ["fund", "capex", "bdc", "oil", "infl", "pivot", "turn"];
+const DET_CH = { calm: ".", good: "+", watch: "w", fired: "F" };
+const DET_CH_RANK = { "?": 0, ".": 1, "+": 2, w: 3, F: 4 };
+function detDiary(detectors) {
+  const by = Object.fromEntries((detectors || []).map((d) => [String(d.id || "").replace(/^d_/, ""), d]));
+  if (!DIARY_DETS.some((k) => by[k])) return null;
+  const x = DIARY_DETS.map((k) => DET_CH[by[k]?.state] || "?").join("");
+  const co = (k) => (by[k] && (by[k].state === "watch" || by[k].state === "fired") && Array.isArray(by[k].co) ? by[k].co.filter(Boolean).join(",") : "");
+  return { x, xc: co("capex"), xb: co("bdc") };
+}
+const mergeDetX = (a, b) => (typeof a === "string" && a.length === b.length
+  ? [...b].map((c, i) => ((DET_CH_RANK[a[i]] ?? 0) > (DET_CH_RANK[c] ?? 0) ? a[i] : c)).join("") : b);
+const mergeCo = (a, b) => [...new Set([...String(a || "").split(","), ...String(b || "").split(",")].filter(Boolean))].join(",");
 const snapshotFunds = (snap) =>
   Object.fromEntries(Object.entries(DIARY_FUNDS).map(([k, sym]) => {
     const rows = snap?.responses?.["yix:" + sym];
@@ -799,7 +818,7 @@ const fundClosesOn = (pagePoints, snapPoints, day) =>
 
 // Следующая версия журнала. Смена записывается, когда ступень в памяти ИЗМЕНИЛАСЬ против прошлого
 // журнала; строка дневника — одна на сессию данных, свежий прогон её переписывает.
-function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, now = Date.now() } = {}) {
+function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, dets = null, now = Date.now() } = {}) {
   const prevMem = validMemory(prev?.memory) ? prev.memory : null;
   const mem = dec.memory;
   const transitions = (Array.isArray(prev?.transitions) ? prev.transitions : []).filter((t) => isDay(t?.d) && isRung(t.from) && isRung(t.to));
@@ -823,12 +842,21 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, now
         .filter(([, v]) => finite(v))),
       p: round(dec.tail?.p, 3),
     };
+    if (dets && dets.x) {
+      row.x = mergeDetX(old?.x, dets.x);
+      const xc = mergeCo(old?.xc, dets.xc), xb = mergeCo(old?.xb, dets.xb);
+      if (xc) row.xc = xc;
+      if (xb) row.xb = xb;
+    } else {
+      for (const k of ["x", "xc", "xb"]) if (old?.[k]) row[k] = old[k];
+    }
     // Строка текущей сессии переписывается, только когда изменилось что-то значимое: режим, ступень,
     // балл на ≥1 пункт или риск просадки на ≥1 п.п. Внутри дня балл дрожит на десятые от
     // интрадей-котировок, и без порога ветка ledger получала бы коммит почти на каждый такт снимка.
     const material = !old || old.r !== row.r || old.g !== row.g || !finite(old.c) || Math.abs(old.c - row.c) >= 1
       || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null)
-      || Object.keys(DIARY_FUNDS).some((k) => !finite(old[k]) && finite(row[k]));
+      || Object.keys(DIARY_FUNDS).some((k) => !finite(old[k]) && finite(row[k]))
+      || ["x", "xc", "xb"].some((k) => (old[k] || "") !== (row[k] || ""));
     if (material) {
       diary = diary.filter((x) => x.d !== row.d);
       diary.push(row);
@@ -907,7 +935,7 @@ function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, funds = 
     console.log(`::warning::у решения нет даты данных (dataAsOf=${dec.dataAsOf ?? "—"}) — журнал не пишется`);
     return { ledger: null, changed: false };
   }
-  const ledger = buildLedger(prevLedger, dec, { snapshotAt, spx, funds, now });
+  const ledger = buildLedger(prevLedger, dec, { snapshotAt, spx, funds, dets: detDiary(panel.detectors), now });
   if (panel.allocation) panel.allocation.changes = ledgerChanges(ledger.transitions);
   return { ledger, changed: ledgerChanged(prevLedger, ledger) };
 }
@@ -2278,5 +2306,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+export { detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };

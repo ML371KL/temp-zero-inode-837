@@ -1,7 +1,7 @@
 // Тесты уведомлений. Все фикстуры синтетические и НЕ зависят от текущей даты: проверяется
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
-import { pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+import { detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR } from "./notify.mjs";
 
 let passed = 0;
@@ -705,6 +705,36 @@ test("v5.4: первое сообщение о смене доли после в
   assert.ok(!again[0].causes.some((c) => /Правило детекторов/.test(c)), "второй раз пояснения нет");
   assert.equal(pendingRuleNotes({}, Date.parse("2027-01-15T12:00:00Z")).length, 0, "после срока пояснение не добавляется");
   assert.equal(pendingRuleNotes({}, Date.parse("2026-10-27T12:00:00Z")).length, 0, "до выкладки — тоже");
+});
+
+test("v5.4.1: дневник хранит состояния семи детекторов за сессию — максимум за день, компании новостных", () => {
+  const dets = (o = {}) => DIARY_DETS.map((k) => ({ id: "d_" + k, state: o[k] || "calm", co: o[k + "Co"] || null }));
+  assert.equal(detDiary(dets()).x, ".......");
+  const d1 = detDiary(dets({ capex: "fired", capexCo: ["MSFT/cut", "META/dc"], oil: "watch", turn: "good" }));
+  assert.deepEqual([d1.x, d1.xc, d1.xb], [".F.w..+", "MSFT/cut,META/dc", ""]);
+  assert.equal(detDiary([]), null, "без детекторов — поля нет");
+  assert.equal(detDiary([{ id: "d_fund", state: "fired" }]).x, "F??????", "отсутствующий детектор — «?»");
+  const dec = decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2026-10-29" });
+  const l1 = buildLedger(ledgerAt(1), dec, { spx: 7700, dets: d1, now: 0 });
+  const r1 = l1.diary.find((x) => x.d === "2026-10-29");
+  assert.deepEqual([r1.x, r1.xc], [".F.w..+", "MSFT/cut,META/dc"]);
+  // к вечеру капекс успокоился, а нефть сработала: в дневнике — худшее за сессию, компании — объединение
+  const d2 = detDiary(dets({ oil: "fired", bdc: "watch", bdcCo: ["OBDC/gate"] }));
+  const l2 = buildLedger(l1, dec, { spx: 7710, dets: d2, now: 0 });
+  const r2 = l2.diary.find((x) => x.d === "2026-10-29");
+  assert.deepEqual([r2.x, r2.xc, r2.xb], [".FwF..+", "MSFT/cut,META/dc", "OBDC/gate"]);
+  assert.ok(ledgerChanged(l1, l2), "новое состояние детектора — существенное изменение журнала");
+  const l3 = buildLedger(l2, dec, { spx: 7712, dets: detDiary(dets()), now: 0 });
+  assert.ok(!ledgerChanged(l2, l3), "успокоение внутри сессии строку не переписывает");
+  const l4 = buildLedger(l3, dec, { spx: 7712, now: 0 });
+  assert.equal(l4.diary.find((x) => x.d === "2026-10-29").x, ".FwF..+", "без детекторов в прогоне поле сохраняется");
+});
+
+test("v5.4.1: извлечение со страницы несёт компании новостных детекторов", () => {
+  const document = { getElementById: (id) => (id === "actionStrip" ? { innerText: "", querySelector: () => null } : null) };
+  const DETS = [{ id: "d_capex", name: "Капекс", logic: "", last: { st: "fired", inputs: "x", co: ["MSFT/cut", "META/dc"] } }, { id: "d_oil", name: "Нефть", logic: "", last: { st: "watch" } }];
+  const out = new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, [], { data: {}, decision: decisionOf({ rung: 1 }) }, DETS, null, undefined);
+  assert.deepEqual(out.detectors.map((d) => [d.id, d.state, d.co]), [["d_capex", "fired", ["MSFT/cut", "META/dc"]], ["d_oil", "watch", null]]);
 });
 
 test("первый канонический прогон без журнала — база, а не сообщение", () => {

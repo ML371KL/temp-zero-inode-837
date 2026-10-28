@@ -21,6 +21,7 @@ on:
       - "scripts/indices-test.mjs"
       - "scripts/breakdown-test.mjs"
       - "scripts/households-test.mjs"
+      - "scripts/episodes-test.mjs"
       - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
@@ -87,6 +88,11 @@ jobs:
         # числа, г/г по календарю при дыре, Δ52 нед., Δ4 кв., перцентиль с 1978, пик из ряда, «−», пропавший ряд.
         # Глубина рядов сверяется со сборщиком, ужатие и valid() — настоящими функциями сборщика. Без сети.
         run: node scripts/households-test.mjs
+
+      - name: Проверить журнал эпизодов детекторов
+        # Ядро ⟦EPISODES-CORE⟧ исполняется из страницы: эпизоды по полю x дневника (максимум за сессию), пик,
+        # компании, S&P через 21 и 63 сессии по закрытиям дневника, восстановленный эпизод капекса октября. Без сети.
+        run: node scripts/episodes-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,
