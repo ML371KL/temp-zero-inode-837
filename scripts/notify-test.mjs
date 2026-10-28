@@ -9,9 +9,13 @@ import { readFileSync } from "node:fs";
 process.env.NOTIFY_LLM_MAX_RETRIES = "0";
 process.env.NOTIFY_LLM_TIMEOUT_MS = "1500";
 for (const k of ["NOTIFY_MODEL", "NOTIFY_LLM_EFFORT", "NOTIFY_LLM_DAILY_USD", "ANTHROPIC_BASE_URL"]) delete process.env[k];
-const { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+const { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, diff: diffRaw, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR,
   guardCheck, gParseBlocks, guardRecord, guardOpsTick, guardWeekOf } = await import("./notify.mjs");
+// Все события, которые за прогон тестов собрал diff(), — их рендер проверяет на стандарт сообщений
+// последний тест файла («единый стиль: каждое событие прогона тестов…»).
+const ALL_EVENTS = [];
+const diff = (...a) => { const ev = diffRaw(...a); ALL_EVENTS.push(...ev); return ev; };
 
 let passed = 0;
 const test = (name, fn) => {
@@ -458,7 +462,7 @@ test("VIX выходит по закрытию FRED, а не по первой �
   const ev = step(["+3,4", "2026-10-22", true], ["0,96", "2026-10-22", true], C21);
   assert.equal(ev.length, 1, "закрытие 21.10 — одно сообщение на обе карточки");
   assert.equal(ev[0].title, "Индексы волатильности CBOE");
-  assert.match(ev[0].detail, /21\.10\.2026/);
+  assert.match(ev[0].detail, /21\.10(?!\.)/, "год снимка не пишется");
   assert.deepEqual(ev[0].moves.map((m) => `${m.name}: ${m.before}→${m.after}`), [`${HUMAN.vix.t}: 17,9→18,6`, `${HUMAN.vixterm.t}: 0,91→0,95`], "в строке — официальные закрытия, а не котировка");
   assert.equal(step(["+1,8", "2026-10-21"], ["0,95", "2026-10-21"], C21).length, 0, "то же закрытие на карточке без котировки — уже сказано");
   assert.equal(step(["+3,6", "2026-10-22", true], ["0,95", "2026-10-22", true], C21).length, 0);
@@ -472,7 +476,7 @@ testAsync("контекст модели называет VIX уровнем з�
   const { seen, impl } = capture(reply("===0===\nтекст"));
   await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
   const ctx = JSON.parse(seen[0].body.messages[0].content).panel_context.market_now;
-  assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10.2026)`]);
+  assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10)`]);
 });
 
 test("иена и нефть выходят по фиксингу ЕЦБ и цене EIA, а не по ночной котировке Yahoo", () => {
@@ -492,8 +496,8 @@ test("иена и нефть выходят по фиксингу ЕЦБ и це
   assert.deepEqual(ev.map((e) => e.title).sort(), ["Курсы валют (фиксинг ЕЦБ)", "Цены на нефть (EIA)"]);
   const line = (t) => ev.find((e) => e.title === t).moves.map((m) => `${m.before}→${m.after}`)[0];
   assert.equal(line("Курсы валют (фиксинг ЕЦБ)"), "157,02 ¥→157,52 ¥", "в строке — фиксинг ЕЦБ");
-  assert.equal(line("Цены на нефть (EIA)"), "101,50 $→94,99 $", "в строке — цена EIA, а не фьючерс");
-  assert.match(ev.find((e) => e.title === "Цены на нефть (EIA)").detail, /20\.10\.2026/, "дата — день цены EIA, а не день котировки");
+  assert.equal(line("Цены на нефть (EIA)"), "$101,50→$94,99", "в строке — цена EIA, а не фьючерс");
+  assert.match(ev.find((e) => e.title === "Цены на нефть (EIA)").detail, /20\.10(?!\.)/, "дата — день цены EIA, а не день котировки");
 });
 
 testAsync("контекст модели называет нефть ценой EIA, а иену — фиксингом ЕЦБ, с единицей и датой", async () => {
@@ -504,7 +508,7 @@ testAsync("контекст модели называет нефть ценой 
   const { seen, impl } = capture(reply("===0===\nтекст"));
   await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
   assert.deepEqual(JSON.parse(seen[0].body.messages[0].content).panel_context.market_now,
-    [`${HUMAN.jpy.t}: 157,96 ¥ (фиксинг ЕЦБ 28.10.2026)`, `${HUMAN.oil.t}: 94,99 $ (цена EIA 20.10.2026)`]);
+    [`${HUMAN.jpy.t}: 157,96 ¥ (фиксинг ЕЦБ 28.10)`, `${HUMAN.oil.t}: $94,99 (цена EIA 20.10)`]);
 });
 
 test("официальные ряды нефти и иены страница не трогает котировкой: она кладётся поверх копии", () => {
@@ -674,7 +678,7 @@ test("переписанная точка ряда показывается с �
   const ev = diff(before, after);
   assert.equal(ev.length, 1);
   assert.equal(ev[0].kind, "revision");
-  assert.match(ev[0].detail, /27\.05\.2026/, "дата переписанной точки обязана быть в сообщении");
+  assert.match(ev[0].detail, /за 27\.05(?![.\d])/, "дата переписанной точки обязана быть в сообщении");
   assert.equal(ev[0].moves[0].before, "100");
   assert.equal(ev[0].moves[0].after, "115");
   assert.equal(ev[0].moves[0].delta, "+15,0%", "проценты пишутся по-русски, с запятой");
@@ -693,7 +697,7 @@ test("несколько переписанных точек — одно соо
   const moved = { ...base, [day("2026-05-02")]: 21, [day("2026-05-03")]: 31, [day("2026-05-04")]: 41 };
   const ev = diff(before, panelOf([withPoints(moved)]));
   assert.equal(ev.length, 1);
-  assert.match(ev[0].detail, /период 02\.05\.2026 — 04\.05\.2026/);
+  assert.match(ev[0].detail, /период 02\.05 — 04\.05(?![.\d])/);
   assert.equal(ev[0].moves.length, 3);
 });
 
@@ -813,19 +817,26 @@ test("крупные и мелкие порядки печатаются чит�
   assert.equal(ev[0].moves[0].delta, "+14,4%");
 });
 
-test("шаблонный комментарий не бывает пустым ни для одного типа события", () => {
+test("шаблон есть у каждого события, о котором ему есть что сказать, а пустой не печатается", () => {
   const kinds = [
-    { kind: "target", before: "80%", after: "5%" },
-    { kind: "verdict" },
-    { kind: "detector", after: "СРАБОТАЛ" },
-    { kind: "zone", beforeScore: 1, afterScore: -1, note: "Заметка. Хвост." },
-    { kind: "release", moves: [{ name: "A", before: "1", after: "2" }] },
+    { kind: "allocation", before: "80%", after: "5%" },
+    { kind: "risk", after: "СРАБОТАЛ" },
+    { kind: "risk", after: "спокоен" },
+    { kind: "release", moves: [{ name: "A", before: "1", after: "2" }], plain: ["Индекс волатильности VIX — ожидаемая рынком амплитуда колебаний S&P 500 на месяц вперёд"] },
+    { kind: "release", moves: [{ name: "A", before: "1", after: "2", delta: "заметное движение" }] },
     { kind: "revision" },
   ];
   for (const ev of kinds) {
     const c = templateComment(ev);
     assert.ok(c && c.length > 20, `пустой комментарий у ${ev.kind}`);
   }
+  // справка о смысле показателя — без повтора его имени (оно уже стоит в строке движения)
+  assert.equal(templateComment(kinds[3]), "Ожидаемая рынком амплитуда колебаний S&P 500 на месяц вперёд.");
+  // сказать нечего — строки нет вовсе: ни «вышли новые данные», ни оговорки «разбор недоступен»
+  const bare = { kind: "release", title: "T", before: "", after: "", detail: "", moves: [{ name: "A", before: "1", after: "2" }] };
+  assert.equal(templateComment(bare), "");
+  const msg = renderMessage(bare, null, { note: templateComment(bare) });
+  assert.doesNotMatch(msg, /💬|<i><\/i>|недоступен/, msg);
 });
 
 test("шаблон релиза не вываливает заметки всех карточек", () => {
@@ -964,7 +975,7 @@ test("каноническая смена доли идёт от журнала 
   assert.equal(ev[0].before, "100% нормы");
   assert.equal(ev[0].after, "50% нормы");
   assert.match(ev[0].detail, /РИСК УМЕРЕННЫЙ → РИСК ПОВЫШЕН/, "режим называется словами шапки");
-  assert.match(ev[0].detail, /01\.10\.2026/, "сессия данных указана");
+  assert.match(ev[0].detail, /01\.10(?![.\d])/, "сессия данных указана");
   assert.match(ev[0].key, /@2026-10-01$/, "в ключе — дата смены");
   assert.match(ev[0].causes[0], /Сводная оценка рынка −14,2/);
   const msg = renderMessage(ev[0], "к");
@@ -1044,7 +1055,7 @@ test("v5.5: поправка владельца включена — обе до
   const on = diff({ ...prevNo, ledger: ledgerAt(2, "2026-10-29") }, pOn).filter((e) => /Поправка владельца/.test(e.title));
   assert.equal(on.length, 1);
   assert.deepEqual([on[0].title, on[0].before, on[0].after], ["Поправка владельца включена", "100% нормы", "50% нормы"]);
-  assert.match(on[0].detail, /не больше 50% нормы до 20\.11\.2026 \(отчёты гиперскейлеров\); доля модели — 100%/);
+  assert.match(on[0].detail, /не больше 50% нормы до 20\.11 \(отчёты гиперскейлеров\); доля модели — 100%/);
   assert.match(renderMessage(on[0], "к"), /Поправка владельца включена/);
   assert.match(pingMessage(pOn), /доля модели — 100%/);
   // повтор того же состояния — тишина; истечение — событие «истекла», действует доля модели
@@ -1055,7 +1066,7 @@ test("v5.5: поправка владельца включена — обе до
   // смена доли модели при включённой поправке — в сообщении обе доли
   const { panel: pMove } = canonPanel(decisionOf({ rung: 1, since: "2026-11-04", dataAsOf: "2026-11-04", owner: { ...own, eff: 50, limiting: false } }), ledgerAt(2, "2026-10-29"));
   const mv = allocEvents(diff({ ...stateOf(pOn), ledger: ledgerAt(2, "2026-10-29") }, pMove)).find((e) => /Доля акций/.test(e.title));
-  assert.match(mv.detail, /Поправка владельца: держите не больше 50% нормы до 20\.11\.2026/);
+  assert.match(mv.detail, /Поправка владельца: держите не больше 50% нормы до 20\.11(?![.\d])/);
 });
 
 test("первый канонический прогон без журнала — база, а не сообщение", () => {
@@ -2166,6 +2177,119 @@ test("renderMessage: длинный разбор не рвёт HTML-сущнос
       assert.equal(opened, closed, `сдвиг ${shift}: <${tag}> без пары`);
     }
   }
+});
+
+/* ---------- единый стиль сообщений (стандарт 29.10.2026, TELEGRAM-STYLE-2026-10-29.md) ----------
+   Пометка панели первым словом заголовка, одна эмодзи из таблицы стандарта, подвал «ссылка · время
+   МСК», русские числа (запятая, «−», «$» перед числом, процент слитно), ни ISO, ни UTC, ни сырых
+   float. Лента NEXUS получает тот же текст без разметки — он читается так же. */
+const { fmtNum, ruMoment, typo, PANEL_TAG, PANEL_URL, telegramPlain } = await import("./notify.mjs");
+const sp = (s) => String(s ?? "").replace(/\u00a0/g, " ");
+
+function styleFaults(html) {
+  const bad = [];
+  const lines = html.split("\n");
+  if (!/^(🔔|⚠️|🗓|ℹ️|📈|📉) <b>Рынок США · [^<\n]+<\/b>$/u.test(lines[0])) bad.push(`заголовок без пометки панели или эмодзи стандарта: ${lines[0]}`);
+  if (!/^<a href="https:\/\/tzi-837\.pages\.dev\/">Открыть панель<\/a> · \d\d\.\d\d(\.\d{4})?, \d\d:\d\d МСК$/.test(lines.at(-1))) bad.push(`подвал не по стандарту: ${lines.at(-1)}`);
+  if (lines.at(-2) !== "") bad.push("перед подвалом нет пустой строки");
+  if (html.length > 4096) bad.push(`длиннее 4096: ${html.length}`);
+  const plain = telegramPlain(html, 1e9);
+  // версия правила («v5.4») — не десятичная дробь
+  const body = plain.replace(/\b\d\d\.\d\d(\.\d{4})?\b/g, "ДАТА").replace(/\bv\d+(\.\d+)+/g, "ВЕРСИЯ");
+  for (const [re, what] of [
+    [/UTC|\d{4}-\d\d-\d\d|T\d\d:\d\d|\d:\d\dZ/, "ISO или UTC"],
+    [/\d\.\d/, "десятичная точка"],
+    [/(^|[\s(«:;,/])-\d/m, "дефис вместо минуса"],
+    [/\d[ \u00a0]%/, "процент через пробел"],
+    [/\d[ \u00a0]?\$(?![A-Za-z0-9])/, "доллар после числа"],
+    [/\d[.,]\d{5,}/, "сырой float"],
+    [/&lt;|&gt;|&amp;|&quot;/, "сущность HTML в ленте NEXUS"],
+    [/(^|\n)\s*·|·\s*($|\n)/, "висящая «·»"],
+    [/\d \d{3}(?!\d)/, "разряды обычным пробелом"],
+  ]) if (re.test(body)) bad.push(`${what}: «${(body.match(re) || [""])[0]}» в ${JSON.stringify(plain).slice(0, 300)}`);
+  for (const l of lines.slice(1)) if (/^\p{Extended_Pictographic}/u.test(l) && !/^(⏳|💬|🔴|🟠|🟡|🟢) /u.test(l)) bad.push(`эмодзи не в заголовке: ${l}`);
+  return bad;
+}
+
+test("числа пишет одна функция: запятая, «−», разряды с 10 000, четырёхзначные слитно", () => {
+  const cases = [[1234, {}, "1234"], [12345, {}, "12 345"], [2391.72, { digits: 2 }, "2391,72"], [-0.5, {}, "−0,5"], [0.5, { sign: true }, "+0,5"],
+    [-0.04, { sign: true }, "0"], [-0.5, { digits: 2, fixed: true }, "−0,50"], [NaN, {}, "—"]];
+  for (const [x, o, want] of cases) assert.equal(sp(fmtNum(x, o)), want, `${x} ${JSON.stringify(o)}`);
+  assert.ok(fmtNum(12345).includes("\u00a0"), "разряды — неразрывным пробелом");
+});
+
+test("подписи страницы приводятся к стандарту, повторный проход ничего не меняет", () => {
+  const cases = [["-0,50", "−0,50"], ["107,89 $", "$107,89"], ["1 147 б.п.", "1147 б.п."], ["12 345 б.п.", "12 345 б.п."], ["0,5 %", "0,5%"], ["-24 б.п.", "−24 б.п."], ["157,82 ¥", "157,82 ¥"]];
+  for (const [raw, want] of cases) {
+    assert.equal(sp(typo(raw)), want, raw);
+    assert.equal(typo(typo(raw)), typo(raw), `${raw}: не идемпотентно`);
+  }
+});
+
+test("время — по Москве с пометкой, год — только не текущий", () => {
+  diff(stateOf(panelOf([ind({})])), panelOf([ind({})]));
+  assert.equal(ruMoment(Date.parse("2026-07-24T11:05:00Z")), "24.07, 14:05 МСК");
+  assert.equal(ruMoment(Date.parse("2026-12-31T22:30:00Z")), "01.01.2027, 01:30 МСК", "в Москве уже следующий год");
+  const prev = stateOf(panelOf([ind({ observed_at: "2026-12-29" })], { generated_at: "2027-01-05T10:00:00.000Z" }));
+  const ev = diff(prev, panelOf([ind({ value: "2", value_num: 2, observed_at: "2026-12-30" })], { generated_at: "2027-01-05T10:00:00.000Z" }));
+  assert.equal(ev[0].detail, "данные за 30.12.2026");
+  assert.match(renderMessage(ev[0], null), /Открыть панель<\/a> · 05\.01, 13:00 МСК$/);
+  diff(stateOf(panelOf([ind({})])), panelOf([ind({})])); // вернуть «текущий год» фикстур
+});
+
+test("досылка с опозданием помечена строкой под заголовком", () => {
+  const t = Date.parse("2026-10-01T20:06:00Z");
+  const ev = { kind: "release", title: "Кредитные спреды США", before: "", after: "", moves: [{ name: "Спред", before: "330 б.п.", after: "318 б.п." }], detail: "данные за 01.10", at: t };
+  const late = renderMessage(ev, null, { sentAt: t + 3 * 3600e3 });
+  assert.equal(late.split("\n")[1], "⏳ С опозданием на 3 ч", late);
+  assert.match(late, /· 01\.10, 23:06 МСК$/, "в подвале — время события, а не отправки");
+  assert.doesNotMatch(renderMessage(ev, null, { sentAt: t + 30 * 60e3 }), /⏳/);
+});
+
+test("проверка связи — с пометкой панели", () => {
+  const m = pingMessage(panelOf([ind({})]));
+  assert.match(m, /^ℹ️ <b>Рынок США · Проверка связи<\/b>\n/, m);
+  assert.doesNotMatch(m, /детектор/i, m);
+});
+
+test("сигнал риска: служебная приписка о судье новостей и «(вне балла)» читателю не идут", () => {
+  const prev = stateOf(panelOf([ind({})], { detectors: [{ id: "capex", name: "Капекс / амортизация гиперскейлеров", state: "fired", inputs: "", note: "" }] }));
+  const inputs = "отступление: фактов 0 · неподтв. 0 · трения стройки (вне балла): 2 у 2 компаний [AMZN,MSFT] · без причины (вне балла): 1 · мнений: 6 · LLM-судья сервера ✓ nemotron-3-ultra-550b-a55b:free (12 вердиктов в снимке)";
+  const ev = diff(prev, panelOf([ind({})], { detectors: [{ id: "capex", name: "Капекс / амортизация гиперскейлеров", state: "calm", inputs, note: "" }] }));
+  assert.equal(ev[0].kind, "risk");
+  assert.equal(ev[0].detail, "отступление: фактов 0 · неподтв. 0 · трения стройки: 2 у 2 компаний [AMZN,MSFT] · без причины: 1 · мнений: 6");
+  assert.deepEqual(styleFaults(renderMessage(ev[0], null, { note: templateComment(ev[0]) })), []);
+});
+
+test("каждый вид сообщения: пометка «Рынок США», эмодзи стандарта, подвал со временем МСК", () => {
+  assert.equal(PANEL_TAG, "Рынок США");
+  assert.equal(PANEL_URL, "https://tzi-837.pages.dev/");
+  const at = Date.parse("2026-10-01T20:06:00Z");
+  const want = { allocation: "🔔", risk: "⚠️", service: "ℹ️", release: "🗓", revision: "ℹ️" };
+  for (const kind of KIND_ORDER) {
+    const msg = renderMessage({ kind, title: "Заголовок", before: "", after: "", detail: "x", at }, kind === "release" ? "разбор" : null);
+    assert.ok(msg.startsWith(`${want[kind]} <b>Рынок США · Заголовок</b>\n`), `${kind}: ${msg}`);
+    assert.deepEqual(styleFaults(msg), [], kind);
+  }
+});
+
+testAsync("единый стиль: смена доли и служебное сообщение из main() — по стандарту", async () => {
+  const r = await mainRun({ state: prevForMain(), selftest: "failure" });
+  assert.ok(r.texts.length >= 2);
+  for (const t of r.texts) assert.deepEqual(styleFaults(t), [], t);
+});
+
+testAsync("единый стиль: каждое событие прогона тестов — по стандарту", async () => {
+  // последний тест файла: к этому моменту diff() собрал события всех видов из фикстур выше
+  const kinds = new Set();
+  for (const ev of ALL_EVENTS) {
+    const html = renderMessage(ev, null, { note: templateComment(ev) });
+    const faults = styleFaults(html);
+    assert.deepEqual(faults, [], `${faults.join("; ")}\n${html}`);
+    kinds.add(ev.kind);
+  }
+  assert.ok(ALL_EVENTS.length >= 40, `событий мало для проверки: ${ALL_EVENTS.length}`);
+  for (const k of ["allocation", "risk", "release", "revision"]) assert.ok(kinds.has(k), `в прогоне нет события ${k}`);
 });
 
 for (const [name, fn] of asyncTests) {
