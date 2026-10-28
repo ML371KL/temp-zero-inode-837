@@ -294,6 +294,47 @@ try {
     assert.equal(await S(() => localStorage.getItem("razlom26.rung.v2")), null);
   });
   await test("сценарии без ошибок JS", async () => assert.deepEqual(w.errors, []));
+
+  /* v5.5.1: ставка ФРС на дату раньше окна её ряда — неизвестна. 17.09.2026 ФРС подняла ставку (IORB 3,65 → 3,90,
+     верх коридора 3,75 → 4,00); когда окно ряда ставки ушло за 17.09, страница подставляла в 14–16.09 самую позднюю
+     (SOFR − IORB: −3 → −28) или самую раннюю (путь ФРС: 90 → 65) ставку окна, и уведомления разослали это как
+     пересчёт истории. Карточки исполняются на подставленном кэше FRED в отдельной странице. */
+  const r = await open();
+  const R = (fn, ...a) => r.page.evaluate(fn, ...a);
+  await test("rateAt: раньше окна — неизвестно, внутри — последнее значение не позже даты", async () => {
+    const out = await R(() => {
+      const rows = [{ d: new Date("2026-09-17T00:00:00Z"), v: 3.9 }, { d: new Date("2026-09-20T00:00:00Z"), v: 4.15 }];
+      return ["2026-09-16", "2026-09-17", "2026-09-19", "2026-09-20", "2026-09-30"].map(d => rateAt(rows, new Date(d + "T00:00:00Z")));
+    });
+    assert.deepEqual(out, [null, 3.9, 3.9, 4.15, 4.15]);
+  });
+  await test("SOFR − IORB и путь ФРС: даты раньше окна ставки выпадают из ряда, а не получают чужую ставку", async () => {
+    const res = await R(async () => {
+      const days = ["2026-09-10", "2026-09-11", "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-21", "2026-09-22"];
+      const at = (d) => new Date(d + "T00:00:00Z");
+      const put = (k, rows) => { FREDCACHE[k] = { obs: rows.map(([d, v]) => ({ d: at(d), v })), ts: Date.now() }; };
+      put("SOFR", days.map(d => [d, d < "2026-09-17" ? 3.62 : 3.85]));
+      put("DGS2", days.map(d => [d, 4.5]));
+      // окно ставки начинается ПОСЛЕ повышения: дат 10–16.09 в нём нет
+      put("IORB", ["2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21", "2026-09-22"].map(d => [d, 3.9]));
+      put("DFEDTARU", ["2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21", "2026-09-22"].map(d => [d, 4.0]));
+      const load = async (id) => { const o = await IND.find(i => i.id === id).load(); return o.series.map(p => [p.d.toISOString().slice(0, 10), Math.round(p.v)]); };
+      return { sofr: await load("sofr_iorb"), policy: await load("policy") };
+    });
+    assert.deepEqual(res.sofr, [["2026-09-17", -5], ["2026-09-18", -5], ["2026-09-21", -5], ["2026-09-22", -5]], "SOFR − IORB: 10–16.09 без IORB — без точки (было −28)");
+    assert.deepEqual(res.policy.map(p => p[0]), ["2026-09-17", "2026-09-18", "2026-09-21", "2026-09-22"], "путь ФРС: 10–16.09 без верха коридора — без точки");
+    assert.ok(res.policy.every(p => p[1] === 50), `путь ФРС: 2-летка 4,5 % минус верх коридора 4,0 % = +50 б.п.: ${JSON.stringify(res.policy)}`);
+  });
+  await test("глубина рядов ставки на странице и в сборщике одна и покрывает окна SOFR и 2-летки", async () => {
+    const lit = (src, name) => { const m = src.match(new RegExp("const " + name + "=\\{([\\s\\S]*?)\\};")); assert.ok(m, name);
+      return Object.fromEntries([...m[1].matchAll(/([A-Z0-9]+):(\d+)/g)].map(x => [x[1], Number(x[2])])); };
+    const pg = lit(PAGE, "SERIES_LIMITS"), coll = lit(readFileSync("scripts/fetch-snapshot.mjs", "utf-8"), "SERIES");
+    for (const k of ["SOFR", "IORB", "DGS2", "DFEDTARU"]) assert.equal(pg[k], coll[k], `${k}: глубина на странице ≠ сборщику`);
+    // ставка — ряд по календарным дням, SOFR и 2-летка — по торговым сессиям (≈ 7/5 календарного дня на сессию)
+    assert.ok(pg.IORB >= Math.ceil(pg.SOFR * 7 / 5) + 3, `IORB ${pg.IORB} дн. не покрывает ${pg.SOFR} сессий SOFR`);
+    assert.ok(pg.DFEDTARU >= Math.ceil(pg.DGS2 * 7 / 5) + 3, `DFEDTARU ${pg.DFEDTARU} дн. не покрывает ${pg.DGS2} сессий 2-летки`);
+  });
+  await test("проверки ставки без ошибок JS", async () => assert.deepEqual(r.errors, []));
 } finally {
   await browser.close();
   server.close();

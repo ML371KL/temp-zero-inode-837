@@ -475,6 +475,48 @@ testAsync("контекст модели называет VIX уровнем з�
   assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10.2026)`]);
 });
 
+test("иена и нефть выходят по фиксингу ЕЦБ и цене EIA, а не по ночной котировке Yahoo", () => {
+  // Неделя 21–28.10.2026: «Курсы валют (фиксинг ЕЦБ) · иена» уходили в 00:06 UTC и в воскресенье 19:26, «Цены на нефть
+  // (EIA)» — в 00:26 UTC и в воскресенье 22:26: дата карточки сдвигалась с котировкой Yahoo поверх официального ряда.
+  const card = (id, value, d, unit) => ({ id, name: id, value, value_num: Number(String(value).replace(",", ".")), unit, delta: "интрадей (~15 мин)",
+    zone: "норма", score: 0, observed_at: d, source: "", note: "", degraded: false, voting: true, lead: false, series: [] });
+  const run = (jpy, oil, c) => mute(() => fromPageRaw({ generated_at: "2026-10-27T00:06:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [card("jpy", jpy[0], jpy[1], "¥"), card("oil", oil[0], oil[1], "$")], closes: c }));
+  const C = (ecb, wti) => ({ "ECB:JPY": ecb.map(([d, v]) => ({ d, v })), DCOILWTICO: wti.map(([d, v]) => ({ d, v })) });
+  const c26 = C([["2026-10-23", 156.8], ["2026-10-26", 157.02]], [["2026-10-19", 101.5]]);
+  let state = stateOf(run(["157,0", "2026-10-26"], ["101,5", "2026-10-19"], c26));
+  const step = (jpy, oil, c) => { const p = run(jpy, oil, c); const ev = diff(state, p); state = snapshotState(p, state); return ev; };
+  assert.equal(step(["157,5", "2026-10-27"], ["101,2", "2026-10-27"], c26).length, 0, "00:06 UTC: котировка Yahoo нового дня — не фиксинг ЕЦБ и не цена EIA");
+  // 27.10 ~14:00 UTC ЕЦБ публикует фиксинг; цена EIA за 20.10 приходит во FRED с обычным лагом
+  const ev = step(["157,6", "2026-10-27"], ["100,4", "2026-10-28"], C([["2026-10-26", 157.02], ["2026-10-27", 157.52]], [["2026-10-19", 101.5], ["2026-10-20", 94.99]]));
+  assert.deepEqual(ev.map((e) => e.title).sort(), ["Курсы валют (фиксинг ЕЦБ)", "Цены на нефть (EIA)"]);
+  const line = (t) => ev.find((e) => e.title === t).moves.map((m) => `${m.before}→${m.after}`)[0];
+  assert.equal(line("Курсы валют (фиксинг ЕЦБ)"), "157,02 ¥→157,52 ¥", "в строке — фиксинг ЕЦБ");
+  assert.equal(line("Цены на нефть (EIA)"), "101,50 $→94,99 $", "в строке — цена EIA, а не фьючерс");
+  assert.match(ev.find((e) => e.title === "Цены на нефть (EIA)").detail, /20\.10\.2026/, "дата — день цены EIA, а не день котировки");
+});
+
+testAsync("контекст модели называет нефть ценой EIA, а иену — фиксингом ЕЦБ, с единицей и датой", async () => {
+  const card = (id, value, unit) => ({ id, name: id, value, value_num: 1, unit, delta: "", zone: "норма", score: 0, observed_at: "2026-10-28", source: "", note: "", degraded: false, voting: true, lead: false, series: [] });
+  const panel = mute(() => fromPageRaw({ generated_at: "2026-10-28T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [card("jpy", "157,6", "¥"), card("oil", "100,4", "$")],
+    closes: { "ECB:JPY": [{ d: "2026-10-28", v: 157.96 }], DCOILWTICO: [{ d: "2026-10-20", v: 94.99 }] } }));
+  const { seen, impl } = capture(reply("===0===\nтекст"));
+  await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
+  assert.deepEqual(JSON.parse(seen[0].body.messages[0].content).panel_context.market_now,
+    [`${HUMAN.jpy.t}: 157,96 ¥ (фиксинг ЕЦБ 28.10.2026)`, `${HUMAN.oil.t}: 94,99 $ (цена EIA 20.10.2026)`]);
+});
+
+test("официальные ряды нефти и иены страница не трогает котировкой: она кладётся поверх копии", () => {
+  const html = readFileSync(new URL("../docs/index.html", import.meta.url), "utf8");
+  const block = (id) => html.split(`addInd({id:"${id}"`)[1]?.split("addInd({id:")[0] || "";
+  assert.match(block("oil"), /fred\("DCOILWTICO"\)\)\.slice\(\)/, "нефть: котировка поверх КОПИИ ряда EIA — кэш FRED остаётся ценой EIA");
+  assert.match(block("jpy"), /fxRange\("JPY"\)/, "иена: фиксинг ЕЦБ через fxRange");
+  assert.match(html, /async function fxRange[\s\S]{0,900}Object\.entries\(j\.rates\|\|\{\}\)\.map\(/, "fxRange строит СВОЙ массив из rates — ответ снимка fx:JPY остаётся фиксингом");
+  assert.match(html, /if\(h\.includes\("frankfurter"\)\)\s*\{const c=\(q\.get\("symbols"\)\|\|q\.get\("to"\)\|\|""\);return c\?"fx:"\+c:null;\}/, "фиксинг лежит в снимке под ключом fx:<валюта>");
+  assert.match(html, /<span class="num">v\d+\.\d+\.\d+ /, "версия страницы в шапке — по ней уведомитель отличает смену методики от пересмотра");
+});
+
 test("закрытие не прочиталось — публикации нет, база держит прошлое закрытие", () => {
   const card = (id) => ({ id, name: id, value: "1", value_num: 1, unit: "", delta: "", zone: "норма", score: 0, observed_at: "2026-10-21", source: "", note: "", degraded: false, voting: true, lead: false, series: [] });
   const run = (c) => mute(() => fromPageRaw({ generated_at: "2026-10-22T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" }, indicators: [card("vix")], closes: c }));
@@ -735,6 +777,23 @@ test("смена поставщика — не пересмотр: ряд цел
   // смена поставщика без переписанного целиком ряда пересмотр не глушит
   const one = { ...base, [day("2026-10-05")]: 170 };
   assert.equal(mute(() => diff(was, panelOf([withPoints(one, { id: "jpy" })], { providers: { "fx:JPY": "failed" } }))).length, 1);
+});
+
+test("смена версии страницы — не пересмотр: пересчитанные её кодом ряды не рассылаются", () => {
+  // v5.5.1 исправила спред SOFR − IORB и путь ФРС для дат до окна ставки: в первом прогоне после выкладки точки
+  // 14–16.09 и старше «пересчитались» бы на 25 б.п. — это смена методики панели, а не правка первоисточника.
+  const pts = (v) => ({ [day("2026-09-10")]: 70, [day("2026-09-14")]: v, [day("2026-09-15")]: v + 2, [day("2026-09-18")]: 95 });
+  const was = { ...stateOf(panelOf([withPoints(pts(65), { id: "policy" })])), page_version: "v5.5.0" };
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let ev;
+  try { ev = diff(was, panelOf([withPoints(pts(90), { id: "policy" })], { page_version: "v5.5.1" })); } finally { console.log = realLog; }
+  assert.equal(ev.length, 0);
+  assert.ok(logs.some((l) => /версия страницы v5\.5\.0 → v5\.5\.1: точек рядов с другим значением 2/.test(l)), `факт — в логе: ${logs}`);
+  assert.equal(diff(was, panelOf([withPoints(pts(90), { id: "policy" })], { page_version: "v5.5.0" })).length, 1, "та же версия — пересмотр, как раньше");
+  assert.equal(snapshotState(panelOf([], { page_version: "v5.5.1" })).page_version, "v5.5.1", "версия запоминается в базе");
+  assert.equal(snapshotState(panelOf([]), { page_version: "v5.5.1" }).page_version, "v5.5.1", "не прочиталась — помним прежнюю");
 });
 
 test("память о показанных значениях протухает и не растёт бесконечно", () => {
@@ -1345,12 +1404,12 @@ test("каноническое решение передаёт закрытия 
 /* ---- v5.2.3: плитки вердикта со знаком «−» — настоящее извлечение со страницы на подставном DOM ---- */
 
 // Исполняется ТОТ ЖЕ текст PAGE_EXTRACTOR, что уходит в Chrome; глобали страницы подставлены параметрами.
-const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {}, snap = null, fred = undefined }) => {
+const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {}, snap = null, fred = undefined, station = "" }) => {
   const els = {
     ...Object.fromEntries(Object.entries(dom).map(([id, t]) => [id, { textContent: t }])),
     actionStrip: { innerText: strip, querySelector: (s) => (s === ".as-pct" ? { textContent: "50%" } : null) },
   };
-  const document = { getElementById: (id) => els[id] || null };
+  const document = { getElementById: (id) => els[id] || null, querySelector: (q) => (q === ".station .num" && station ? { textContent: station } : null) };
   const state = { data, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
   return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], snap, fred);
 };
@@ -1410,10 +1469,15 @@ test("извлечение со страницы отдаёт поставщик
   assert.deepEqual(out.providers, { "fx:JPY": "failed", "fred:NFCI": "stale" });
 });
 
-test("извлечение со страницы отдаёт хвосты официальных рядов закрытий из кэша FRED", () => {
-  const fred = (k) => ({ VIXCLS: [{ d: new Date("2026-10-20T00:00:00Z"), v: 17.9 }, { d: new Date("2026-10-21T00:00:00Z"), v: 18.6 }], VXVCLS: [{ d: new Date("2026-10-21T00:00:00Z"), v: 19.6 }] })[k] || null;
-  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), fred });
-  assert.deepEqual(out.closes, { VIXCLS: [{ d: "2026-10-20", v: 17.9 }, { d: "2026-10-21", v: 18.6 }], VXVCLS: [{ d: "2026-10-21", v: 19.6 }] });
+test("извлечение со страницы отдаёт хвосты официальных рядов: FRED из кэша страницы, фиксинг ЕЦБ из снимка, версию страницы", () => {
+  const fred = (k) => ({ VIXCLS: [{ d: new Date("2026-10-20T00:00:00Z"), v: 17.9 }, { d: new Date("2026-10-21T00:00:00Z"), v: 18.6 }], VXVCLS: [{ d: new Date("2026-10-21T00:00:00Z"), v: 19.6 }],
+    DCOILWTICO: [{ d: new Date("2026-10-20T00:00:00Z"), v: 94.99 }] })[k] || null;
+  const snap = { responses: { "fx:JPY": { base: "USD", rates: { "2026-10-27": { JPY: 157.52 }, "2026-10-28": { JPY: 157.96 }, "2026-10-26": { JPY: 157.0 } } } } };
+  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), fred, snap, station: "v5.5.1 · макроэкономика · ликвидность" });
+  assert.deepEqual(out.closes, { VIXCLS: [{ d: "2026-10-20", v: 17.9 }, { d: "2026-10-21", v: 18.6 }], VXVCLS: [{ d: "2026-10-21", v: 19.6 }],
+    DCOILWTICO: [{ d: "2026-10-20", v: 94.99 }], "ECB:JPY": [{ d: "2026-10-26", v: 157 }, { d: "2026-10-27", v: 157.52 }, { d: "2026-10-28", v: 157.96 }] });
+  assert.equal(out.page_version, "v5.5.1");
+  assert.deepEqual(extractFrom({ dom: {}, decision: decisionOf({ rung: 1 }) }).closes["ECB:JPY"], [], "нет fx:JPY в снимке — нет фиксинга, а не ошибка");
 });
 
 test("проверка связи называет долю в долях нормы", () => {
