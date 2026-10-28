@@ -122,11 +122,13 @@ const MACRO_CADENCE = {
   curve: { scheduled: true, revisable: false, release: "ФРС H.15", cadence: "каждый рабочий день" },
   real10: { scheduled: true, revisable: false, release: "ФРС H.15", cadence: "каждый рабочий день" },
   // режимы
-  jpy: { scheduled: true, revisable: false, release: "фиксинг ЕЦБ", cadence: "рабочий день" },
+  // иена и нефть — тоже по официальному ряду (close, см. CLOSE_OF): котировка Yahoo поверх фиксинга ЕЦБ и цены EIA
+  // «выходила» в 00:06 и 00:26 UTC и в воскресенье вечером под их именами
+  jpy: { scheduled: true, revisable: false, release: "фиксинг ЕЦБ", cadence: "рабочий день", close: true },
   goldreal: { scheduled: true, revisable: false, release: "дневная точка", cadence: "рынок 24/7" },
   btc: { scheduled: true, revisable: false, release: "дневная точка", cadence: "рынок 24/7" },
   stagf: { scheduled: true, revisable: false, release: "ФРС H.15", cadence: "каждый рабочий день" },
-  oil: { scheduled: true, revisable: false, release: "EIA", cadence: "рабочие дни" },
+  oil: { scheduled: true, revisable: false, release: "EIA", cadence: "рабочие дни, лаг 3–5 дней", close: true },
   cny: { scheduled: true, revisable: false, release: "фиксинг ЕЦБ", cadence: "рабочий день" },
   dxy: { scheduled: true, revisable: false, release: "ФРС H.10", cadence: "пакет по понедельникам" },
   // путь ставки ФРС (в балле): 2-летка из того же H.15, что кривая и реальная доходность
@@ -144,19 +146,25 @@ const MACRO_CADENCE = {
   quadrant: { scheduled: true, revisable: false, release: "ФРБ Чикаго · CFNAI", cadence: "ежемесячно" },
 };
 
-/* Официальное закрытие карточек с close: true — прямо из рядов FRED, которые страница держит в кэше
-   (fredCached; PAGE_EXTRACTOR отдаёт их хвосты полем closes). Значение карточки для этого не годится:
+/* Официальное значение карточек с close: true — прямо из официального ряда, который страница держит у себя
+   (PAGE_EXTRACTOR отдаёт его хвост полем closes): ряды FRED из кэша страницы (fredCached) и фиксинг ЕЦБ из снимка
+   (fx:JPY). Котировку страница кладёт поверх КОПИИ ряда, сам ряд остаётся официальным. Значение карточки не годится:
    поверх закрытия страница кладёт котировку нового дня, и 27.10.2026 FRED выложил закрытие за 26.10 в
    13:37–13:46 UTC, а в 13:46 на карточке уже стояла котировка 27.10 — «чистого» закрытия не было ни в одном
    прогоне. Сообщение выходит, когда в ряду FRED появилось закрытие новой даты, и несёт официальные числа:
-   уровень VIX и отношение VIX/VIX3M в один день (так их считает и сама карточка термструктуры). */
-const CLOSE_SERIES = ["VIXCLS", "VXVCLS"];
+   уровень VIX и отношение VIX/VIX3M в один день (так их считает и сама карточка термструктуры). То же у нефти
+   (цена WTI от EIA во FRED, лаг 3–5 дней) и иены (фиксинг ЕЦБ): их «выпуск» раньше был котировкой Yahoo в 00:06 и
+   00:26 UTC и в воскресенье вечером. word — как назвать значение в контексте модели. */
+const CLOSE_SERIES = ["VIXCLS", "VXVCLS", "DCOILWTICO"];
+const CLOSE_FX = ["JPY"];
 const CLOSE_OF = {
-  vix: (c) => { const a = c?.VIXCLS?.at(-1); return a ? { d: a.d, v: a.v, digits: 1 } : null; },
+  vix: (c) => { const a = c?.VIXCLS?.at(-1); return a ? { d: a.d, v: a.v, digits: 1, word: "закрытие" } : null; },
+  oil: (c) => { const a = c?.DCOILWTICO?.at(-1); return a ? { d: a.d, v: a.v, digits: 2, unit: "$", word: "цена EIA" } : null; },
+  jpy: (c) => { const a = c?.["ECB:JPY"]?.at(-1); return a ? { d: a.d, v: a.v, digits: 2, unit: "¥", word: "фиксинг ЕЦБ" } : null; },
   vixterm: (c) => {
     const b = new Map((c?.VXVCLS || []).map((p) => [p.d, p.v]));
     const a = [...(c?.VIXCLS || [])].reverse().find((p) => b.get(p.d) > 0);
-    return a ? { d: a.d, v: a.v / b.get(a.d), digits: 2 } : null;
+    return a ? { d: a.d, v: a.v / b.get(a.d), digits: 2, word: "закрытие" } : null;
   },
 };
 
@@ -558,6 +566,16 @@ const PAGE_EXTRACTOR = `(() => {
       out.closes[k] = s.slice(-5).map(p => ({ d: new Date(p.d).toISOString().slice(0, 10), v: Number(p.v) })).filter(p => p.v > 0);
     } catch (e) { out.closes[k] = []; }
   }
+  // Фиксинг ЕЦБ — из снимка (fx:<валюта>, Frankfurter), как его берёт и сама страница; нет ключа — нет фиксинга.
+  for (const k of ${JSON.stringify(CLOSE_FX)}) {
+    try {
+      const rates = (SNAP && SNAP.responses && SNAP.responses["fx:" + k] && SNAP.responses["fx:" + k].rates) || {};
+      out.closes["ECB:" + k] = Object.keys(rates).sort().slice(-5).map(d => ({ d, v: Number(rates[d] && rates[d][k]) })).filter(p => p.v > 0);
+    } catch (e) { out.closes["ECB:" + k] = []; }
+  }
+  // Версия страницы (подпись шапки): смена кода страницы переписывает производные ряды — это не пересмотр
+  // первоисточника (см. diff).
+  try { out.page_version = ((document.querySelector(".station .num") || {}).textContent || "").match(/v\\d+\\.\\d+\\.\\d+/)?.[0] || ""; } catch (e) { out.page_version = ""; }
   // Поставщики данных: ключи снимка, которые сервер не смог обновить (failed: «ключ — причина») или
   // отдал из старого кэша (stale_keys). От них страница уходит на резервные источники, и ряд карточки
   // меняется целиком — это смена источника, а не пересмотр (см. providersSwitched).
@@ -1465,6 +1483,11 @@ function diff(prevState, panel) {
   const seenRevised = prevState.revised_points || {};
   const prevInd = prevState.indicators || {};
   const providerSwitch = providersSwitched(prevState.providers, panel.providers);
+  // Сменилась версия страницы — её код мог пересчитать производные ряды (v5.5.1 исправила спред SOFR − IORB и путь
+  // ФРС за даты до окна ставки). Это смена методики панели, а не пересмотр первоисточника: в этом прогоне
+  // пересчёт рядов не рассылается, факт — в логе.
+  const pageChanged = !!(prevState.page_version && panel.page_version && prevState.page_version !== panel.page_version);
+  let pageRewritten = 0;
 
   // Изменения внутри панели (вердикт, зоны показателей, детекторы) сами по себе НЕ рассылаются:
   // это внутренняя кухня. Они собираются как объяснение к единственному внешнему событию о самой
@@ -1526,8 +1549,8 @@ function diff(prevState, panel) {
       if (a && b && b.d > a.d && !sameNum(a.v, b.v) && !HUMAN[i.id]?.quiet) {
         const shown = (x) => x.v.toFixed(b.digits ?? 2).replace(".", ",");
         releaseGroups.push({
-          i: { ...i, observed_at: b.d, value: shown(b), value_num: b.v, unit: "", points: pointsUpTo(i.points, b.d) },
-          was: { ...was, observed_at: a.d, value: shown(a), value_num: a.v, unit: "" },
+          i: { ...i, observed_at: b.d, value: shown(b), value_num: b.v, unit: b.unit || "", points: pointsUpTo(i.points, b.d) },
+          was: { ...was, observed_at: a.d, value: shown(a), value_num: a.v, unit: b.unit || "" },
         });
       }
     } else if (i.scheduled && dateAdvanced && changed && !HUMAN[i.id]?.quiet) {
@@ -1555,6 +1578,7 @@ function diff(prevState, panel) {
     const rev = seriesRevisions(was.points, i.points);
     dust += rev.dust;
     if (!rev.changed.length) continue;
+    if (pageChanged) { pageRewritten += rev.changed.length; continue; }
     // Смена источника — не пересмотр. Страница, уйдя на резерв, отдаёт ДРУГОЙ ряд, и сравнение точек
     // выдавало это за «первоисточник переписал уже опубликованные данные». Признаки: у карточки сменилась
     // строка источника либо в такт смены поставщика (см. providersSwitched) ряд переписан целиком.
@@ -1717,6 +1741,7 @@ function diff(prevState, panel) {
     console.log(`смена источника ряда (не пересмотр, в рассылку не идёт): ${switched.length}`);
     for (const s of switched) console.log(`  · ${s}`);
   }
+  if (pageRewritten) console.log(`версия страницы ${prevState.page_version} → ${panel.page_version}: точек рядов с другим значением ${pageRewritten} — смена методики, не пересмотр (в рассылку не идёт)`);
   if (dust) console.log(`пересчёт истории меньше ${String(REVISION_MIN_PCT).replace(".", ",")} % (в рассылку не идёт): точек ${dust}`);
 
   // ---- Доля капитала: что стало, почему и насколько это устойчиво ----
@@ -1964,7 +1989,7 @@ function llmContext(panel) {
 }
 // У карточек с официальным закрытием значение карточки — производная (у VIX — изменение за 30 дней), а имя в
 // словаре — сам индекс; модели уходит то же закрытие, что и читателю в строке «вышли новые данные».
-const closeText = (i) => (i.close ? `${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")} (закрытие ${ruDay(Date.parse(i.close.d))})` : "");
+const closeText = (i) => (i.close ? `${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")}${i.close.unit ? ` ${i.close.unit}` : ""} (${i.close.word || "закрытие"} ${ruDay(Date.parse(i.close.d))})` : "");
 
 // Какая модель реально ответила — нужно для честной подписи в проверке связи.
 let LAST_MODEL = "";
@@ -2950,6 +2975,8 @@ function snapshotState(panel, prev = null) {
     revisions: panel.revisions || [],
     // поставщики данных этого прогона — база для providersSwitched (смена источника ≠ пересмотр)
     ...(panel.providers ? { providers: panel.providers } : {}),
+    // версия страницы — смена методики ≠ пересмотр (см. diff); нет в этом прогоне — помним прежнюю
+    ...(panel.page_version || prev?.page_version ? { page_version: panel.page_version || prev.page_version } : {}),
   };
 }
 
