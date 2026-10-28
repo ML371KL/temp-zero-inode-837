@@ -1692,8 +1692,12 @@ function diff(prevState, panel) {
       note: "",
     });
   }
-  events.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
-  return events;
+  // Тип, убранный из KIND_ORDER, не рассылается вовсе: так работает «тумблер шума» из
+  // УВЕДОМЛЕНИЯ.md. Раньше список задавал только порядок, и убранный тип уезжал в начало пачки.
+  const kept = events.filter((ev) => KIND_ORDER.includes(ev.kind));
+  if (kept.length !== events.length) console.log(`тип события выключен в KIND_ORDER (в рассылку не идёт): ${events.length - kept.length}`);
+  kept.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+  return kept;
 }
 
 /* ================================= 4. ТЕКСТ СООБЩЕНИЙ ================================= */

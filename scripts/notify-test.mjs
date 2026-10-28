@@ -74,6 +74,20 @@ test("первый прогон не рассылает историю", () => {
   assert.equal(diff({}, panel).length, 0, "пустое состояние не должно порождать событий");
 });
 
+test("тумблер шума: тип, убранный из KIND_ORDER, не рассылается", () => {
+  // УВЕДОМЛЕНИЯ.md обещает именно это; раньше список задавал только порядок, и убранный тип уезжал в начало пачки.
+  const before = stateOf(panelOf([ind({ value: "1", value_num: 1 })]));
+  const after = panelOf([ind({ value: "2", value_num: 2, observed_at: "2026-07-21" })]);
+  const at = KIND_ORDER.indexOf("release");
+  KIND_ORDER.splice(at, 1);
+  try {
+    assert.equal(mute(() => diff(before, after)).length, 0, "релизы выключены — событий нет");
+  } finally {
+    KIND_ORDER.splice(at, 0, "release");
+  }
+  assert.equal(diff(before, after).length, 1, "с полным списком релиз приходит");
+});
+
 test("новая карточка не порождает событие задним числом", () => {
   const before = stateOf(panelOf([ind({ id: "a" })]));
   const after = panelOf([ind({ id: "a" }), ind({ id: "b", name: "Новая" })]);
