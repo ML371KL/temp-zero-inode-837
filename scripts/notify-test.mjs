@@ -1038,14 +1038,14 @@ test("каноническое решение передаёт закрытия 
 /* ---- v5.2.3: плитки вердикта со знаком «−» — настоящее извлечение со страницы на подставном DOM ---- */
 
 // Исполняется ТОТ ЖЕ текст PAGE_EXTRACTOR, что уходит в Chrome; глобали страницы подставлены параметрами.
-const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы" }) => {
+const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {} }) => {
   const els = {
     ...Object.fromEntries(Object.entries(dom).map(([id, t]) => [id, { textContent: t }])),
     actionStrip: { innerText: strip, querySelector: (s) => (s === ".as-pct" ? { textContent: "50%" } : null) },
   };
   const document = { getElementById: (id) => els[id] || null };
-  const state = { data: {}, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
-  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, [], state, [], null, undefined);
+  const state = { data, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
+  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], null, undefined);
 };
 const TILES = { score: "+0", lead: "-7", coin: "+35", det: "-19" };
 const EXTRA = "опережающие -7 · подтверждающие +35 · детекторы -19";
@@ -1071,6 +1071,20 @@ test("плитки: переходный режим разбирает балл 
     assert.deepEqual([viaState.allocation.score, viaState.allocation.lead], [want, want], "state.tiles " + shown);
   }
   assert.equal(extractFrom({ dom: { vScore: "—", vLead: "—" } }).allocation.lead, null, "прочерк — числа нет");
+});
+
+test("v5.3: карточка с notify:false уведомителю не видна, прочие справочные — как раньше", () => {
+  const zones = [{ l: "у минимума", s: 0 }, { l: "норма", s: 0 }, { l: "эйфория", s: 0 }];
+  const ind = [
+    { id: "households", info: true, notify: false, name: "Домохозяйства и жильё", unit: "", zones, link: "https://fred.stlouisfed.org/series/UMCSENT" },
+    { id: "cot_es", info: true, name: "Позиционирование", unit: "% OI", zones, link: "https://www.cftc.gov/" },
+    { id: "hy", name: "HY OAS", unit: "б.п.", zones: [{ l: "узко", s: 1 }, { l: "широко", s: -1 }], link: "https://fred.stlouisfed.org/" },
+  ];
+  const r = (v, zi) => ({ value: v, delta: "", note: "", zi, date: new Date("2026-10-23T00:00:00Z"), series: [] });
+  const data = { households: r("48,1", 0), cot_es: r("-3,2", 1), hy: r("312", 0) };
+  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), ind, data });
+  assert.deepEqual(out.indicators.map((i) => i.id), ["cot_es", "hy"]);
+  assert.deepEqual(out.indicators.map((i) => i.voting), [false, true]);
 });
 
 test("проверка связи называет долю в долях нормы", () => {

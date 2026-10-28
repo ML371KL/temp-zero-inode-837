@@ -468,6 +468,9 @@ const PAGE_EXTRACTOR = `(() => {
             tile("coin", "vCoin") && ("подтверждающие " + tile("coin", "vCoin")),
             tile("det", "vDet") && ("детекторы " + tile("det", "vDet"))].filter(Boolean).join(" · ") };
   for (const i of IND) {
+    // v5.3: карточки с notify:false («Домохозяйства и жильё») уведомителю не нужны: без пометки любая новая карточка
+    // считалась бы плановым релизом и слала бы «вышли новые данные» на каждый выпуск своих рядов.
+    if (i.notify === false) continue;
     const r = (state.data || {})[i.id];
     if (!r || r.zi == null) continue;
     const z = i.zones[r.zi] || {};

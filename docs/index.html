@@ -262,6 +262,20 @@
   .idx-tab td.pos{color:var(--calm)} .idx-tab td.warn{color:var(--tension)} .idx-tab td.neg{color:var(--fault)}
   .card.loading .idx-tab td+td{color:var(--line)}
   .idx-flag{font-size:12px;color:var(--ink-soft);line-height:1.45;padding-left:6px}
+  /* v5.3: карточка со строками («Домохозяйства и жильё») — на широком экране в две колонки, как таблица «Индексов» */
+  @media (min-width:680px){.wide-card{grid-column:span 2}}
+  .hh-tab{width:100%;border-collapse:collapse;margin:2px 0 1px}
+  .hh-tab th{font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink-soft);text-align:right;white-space:nowrap;padding:0 0 4px 10px;border-bottom:1px dotted var(--line)}
+  .hh-tab td{font-family:var(--mono);font-size:12.5px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding:4px 0 3px 10px;color:var(--ink);vertical-align:baseline}
+  .hh-tab th:first-child,.hh-tab td:first-child{text-align:left;padding-left:6px}
+  .hh-tab td:first-child{font-family:var(--sans);white-space:normal}
+  .hh-tab td.hh-dt{font-size:11px;color:var(--ink-soft)}
+  .hh-tab td.hh-miss{color:var(--ink-soft)}
+  .hh-tab .hh-dn{display:none}
+  .hh-tab td.hh-dt.stale,.hh-tab .hh-dn.stale{color:var(--tension)}
+  @media (max-width:520px){.hh-tab .hh-dt{display:none}
+    .hh-tab .hh-dn{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);padding-top:1px}
+    .hh-tab .hh-dn.stale{color:var(--tension)}}
   .idx-flag b{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--on-brand);background:var(--tension);padding:1px 7px;border-radius:9px;margin-right:4px;white-space:nowrap}
   .c-kind.coin{color:var(--ink-soft)}
   .c-meta a{text-decoration:none;border-bottom:1px dotted var(--ink-soft)}
@@ -355,7 +369,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.2.4 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.3.0 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -456,7 +470,7 @@
     <p><b>Честные пределы.</b> (1) Общий балл измеряет <b>состояние</b>, а не будущую доходность: на истории его связь с доходностью следующих месяцев слабая и даже обратная (рынок в плохом состоянии уже упал), ценность панели — в защите от глубоких затяжных просадок, прежде всего кредитно-фондинговых (2008). Таких эпизодов в выборке три-четыре, поэтому статистическая уверенность в преимуществе над простыми правилами невелика. (2) Быстрый внешний шок (иена-2024, февраль-2020, тарифы-2025) первые −5–10% панель встретит в «умеренном» режиме — это неустранимо для дневных данных. (3) Пороги откалиброваны на той же истории, на которой проверены; правки v5.0 подтверждены в обеих половинах выборки, а пороги лестницы взяты прежние (−10/−30), а не подобранные, но это не настоящая проверка вне выборки. (4) Реплика идёт на текущих ревизиях данных: пересмотры пейроллов и заявок задним числом ей льстят. (5) Две карточки работают почти как константы при нынешних узких спредах: IG «&lt;100 → +2» держится 95% дней с октября 2024, NFCI на +1 — 84% недель с 2010-го. Альтернативы (перцентили, предохранители) бэктест не улучшили, поэтому они оставлены, но имейте в виду: сегодняшний «умеренный» режим заметно опирается на них. (6) Действовать по панели — ступенчато, на подтверждённых сменах доли, а не рывком по одному сигналу.</p>
     <p><b>Ритм использования.</b> Почти все ряды T+1, балансы ФРС — еженедельно: смотреть чаще раза в день бессмысленно. Спокойная фаза: один взгляд вечером (по Москве — когда вышли вчерашние данные США и дневные операции ФРС), 2–3 минуты — режим, доля, блок «Что изменит решение», состояния детекторов; чуть внимательнее в четверг–пятницу (H.4.1, заявки, NFCI) и по календарю: первая пятница месяца (пейроллы), середина месяца (CPI), февраль/май/август/ноябрь (SLOOS), дни FOMC. Если под режимом горит «Повышенное внимание» — дважды в день. Смена доли приходит и в Telegram — та же, что на сайте.</p>
     <p><b>Горизонты опережения.</b> Быстрый слой (дни): иена, SRF, SOFR−IORB, термструктура VIX — сигналы «уже происходит». Средний (2 недели — 2 месяца): вола ставок (исторически ломается за 2–3 недели до кредита), HY-импульс (2007: спреды поехали за 3–4 месяца до пика акций; 2020: за дни), путь ФРС, биткоин-канарейка, чистая ликвидность. Медленный (1–2 квартала): SLOOS, бычье раскручивание кривой. Sahm и пейроллы — подтверждение уже идущей рецессии: калибровка фазы, не прогноз.</p>
-    <p><b>Контекст (справочно, вне балла).</b> Позиционирование CFTC, подразумеваемая корреляция CBOE, срочная премия Kim–Wright, потоки TIC и кастодия ФРС, карта режима CFNAI × базовый CPI — из сравнения с Capital Flows Research (v4.15): эти ряды улучшали 2003–2026, но не держались на 1990–2002, поэтому в балл не включены. С v5.0 там же: <b>расслоение кредита CCC−BB</b> (агрегатный HY не видит стресса нижнего слоя; у FRED сейчас лишь три года истории CCC/BB — проверить сигнал на длинной истории нечем), <b>цена ставки на ИИ</b> (корзина капекса против S&amp;P: относительная доходность за 3 месяца, просадки от пика, доля ниже 200-дневной) и <b>частный кредит</b> (корзина BDC против S&amp;P и сколько из них снизили выплаты за год). Узкие радары-детекторы видят события и забывают их через 14–45 дней; цены носителей ставки помнят всё.</p>
+    <p><b>Контекст (справочно, вне балла).</b> Позиционирование CFTC, подразумеваемая корреляция CBOE, срочная премия Kim–Wright, потоки TIC и кастодия ФРС, карта режима CFNAI × базовый CPI — из сравнения с Capital Flows Research (v4.15): эти ряды улучшали 2003–2026, но не держались на 1990–2002, поэтому в балл не включены. С v5.0 там же: <b>расслоение кредита CCC−BB</b> (агрегатный HY не видит стресса нижнего слоя; у FRED сейчас лишь три года истории CCC/BB — проверить сигнал на длинной истории нечем), <b>цена ставки на ИИ</b> (корзина капекса против S&amp;P: относительная доходность за 3 месяца, просадки от пика, доля ниже 200-дневной) и <b>частный кредит</b> (корзина BDC против S&amp;P и сколько из них снизили выплаты за год). Узкие радары-детекторы видят события и забывают их через 14–45 дней; цены носителей ставки помнят всё. С v5.3 — <b>домохозяйства и жильё</b>: настроения потребителей Мичигана (перцентиль по месяцам с 1978 года), реальные доходы без трансфертов, продажи вторичного жилья, ставка ипотеки на 30 лет и просрочка по картам и ипотеке — всё из FRED, у каждой строки своя дата: настроения приходят с задержкой около месяца, просрочка — через два месяца после квартала, продажи жилья FRED по лицензии NAR отдаёт только за ~13 месяцев. Аудит 28.10.2026: 26 показателей жилья, домохозяйств, малого бизнеса и прибылей поверх балла устойчиво не улучшают прогноз падений S&amp;P на 2000–2026 — их информация уже есть в кредите, занятости и финансовых условиях. Чтения Мичигана ниже 60 исторически ближе ко дну: с 1978 года через 12 месяцев после них S&amp;P рос в среднем на 16% против 10,7% по всем месяцам, в минусе — 3 случая из 27, худший — 2008 год (−34%).</p>
     <p><b>Другие индексы (блок «Индексы», справочно, вне балла).</b> Балл почти целиком (≈93% веса) — общие для всего рынка макро, кредит и ликвидность, поэтому доля по сигналу панели применима к любому широкому индексу США. От системных кризисов она защищает все индексы (2000–02, 2008, 2020: падения срезаны в 2–6 раз), от «своих» медведей — нет: Nasdaq (ставки, 2022), малые компании (кредит и прибыли: 2011, 2015–16, 2018, 2025). Худшая просадка 2003–2026 с долей панели: S&amp;P −18,7%, Dow −16,2%, равновзвешенный −21,7%, Nasdaq-100 −29,6%, Russell 2000 −27,5% (без панели −53…−60%). 100% нормы в Russell 2000 ≈ 1,3 риска S&amp;P (волатильность 24% против 19%), в Nasdaq-100 ≈ 1,15, в равновзвешенном ≈ 1,06, в Dow ≈ 0,94. Риск падения на 10%+ по индексу — та же модель, что у S&amp;P, с коэффициентами своего индекса (2000–2026, равновзвешенный — с 10.2003): Dow 1,720 и 0,0379, Nasdaq-100 1,084 и 0,0365, Russell 2000 1,148 и 0,0267, равновзвешенный 1,660 и 0,0375. Строка S&amp;P — ряд FRED, остальные — закрытия фондов DIA, QQQ, IWM, RSP на ту же дату. «Узкий рынок» — S&amp;P в пределах 2% от годового максимума, а Russell 2000 ниже 200-дневной: риск падения выше, ожидаемая доходность не хуже; на долю не влияет.</p>
     <p><b>Дневник решений.</b> Ведётся на сервере вместе со ступенью: одна запись на торговую сессию — режим, доля, риск просадки, S&amp;P и закрытия фондов QQQ, IWM, RSP, DIA; рядом реализованное движение рынка за 21 и 63 дня и сверка прогноза риска с фактом (в конце этого раздела). Общий для всех устройств.</p>
     <p><b>Смена цикла — как пересадить панель на новую ставку, не ломая двигатель.</b> Панель двухэтажна: <b>шасси</b> (водопровод ликвидности, кредит-против-акций, кривая, путь ФРС, труд, доллар, семьи, опережающие, триада-как-жанр, фазовая модель) — макро-физика, не привязанная к ИИ; <b>картридж</b> (блок CYCLE в начале скрипта) — всё, что привязано к текущей ставке: её формулировка и тикеры двух узких радаров. Когда ставка отыграет: 1) сформулируйте новую ставку одним предложением и впишите в CYCLE.bet; 2) замените capexTickers на 4–6 эмитентов, чьи расходы несут новую ставку, и bdcTickers — на публичные канарейки её самого непрозрачного канала финансирования; серверный сборщик и ценовые карточки корзин подхватят их сами, а в словарь имён компаний для новостей (CO_NAMES рядом со сканером) впишите названия новых эмитентов — сам тикер там уже учтён; 3) проверьте серверный префильтр новостей (HIT_RX в scripts/fetch-snapshot.mjs) — его словарь должен покрывать лексику событий новой ставки; 4) убедитесь, что триада всё ещё осмыслена: «фондинговый стресс» вечен, а два новостных детектора должны смотреть на каналы новой ставки. Ничего за пределами CYCLE и порогов не трогать.</p>
@@ -1036,6 +1050,10 @@
      баллы, журнал и сообщения не меняются; у страницы без state.tiles уведомитель разбирает текст с любым минусом.
    ═ v5.2.4: полоса «доля акций сейчас» перенесена из-под карточки вердикта в левую колонку, под «что происходит /
      что делать» — на место, освободившееся после полос блоков; «Спросить ИИ» — по-прежнему на всю ширину.
+   ═ v5.3.0: справочная карточка «Домохозяйства и жильё» в «Контексте», вне балла: настроения Мичигана (перцентиль
+     с 1978 года), реальные доходы без трансфертов, продажи вторичного жилья, ипотека на 30 лет, просрочка по картам
+     и ипотеке — каждая строка со своей датой. Аудит 28.10: 26 таких рядов поверх балла прогноз падений S&P не
+     улучшают. Балл, покрытие, лесенка и уведомления прежние (notify:false); ряды в снимке — только дата и значение.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -1253,6 +1271,7 @@ const SERIES_LIMITS={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,RRPONTSYD:300,WRESBAL:9
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
   THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,   /* v4.15: справочный блок «контекст» (срочная премия, кастодия ФРС, TIC, CFNAI) */
   DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,                 /* v5.0: путь ФРС; расслоение кредита CCC/BB (справочно) */
+  UMCSENT:620,W875RX1:26,EXHOSLUSM495S:15,MORTGAGE30US:60,DRCCLACBS:150,DRSFRMACBS:150, /* v5.3: «Домохозяйства и жильё» (справочно) */
   DEXJPUS:70,DEXCHUS:70,UNRATE:30,RPONTTLD:20};    /* ленивые резервы: не предзагружаются; CPI/зарплаты 26 — запас на дыры ряда для г/г по датам */
 /* Примечание (июль-2026, по внешнему аудиту): FRED может отдавать BAML-серии (HY/IG OAS)
    ограниченным окном ~3 лет — наш лимит 520 точек (≈2 года) в окно помещается, P₂ᵧ живёт. */
@@ -1281,7 +1300,8 @@ const SANITY={SOFR:[0,15],IORB:[0,15],WALCL:[2e6,2.5e7],WTREGEN:[2,2.5e6],
   VXVCLS:[5,120],SAHMREALTIME:[-1,10],CCSA:[5e5,3e7],T10Y3M:[-5,8],DFII10:[-4,9],
   T10YIE:[-1,8],DCOILWTICO:[-60,300],DGS2:[-1,16],DGS10:[-1,16],CPILFESL:[100,600],
   CES0500000003:[10,90],PAYEMS:[1.1e5,2.3e5],DTWEXBGS:[70,200],NFCI:[-3,12],
-  DRTSCILM:[-100,100],GDP:[15000,80000],DEXJPUS:[60,400],DEXCHUS:[4,12],UNRATE:[1,30]};
+  DRTSCILM:[-100,100],GDP:[15000,80000],DEXJPUS:[60,400],DEXCHUS:[4,12],UNRATE:[1,30],
+  UMCSENT:[20,130],W875RX1:[3000,60000],EXHOSLUSM495S:[1e6,1.2e7],MORTGAGE30US:[1,25],DRCCLACBS:[0.5,15],DRSFRMACBS:[0.3,20]};
 const MONTHLY_FILL=new Set(["CPILFESL","CES0500000003"]);
 async function fredFetch(series){
   if(FREDINFLIGHT[series]) return FREDINFLIGHT[series];
@@ -2234,6 +2254,88 @@ addInd({id:"quadrant",block:"context",info:true,txt:true,staleDays:75,name:"Ка
      zi,date:last(c).d,series:hist};
  }});
 
+/* v5.3: «Домохозяйства и жильё» — справка к новостям о слабых домохозяйствах и продажах жилья. Аудит 28.10.2026:
+   26 показателей жилья, домохозяйств, малого бизнеса и прибылей поверх балла устойчиво не улучшают прогноз падений
+   S&P (2000–2026, логит «−10% за 3 мес.» и «−15% за 6 мес.», обучение на одной половине истории, проверка на другой,
+   в обе стороны): их информация уже есть в кредите, занятости и финансовых условиях. Балла нет; уведомитель карточку
+   не читает (notify:false) — уведомления остались прежними. Ядро исполняет scripts/households-test.mjs.
+   Перцентиль, минимум и пик считаются из рядов; зашита только статистика S&P после чтений Мичигана ниже 60
+   (1978–2025, месячные закрытия, полные 12-мес. окна: 27 месяцев, в среднем +16,0% против +10,7% у всех). */
+/* ⟦HOUSEHOLDS-CORE⟧ */
+const HH_FROM=Date.UTC(1978,0,1);                       /* до 1978 года ряд Мичигана квартальный */
+const HH_MON=["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
+const hhNum=(v,d)=>v.toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d}).replace("-","−");
+const hhSig=(v,d)=>{const r=+v.toFixed(d); return r===0?hhNum(0,d):(r>0?"+":"")+hhNum(r,d);};
+const hhMonth=d=>d.getUTCFullYear()*12+d.getUTCMonth();
+const hhMonLabel=d=>HH_MON[d.getUTCMonth()]+" "+d.getUTCFullYear();
+const hhQLabel=d=>["I","II","III","IV"][Math.floor(d.getUTCMonth()/3)]+" кв. "+d.getUTCFullYear();
+const hhDayLabel=d=>d.getUTCDate()+" "+HH_MON[d.getUTCMonth()]+" "+d.getUTCFullYear();
+/* та же точка календаря k месяцев назад (г/г и Δ4 кв. — k=12); дыра в ряду → null, а не соседний месяц */
+const hhAgoMonths=(s,k)=>{const t=hhMonth(s[s.length-1].d)-k; return s.find(p=>hhMonth(p.d)===t)||null;};
+/* недельный ряд: точка w недель назад; пропущенная неделя → ближайшая раньше, но не дальше 10 дней */
+const hhAgoWeeks=(s,w)=>{const t=+s[s.length-1].d-w*7*864e5; let b=null;
+  for(const p of s){ if(+p.d<=t) b=p; else break; } return b&&t-+b.d<=10*864e5?b:null;};
+/* перцентиль настроений по месяцам с 1978 года: доля месяцев строго ниже текущего */
+function hhSentiment(s){
+  const p=s[s.length-1], w=s.filter(x=>+x.d>=HH_FROM);
+  if(w.length<120) return {pc:null,zi:null};
+  const below=w.filter(x=>x.v<p.v), pc=below.length/w.length*100;
+  return {pc,zi:pc<10?0:pc>90?2:1,from:w[0].d,below,min:w.reduce((a,x)=>x.v<a.v?x:a,w[0])};
+}
+const hhPc=pc=>pc<1?"<1":pc>99?">99":String(Math.round(pc));
+/* src: {UMCSENT, W875RX1, EXHOSLUSM495S, MORTGAGE30US, DRCCLACBS, DRSFRMACBS} → [{d:Date, v}] или null.
+   Строки — каждая со своей датой и своей нормой свежести; пропавший ряд даёт строку «нет данных». */
+function householdsOf(src,now){
+  const get=k=>Array.isArray(src[k])&&src[k].length?src[k]:null;
+  const keys=["UMCSENT","W875RX1","EXHOSLUSM495S","MORTGAGE30US","DRCCLACBS","DRSFRMACBS"];
+  if(!keys.some(get)) return null;
+  const rows=[];
+  const row=(k,name,staleDays,f)=>{const s=get(k); if(!s){rows.push({k,name,miss:true});return;}
+    const p=s[s.length-1], r=f(s,p); rows.push({k,name,val:r.val,chg:r.chg,date:r.date,d:p.d,stale:now-+p.d>staleDays*864e5});};
+  const dm=(s,f)=>{const a=hhAgoMonths(s,12); return a?f(a):"—";};
+  row("UMCSENT","Настроения потребителей",105,(s,p)=>({val:hhNum(p.v,1),chg:dm(s,a=>hhSig(p.v-a.v,1)),date:hhMonLabel(p.d)}));
+  row("W875RX1","Реальные доходы без трансфертов",105,(s,p)=>({val:hhNum(p.v/1000,1)+" трлн $",chg:dm(s,a=>hhSig((p.v/a.v-1)*100,1)+"%"),date:hhMonLabel(p.d)}));
+  row("EXHOSLUSM495S","Продажи вторичного жилья",90,(s,p)=>({val:hhNum(p.v/1e6,2)+" млн",chg:dm(s,a=>hhSig((p.v/a.v-1)*100,1)+"%"),date:hhMonLabel(p.d)}));
+  row("MORTGAGE30US","Ипотека на 30 лет",14,(s,p)=>{const a=hhAgoWeeks(s,52);
+    return {val:hhNum(p.v,2)+"%",chg:a?hhSig((p.v-a.v)*100,0)+" б.п.":"—",date:hhDayLabel(p.d)};});
+  row("DRCCLACBS","Просрочка по картам",260,(s,p)=>({val:hhNum(p.v,2)+"%",chg:dm(s,a=>hhSig(p.v-a.v,2)+" п.п."),date:hhQLabel(p.d)}));
+  row("DRSFRMACBS","Просрочка по ипотеке",260,(s,p)=>({val:hhNum(p.v,2)+"%",chg:dm(s,a=>hhSig(p.v-a.v,2)+" п.п."),date:hhQLabel(p.d)}));
+
+  const sent=get("UMCSENT"), st=sent?hhSentiment(sent):{pc:null,zi:null};
+  let delta="";
+  if(st.pc!=null){
+    const y=st.from.getUTCFullYear();
+    const lo=st.below.length===0?"минимум с "+y+" года"
+      : st.below.length<=2?"ниже было только "+st.below.map(x=>hhNum(x.v,1)+" ("+hhMonLabel(x.d)+")").join(", ")
+      : "минимум "+hhNum(st.min.v,1)+" ("+hhMonLabel(st.min.d)+")";
+    delta="перцентиль "+hhPc(st.pc)+" с "+y+" года · "+lo;
+  }
+  const notes=[];
+  if(st.zi===0) notes.push("Настроения у минимума обычно ближе ко дну: с 1978 года через 12 мес. после чтений ниже 60 S&P рос в среднем на 16% против 10,7% обычно, в минусе — 3 случая из 27, худший — 2008 год (−34%).");
+  const m=get("DRSFRMACBS");
+  if(m){const pk=m.reduce((a,x)=>x.v>a.v?x:a,m[0]), v=m[m.length-1].v;
+    notes.push("Просрочка по ипотеке "+hhNum(v,2)+"% против пика "+hhNum(pk.v,2)+"% ("+hhQLabel(pk.d)+")"+(v<pk.v/2?": жильё упирается в ставки, а не в дефолты.":"."));}
+  notes.push("Слабость домохозяйств доходит до рынка через кредит: пока просрочки и спреды спокойны, балл её не видит.");
+  const live=rows.filter(r=>!r.miss);
+  return {value:sent?hhNum(sent[sent.length-1].v,1):"—",delta,note:notes.join(" "),zi:st.zi,rows,
+    date:sent?sent[sent.length-1].d:live.reduce((a,r)=>r.d>a?r.d:a,live[0].d),
+    series:sent?sent.filter(p=>hhMonth(p.d)>hhMonth(sent[sent.length-1].d)-120):null};
+}
+/* ⟦/HOUSEHOLDS-CORE⟧ */
+const hhRowsHTML=rows=>`<table class="hh-tab"><thead><tr><th></th><th>сейчас</th><th>за год</th><th class="hh-dt">данные</th></tr></thead><tbody>${
+  rows.map(r=>r.miss?`<tr><td>${esc(r.name)}</td><td colspan="3" class="hh-miss">нет данных</td></tr>`
+    :`<tr><td>${esc(r.name)}<span class="hh-dn${r.stale?" stale":""}">${esc(r.date)}</span></td><td>${esc(r.val)}</td><td>${esc(r.chg)}</td><td class="hh-dt${r.stale?" stale":""}">${esc(r.date)}</td></tr>`).join("")}</tbody></table>`;
+addInd({id:"households",block:"context",info:true,notify:false,rows:true,wide:true,staleDays:105,name:"Домохозяйства и жильё",unit:"настроения потребителей",
+ zones:[{l:"у минимума: перцентиль <10",s:0},{l:"норма",s:0},{l:"эйфория: перцентиль >90",s:0}],
+ link:"https://fred.stlouisfed.org/series/UMCSENT",
+ async load(){
+   const keys=["UMCSENT","W875RX1","EXHOSLUSM495S","MORTGAGE30US","DRCCLACBS","DRSFRMACBS"], src={}, errs=[];
+   await Promise.all(keys.map(async k=>{ try{ src[k]=await fred(k); }catch(e){ src[k]=null; errs.push(e&&e.message||"ошибка"); } }));
+   const r=householdsOf(src,Date.now());
+   if(!r) throw new Error(errs[0]||"EMPTY");
+   return r;
+ }});
+
 const BLOCKS={
   plumb:{title:"I · Водопровод ликвидности",short:"Ликвидность",w:25,desc:"резервы, RRP, фондинг, NFCI · TGA справочно"},
   credit:{title:"II · Кредит: публичные цены против марок",short:"Кредит",w:25,desc:"HY/IG, SLOOS, BDC"},
@@ -3111,9 +3213,9 @@ function renderBlocks(){
     sec.innerHTML=`<div class="block-head"><h2>${b.title}</h2><span class="bw">${b.ctx?b.desc:b.desc+" · вес "+b.w+"%"}</span><span class="bscore" id="bs_${bid}"${b.ctx?' style="display:none"':""}>—</span></div><div class="grid" id="grid_${bid}"></div>`;
     root.appendChild(sec);
     IND.filter(i=>i.block===bid).forEach(ind=>{
-      const c=document.createElement("article");c.className="card s-na loading";c.id="card_"+ind.id;
+      const c=document.createElement("article");c.className="card s-na loading"+(ind.wide?" wide-card":"");c.id="card_"+ind.id;
       c.innerHTML=`<div class="c-top"><div class="c-name">${ind.name}</div>${scoreBadge(null,ind.info)}</div>
-        <div class="c-val">···</div><div class="c-delta"></div><div class="c-note">в очереди…</div>
+        <div class="c-val">···</div><div class="c-delta"></div>${ind.rows?'<div class="c-rows"></div>':""}<div class="c-note">в очереди…</div>
         <div class="c-spark"><canvas></canvas></div>
         ${zonesHTML(ind,-1)}
         <div class="c-meta"><span class="obs">—</span><span class="c-prov"><span class="c-kind ${ind.info?"":ind.lead?"lead":"coin"}" title="${ind.info?"не входит в композит":ind.lead?"балл идёт в шкалу ОПЕРЕЖАЮЩИХ (куда клонится) — гейт покупки/защиты":"балл идёт в шкалу ПОДТВЕРЖДАЮЩИХ (условия сейчас)"}">${ind.info?"справочно":ind.lead?"→ опережающий":"◆ подтверждающий"}</span><a href="${ind.link}" target="_blank" rel="noopener">источник ↗</a></span></div>`;
@@ -3136,10 +3238,12 @@ async function loadOne(ind){
 }
 function paintCard(ind,res,err){
   const c=$("card_"+ind.id);if(!c)return;
-  const sc=err?null:scoreOf(ind,res);
-  c.className="card "+statusClass(sc);
+  /* v5.3: справочная карточка со строками может прийти без главного ряда (zi=null) — тогда без балла и без активной зоны */
+  const sc=err||res.zi==null?null:scoreOf(ind,res);
+  c.className="card "+statusClass(sc)+(ind.wide?" wide-card":"");
   c.querySelector(".c-top").innerHTML=`<div class="c-name">${ind.name}</div>${scoreBadge(sc,ind.info)}`;
-  const zwrap=c.querySelector(".zones"); if(zwrap) zwrap.outerHTML=zonesHTML(ind,err?-1:res.zi);
+  const zwrap=c.querySelector(".zones"); if(zwrap) zwrap.outerHTML=zonesHTML(ind,err||res.zi==null?-1:res.zi);
+  const rw=c.querySelector(".c-rows"); if(rw) rw.innerHTML=!err&&res.rows?hhRowsHTML(res.rows):"";
   if(err){
     c.querySelector(".c-val").textContent="—";
     c.querySelector(".c-delta").textContent="";
@@ -3677,7 +3781,9 @@ function buildSnapshot(){
       type:i.info?"info":(i.lead?"опережающий":"подтверждающий"),
       all_zones:i.zones.map(z=>z.l+" → "+(z.s>0?"+":"")+z.s).join(" · "),
       obs_date:r.date?r.date.toISOString().slice(0,10):"",
-      stale:r.date?daysBetween(r.date,today())>(i.staleDays||9):false};
+      stale:r.date?daysBetween(r.date,today())>(i.staleDays||9):false,
+      /* v5.3: строки карточки («Домохозяйства и жильё») — каждая со своей датой */
+      ...(r.rows?{rows:r.rows.map(x=>x.miss?x.name+": нет данных":x.name+": "+x.val+", за год "+x.chg+", данные за "+x.date+(x.stale?" (задержка)":""))}:{})};
   }).filter(Boolean);
   const detectors=DETECTORS.map(d=>({name:d.name,state:STATE_LABEL[(d.last||{}).st||"calm"],
     live_inputs:(d.last||{}).inputs||"",adjustment:(d.last||{}).pts||0,triad_member:!!d.triad,logic:d.logic}));

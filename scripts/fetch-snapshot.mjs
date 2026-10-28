@@ -51,11 +51,20 @@ const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
   T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:300,DGS2:160,CPILFESL:26,CES0500000003:26,
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
   THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,
-  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
+  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,
+  UMCSENT:620,W875RX1:26,EXHOSLUSM495S:15,MORTGAGE30US:60,DRCCLACBS:150,DRSFRMACBS:150}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
   v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст»;
   v5.0: DCOILWTICO 140 → 300 — нефть меряется отношением к своей средней за год (нужно ≥252 торговых дня);
   DFEDTARU — верх коридора ставки ФРС для карточки «путь ФРС» (2-летка минус ставка);
-  BAMLH0A3HYC/BAMLH0A1HYBB — спреды CCC и BB для справочной карточки расслоения кредита */
+  BAMLH0A3HYC/BAMLH0A1HYBB — спреды CCC и BB для справочной карточки расслоения кредита;
+  v5.3: справочная карточка «Домохозяйства и жильё» — настроения Мичигана (620: все месяцы с 1978 плюс запас),
+  реальные доходы без трансфертов, продажи вторичного жилья (NAR отдаёт FRED только ~13 мес.), ипотека 30 лет,
+  просрочка по картам и ипотеке (весь ряд с 1991 — ради пика) */
+/* v5.3: у новых рядов в снимке остаются только дата и значение (страница больше ничего не читает) —
+   ≈40 КБ вместо ≈100 КБ в каждой сборке, а сборки коммитятся раз в 10–20 минут */
+const SLIM_FRED=new Set(["UMCSENT","W875RX1","EXHOSLUSM495S","MORTGAGE30US","DRCCLACBS","DRSFRMACBS"]);
+const slimFred=(s,j)=>{ if(SLIM_FRED.has(s)&&j&&Array.isArray(j.observations))
+  j.observations=j.observations.map(o=>({date:o.date,value:o.value})); return j; };
 /* v4.15: бесключевые источники справочного блока — CFTC (Socrata JSON, спекулятивная позиция в E-mini S&P,
    ~3,3 года недельных отчётов) и CBOE (CSV подразумеваемой корреляции COR1M). Оба без ключей и без CORS-проблем
    на сервере; страница читает их из снимка по ключам cftc:es и cboe:cor1m (см. snapKey в index.html). */
@@ -192,7 +201,7 @@ async function main(){
   /* ── FRED: параллельно пачками по 4 ── */
   const fredList=Object.entries(SERIES);
   for(let i=0;i<fredList.length;i+=4)
-    await Promise.all(fredList.slice(i,i+4).map(([s,l])=>put("fred:"+s,()=>getJSON(fredURL(s,l)))));
+    await Promise.all(fredList.slice(i,i+4).map(([s,l])=>put("fred:"+s,async()=>slimFred(s,await getJSON(fredURL(s,l))))));
 
   /* ── NY Fed ── */
   await put("nyfed:rrp", ()=>getJSON("https://markets.newyorkfed.org/api/rp/reverserepo/all/results/last/320.json"));

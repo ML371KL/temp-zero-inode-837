@@ -20,6 +20,8 @@ on:
       - "scripts/news-test.mjs"
       - "scripts/indices-test.mjs"
       - "scripts/breakdown-test.mjs"
+      - "scripts/households-test.mjs"
+      - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
   workflow_dispatch:
@@ -79,6 +81,12 @@ jobs:
         # Ядро ⟦BREAKDOWN-CORE⟧ и aggregate() движка исполняются из страницы: Σ пунктов блоков + детекторы =
         # общий балл до обрезки (1e-9) на контрольном снимке, при выпавшем блоке, обрезке и в переборе. Без сети.
         run: node scripts/breakdown-test.mjs
+
+      - name: Проверить карточку «Домохозяйства и жильё» и её ряды в сборщике
+        # Ядро ⟦HOUSEHOLDS-CORE⟧ исполняется из страницы на настоящих рядах FRED (фикстура 28.10.2026): контрольные
+        # числа, г/г по календарю при дыре, Δ52 нед., Δ4 кв., перцентиль с 1978, пик из ряда, «−», пропавший ряд.
+        # Глубина рядов сверяется со сборщиком, ужатие и valid() — настоящими функциями сборщика. Без сети.
+        run: node scripts/households-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,

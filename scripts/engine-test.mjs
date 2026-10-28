@@ -15,6 +15,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { PAGE_EXTRACTOR } from "./notify.mjs";   /* v5.3: тот же текст, что уведомитель исполняет в Chrome */
 
 const require = createRequire(import.meta.url);
 const DIR = process.env.ENGINE_TEST_DIR || "docs";
@@ -117,6 +118,41 @@ try {
     for (const row of r.rows) assert.ok(row.slice(1).every(c => c === "—" || /^[+−]?\d+(,\d)?%$/.test(c)), "формат чисел: " + row.join(" | "));
     assert.equal(r.cover.total, r.total, "блок не меняет покрытие");
     assert.equal(r.ai, false, "блок «Индексы» не должен попадать в ИИ-разбор");
+  });
+  await test("v5.3: «Домохозяйства и жильё» — балл, доля, режим и покрытие без карточки те же; ИИ видит, уведомитель нет", async () => {
+    const r = await page.evaluate((EX) => {
+      const ind = IND.find(i => i.id === "households");
+      if (!ind) return { missing: true };
+      const pick = () => { const d = state.decision;
+        return JSON.stringify({ comp: d.composite, lead: d.lead, pct: d.pct, rung: d.rung, raw: d.raw, regime: d.regime, cover: d.coverage,
+          agg: aggregate({}).composite, bd: state.breakdown && state.breakdown.total, tiles: state.tiles, badges: state.blockBadges }); };
+      const withCard = pick(), k = IND.indexOf(ind), saved = state.data.households;
+      IND.splice(k, 1); delete state.data.households; compute();
+      const without = pick();
+      IND.splice(k, 0, ind); state.data.households = saved; compute();
+      const again = pick();
+      /* ИИ-снимок и уведомитель — на загруженной карточке; если снимок ещё без рядов, подставляется её форма */
+      const fake = { value: "48,1", delta: "перцентиль <1 с 1978 года", note: "", zi: 0, date: new Date(), series: [], rows: [] };
+      state.data.households = saved || fake;
+      const snap = buildSnapshot(), ext = new Function("return " + EX)();
+      state.data.households = saved;
+      const card = document.getElementById("card_households");
+      return { info: ind.info, notify: ind.notify, block: ind.block, withCard, without, again, loaded: !!saved,
+        ai: snap.indicators.find(i => i.name === ind.name) || null, ext: ext.indicators.map(i => i.id),
+        rows: [...card.querySelectorAll(".hh-tab tbody tr")].map(tr => [...tr.children].map(td => td.textContent)),
+        text: card.innerText, wide: getComputedStyle(card).gridColumnEnd };
+    }, PAGE_EXTRACTOR);
+    assert.ok(!r.missing, "карточки households нет в IND");
+    assert.deepEqual([r.info, r.notify, r.block], [true, false, "context"]);
+    assert.equal(r.without, r.withCard, "без карточки балл/доля/режим/покрытие другие");
+    assert.equal(r.again, r.withCard, "повторный расчёт с карточкой разошёлся");
+    assert.ok(r.ai && r.ai.type === "info" && /справочно/.test(r.ai.score) && /^Контекст/.test(r.ai.block), "в ИИ-снимке — как прочие карточки «Контекста»");
+    assert.ok(!r.ext.includes("households"), "уведомитель не должен видеть карточку");
+    if (r.loaded) {
+      assert.equal(r.rows.length, 6, "шесть строк");
+      for (const row of r.rows) assert.ok(row.length === 2 && row[1] === "нет данных" || row.length === 4, "строка: " + row.join(" | "));
+      assert.ok(!/(^|[\s(])-\d/.test(r.text), "дефис перед числом на карточке");
+    } else console.log("      (в снимке пока нет рядов карточки — проверены расчёт без неё, ИИ и уведомитель)");
   });
   await test("полосы блоков: Σ пунктов + детекторы = общий балл, баллы блоков = плашкам разделов", async () => {
     const r = await page.evaluate(() => {
