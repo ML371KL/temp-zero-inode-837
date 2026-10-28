@@ -108,11 +108,10 @@ const MACRO_CADENCE = {
   // рынок
   spx: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
   spx_mom: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
-  // close — публикация есть ТОЛЬКО официальное закрытие. Страница кладёт поверх ряда FRED задержанную
-  // котировку текущего дня и помечает это в подписи «интрадей (~15 мин)»; такой прогон публикацией не
-  // считается, а база сравнения держит последнее закрытие (см. fromPageRaw и snapshotState). Раньше VIX
-  // «выходил» по первой котировке дня (13:46–13:56 UTC), а дата термструктуры прыгала между закрытием и
-  // котировкой — отсюда два сообщения CBOE в одном прогоне.
+  // close — публикация есть ТОЛЬКО официальное закрытие (см. CLOSE_OF). Страница кладёт поверх ряда FRED
+  // задержанную котировку текущего дня, и дата карточки сдвигалась с первой котировкой: VIX «выходил» в
+  // 13:46–13:56 UTC с внутридневным значением, а дата термструктуры прыгала между закрытием и котировкой —
+  // отсюда два сообщения CBOE в одном прогоне.
   vix: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
   vixterm: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
   breadth: { scheduled: false, revisable: false, release: "котировки", cadence: "внутридневные" },
@@ -145,6 +144,22 @@ const MACRO_CADENCE = {
   quadrant: { scheduled: true, revisable: false, release: "ФРБ Чикаго · CFNAI", cadence: "ежемесячно" },
 };
 
+/* Официальное закрытие карточек с close: true — прямо из рядов FRED, которые страница держит в кэше
+   (fredCached; PAGE_EXTRACTOR отдаёт их хвосты полем closes). Значение карточки для этого не годится:
+   поверх закрытия страница кладёт котировку нового дня, и 27.10.2026 FRED выложил закрытие за 26.10 в
+   13:37–13:46 UTC, а в 13:46 на карточке уже стояла котировка 27.10 — «чистого» закрытия не было ни в одном
+   прогоне. Сообщение выходит, когда в ряду FRED появилось закрытие новой даты, и несёт официальные числа:
+   уровень VIX и отношение VIX/VIX3M в один день (так их считает и сама карточка термструктуры). */
+const CLOSE_SERIES = ["VIXCLS", "VXVCLS"];
+const CLOSE_OF = {
+  vix: (c) => { const a = c?.VIXCLS?.at(-1); return a ? { d: a.d, v: a.v, digits: 1 } : null; },
+  vixterm: (c) => {
+    const b = new Map((c?.VXVCLS || []).map((p) => [p.d, p.v]));
+    const a = [...(c?.VIXCLS || [])].reverse().find((p) => b.get(p.d) > 0);
+    return a ? { d: a.d, v: a.v / b.get(a.d), digits: 2 } : null;
+  },
+};
+
 /* ====================== 1b. ЧЕЛОВЕЧЕСКИЕ НАЗВАНИЯ ПОКАЗАТЕЛЕЙ ======================
    Сообщение читает человек, который не обязан помнить, что такое «импульс HY-спреда» или
    «китайская нога». Поэтому во внешний текст идёт НЕ подпись карточки панели, а нормальное имя
@@ -152,7 +167,9 @@ const MACRO_CADENCE = {
    панели (зоны, баллы, вклад в композит) во внешние сообщения не попадает вовсе.
 
    Правило пополнения: новый показатель — новая запись здесь, иначе в сообщение уедет
-   внутренняя подпись карточки и читатель снова получит «китайскую ногу».              */
+   внутренняя подпись карточки и читатель снова получит «китайскую ногу».
+   sn — имя ряда карточки, когда ряд — не та величина, что её значение (значение «Фазы цикла» — сочетание
+   рост × инфляция, а ряд — CFNAI): им подписываются строки «Пересчёта истории».            */
 const HUMAN = {
   // --- макро-панель ---
   sofr_iorb: { t: "Стоимость суточных займов в долларах против ставки ФРС по резервам", p: "дорого ли банкам занимать доллары на ночь: рост — свободных резервов в системе всё меньше" },
@@ -191,9 +208,9 @@ const HUMAN = {
   bdc_px: { t: "Акции фондов частного кредита (BDC) против S&P 500 за 3 месяца", p: "цены и выплаты публичных фондов частного кредита реагируют на проблемы заёмщиков раньше их отчётности", quiet: true },
   cot_es: { t: "Позиции спекулянтов во фьючерсах на S&P 500 (CFTC)", p: "чистая длинная позиция крупных спекулянтов в доле открытого интереса; крайности — толпа в лонге или массовый выход — исторически чаще совпадали с разворотами" },
   cor1m: { t: "Ожидаемая корреляция акций S&P 500 на месяц (CBOE COR1M)", p: "насколько синхронно, судя по ценам опционов, рынок ждёт движения крупнейших акций: высокая — продают всё подряд, низкая — каждая бумага живёт своей жизнью" },
-  tp10: { t: "Срочная премия 10-летних облигаций США: изменение за 3 месяца", p: "надбавка за долгий срок владения облигацией сверх ожидаемого пути ставки ФРС (оценка ФРС по модели Ким–Райта); её рост удорожает длинные деньги независимо от решений ФРС" },
-  flows: { t: "Покупки иностранцами долгосрочных ценных бумаг США за 3 месяца (TIC)", p: "сколько иностранные инвесторы вложили в американские облигации и акции; данные выходят с лагом около полутора месяцев" },
-  quadrant: { t: "Фаза цикла США: деловая активность и базовая инфляция", p: "куда одновременно движутся рост (индекс ФРБ Чикаго CFNAI) и базовая инфляция: от сочетания зависит, какие активы исторически чувствовали себя лучше" },
+  tp10: { t: "Срочная премия 10-летних облигаций США: изменение за 3 месяца", p: "надбавка за долгий срок владения облигацией сверх ожидаемого пути ставки ФРС (оценка ФРС по модели Ким–Райта); её рост удорожает длинные деньги независимо от решений ФРС", sn: "Срочная премия 10-летних облигаций США (уровень, б.п.)" },
+  flows: { t: "Покупки иностранцами долгосрочных ценных бумаг США за 3 месяца (TIC)", p: "сколько иностранные инвесторы вложили в американские облигации и акции; данные выходят с лагом около полутора месяцев", sn: "Чистые покупки иностранцами долгосрочных бумаг США за месяц, млрд $" },
+  quadrant: { t: "Фаза цикла США: деловая активность и базовая инфляция", p: "куда одновременно движутся рост (индекс ФРБ Чикаго CFNAI) и базовая инфляция: от сочетания зависит, какие активы исторически чувствовали себя лучше", sn: "Индекс деловой активности ФРБ Чикаго (CFNAI), среднее за 3 месяца" },
   // --- BTC-панель ---
   liquidity_regime: { t: "Чистая ликвидность ФРС", p: "сколько долларов от ФРС реально доступно рынкам", rel: "Баланс ФРС" },
   netliq_4w: { t: "Чистая ликвидность ФРС за 4 недели", p: "краткосрочное направление долларовой ликвидности", rel: "Баланс ФРС" },
@@ -361,6 +378,14 @@ function compactSeries(series) {
   return Object.keys(out).length ? out : null;
 }
 
+// Точки ряда не новее дня закрытия: котировка поверх ряда не должна решать, «заметное» ли движение.
+function pointsUpTo(points, day) {
+  if (!points) return points;
+  const lim = Date.parse(`${day}T00:00:00Z`);
+  const out = Object.fromEntries(Object.entries(points).filter(([t]) => Number(t) <= lim));
+  return Object.keys(out).length ? out : null;
+}
+
 /* ================================ 2. ЧТЕНИЕ СОСТОЯНИЯ ================================ */
 
 async function readJSON(path, fallback = null) {
@@ -525,6 +550,14 @@ const PAGE_EXTRACTOR = `(() => {
   // Время снимка, на котором посчитана страница: им помечаются события риска, чтобы повторный
   // прогон ТОГО ЖЕ снимка не слал их дважды, а настоящий повтор на новом снимке — слал.
   try { out.snapshot_at = state.lastSnapGen || ""; } catch (e) { out.snapshot_at = ""; }
+  // Официальные закрытия (VIX, VIX3M) — хвосты рядов FRED из кэша страницы, без котировки поверх.
+  out.closes = {};
+  for (const k of ${JSON.stringify(CLOSE_SERIES)}) {
+    try {
+      const s = (typeof fredCached === "function" && fredCached(k)) || [];
+      out.closes[k] = s.slice(-5).map(p => ({ d: new Date(p.d).toISOString().slice(0, 10), v: Number(p.v) })).filter(p => p.v > 0);
+    } catch (e) { out.closes[k] = []; }
+  }
   // Поставщики данных: ключи снимка, которые сервер не смог обновить (failed: «ключ — причина») или
   // отдал из старого кэша (stale_keys). От них страница уходит на резервные источники, и ряд карточки
   // меняется целиком — это смена источника, а не пересмотр (см. providersSwitched).
@@ -673,6 +706,8 @@ function fromPageRaw(raw) {
   if (unlisted.length) console.log(`ВНИМАНИЕ: карточки страницы вне MACRO_CADENCE — ${unlisted.join(", ")} (публикациями не считаются: ни релизов, ни пересмотров; добавьте их в MACRO_CADENCE и HUMAN)`);
   const noHuman = raw.indicators.filter((i) => !HUMAN[i.id]).map((i) => i.id);
   if (noHuman.length) console.log(`ВНИМАНИЕ: нет человеческого имени у карточек — ${noHuman.join(", ")} (в сообщение уйдёт внутренняя подпись; добавьте их в HUMAN)`);
+  const noClose = raw.indicators.filter((i) => MACRO_CADENCE[i.id]?.close && !CLOSE_OF[i.id]?.(raw.closes)).map((i) => i.id);
+  if (noClose.length) console.log(`::warning::официальное закрытие не прочитано из рядов FRED страницы — ${noClose.join(", ")}: публикации по ним в этом прогоне нет, база держит прошлое закрытие`);
   const indicators = raw.indicators.map((i) => {
     const c = MACRO_CADENCE[i.id];
     const { series, ...rest } = i;
@@ -683,8 +718,8 @@ function fromPageRaw(raw) {
       release: c ? c.release : "",
       cadence: c?.cadence || "",
       ...(c ? {} : { unlisted: true }),
-      // последняя точка — котировка поверх официального ряда закрытий (см. close в MACRO_CADENCE)
-      ...(c?.close && /интрадей/i.test(String(i.delta || "")) ? { intraday: true } : {}),
+      // официальное закрытие (см. CLOSE_OF); null — ряд FRED не прочитан, публикации в этом прогоне нет
+      ...(c?.close ? { close: CLOSE_OF[i.id]?.(raw.closes) || null } : {}),
       points: compactSeries(series),
     };
   });
@@ -1463,9 +1498,6 @@ function diff(prevState, panel) {
     // источника, а не о рынке. Сообщать об этом — значит слать шум при каждом сбое сети раннера
     // (FRED и Stooq режут раннеры GitHub, у страницы на них штатные резервы).
     if (i.degraded || was.degraded) continue;
-    // Котировка поверх ряда закрытий (VIX в часы торгов) — не публикация: сравнение ждёт закрытия, а
-    // база держит прошлое закрытие (snapshotState).
-    if (i.intraday) continue;
 
     const zoneChanged =
       (i.zone != null && was.zone != null && i.zone !== was.zone) ||
@@ -1487,7 +1519,18 @@ function diff(prevState, panel) {
     // Релиз: вышли новые данные И значение действительно изменилось.
     // Одна публикация первоисточника обычно двигает несколько карточек (H.15 — сразу пять,
     // ETF — четыре), поэтому релизы собираются в ОДНО сообщение на публикацию, а не на карточку.
-    if (i.scheduled && dateAdvanced && changed && !HUMAN[i.id]?.quiet) {
+    // У карточек с официальным закрытием (VIX) публикация — новая дата в ряду FRED, а не дата карточки:
+    // та сдвигается с первой котировкой дня. В строку сообщения идёт само закрытие.
+    if (MACRO_CADENCE[i.id]?.close && i.scheduled) {
+      const a = was.close, b = i.close;
+      if (a && b && b.d > a.d && !sameNum(a.v, b.v) && !HUMAN[i.id]?.quiet) {
+        const shown = (x) => x.v.toFixed(b.digits ?? 2).replace(".", ",");
+        releaseGroups.push({
+          i: { ...i, observed_at: b.d, value: shown(b), value_num: b.v, unit: "", points: pointsUpTo(i.points, b.d) },
+          was: { ...was, observed_at: a.d, value: shown(a), value_num: a.v, unit: "" },
+        });
+      }
+    } else if (i.scheduled && dateAdvanced && changed && !HUMAN[i.id]?.quiet) {
       releaseGroups.push({ i, was });
     }
     // Ревизия: дата наблюдения та же, а значение переписали.
@@ -1551,7 +1594,8 @@ function diff(prevState, panel) {
         const sig = changed.map((c) => `${c.t}|${c.before}|${c.after}`).join(";");
         if (!bySignature.has(sig)) bySignature.set(sig, { names: [], changed, sources: new Set() });
         const slot = bySignature.get(sig);
-        slot.names.push(humanTitle(i.id, i.name));
+        // ряд карточки бывает не той величиной, что её значение (у «Фазы цикла» — CFNAI): sn называет сам ряд
+        slot.names.push(HUMAN[i.id]?.sn || humanTitle(i.id, i.name));
         if (i.source) slot.sources.add(sourceLabel(i.source));
       }
       const span = g.from !== g.to;
@@ -2872,16 +2916,14 @@ function pruneSent(sent, now) {
   return out;
 }
 
-// prev — прошлая база: у карточки, которая сейчас показывает котировку поверх ряда закрытий (intraday),
-// в базе остаётся последнее ЗАКРЫТИЕ, иначе следующее закрытие той же даты не было бы «новыми данными».
+// prev — прошлая база: официальное закрытие, которое в этом прогоне не прочиталось (close === null),
+// переносится из неё — иначе следующее закрытие сравнивать было бы не с чем.
 function snapshotState(panel, prev = null) {
   const indicators = {};
   for (const i of panel.indicators || []) {
-    if (i.intraday) {
-      if (prev?.indicators?.[i.id]) indicators[i.id] = prev.indicators[i.id];
-      continue;
-    }
+    const close = i.close !== undefined ? (i.close ? { d: i.close.d, v: i.close.v } : prev?.indicators?.[i.id]?.close || null) : undefined;
     indicators[i.id] = {
+      ...(close !== undefined ? { close } : {}),
       value: i.value,
       value_num: i.value_num,
       unit: i.unit,
@@ -3167,5 +3209,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
+export { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };
