@@ -154,6 +154,21 @@ try {
       assert.ok(!/(^|[\s(])-\d/.test(r.text), "дефис перед числом на карточке");
     } else console.log("      (в снимке пока нет рядов карточки — проверены расчёт без неё, ИИ и уведомитель)");
   });
+  await test("v5.4: новостные детекторы считают только отступления; заморозку дают только сработавшие", async () => {
+    const r = await page.evaluate(() => {
+      const last = id => (DETECTORS.find(d => d.id === id) || {}).last || {};
+      const cap = last("d_capex"), Tc = newsTally(state.news.capex || []);
+      return { st: cap.st, pts: cap.pts, inputs: cap.inputs || "", want: newsDet(Tc, "capex"), retreat: Tc.fN + Tc.uN,
+        fric: Tc.fric, fired: state.detFired || {}, freezeBy: state.decision.freezeBy || [], newsAt: !!state.newsAt };
+    });
+    assert.ok(r.newsAt, "сканер новостей не отработал");
+    assert.deepEqual([r.st, r.pts], [r.want.st, r.want.pts], "капекс считает не по правилу v5.4");
+    if (!r.retreat) assert.deepEqual([r.st, r.pts], ["calm", 0], "без отступлений капекс СПОКОЙНО, 0");
+    if (!r.fired.capex) assert.ok(!r.freezeBy.includes("Капекс"), "заморозка капексом без срабатывания");
+    if (!r.fired.bdc) assert.ok(!r.freezeBy.includes("Стресс BDC"), "заморозка BDC без срабатывания");
+    assert.match(r.inputs, /^отступление: фактов \d+/, "строка детектора начинается с отступлений");
+    console.log("      капекс:", r.st, r.pts, "·", r.inputs.replace(/\s+/g, " ").slice(0, 160));
+  });
   await test("полосы блоков: Σ пунктов + детекторы = общий балл, баллы блоков = плашкам разделов", async () => {
     const r = await page.evaluate(() => {
       const bd = state.breakdown, el = document.getElementById("blockBars");

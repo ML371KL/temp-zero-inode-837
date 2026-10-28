@@ -1,7 +1,7 @@
 // Тесты уведомлений. Все фикстуры синтетические и НЕ зависят от текущей даты: проверяется
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
-import { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+import { pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR } from "./notify.mjs";
 
 let passed = 0;
@@ -690,6 +690,21 @@ test("каноническая смена доли идёт от журнала 
   const msg = renderMessage(ev[0], "к");
   assert.match(msg, /100% нормы → <b>50% нормы<\/b>/);
   assert.ok(!/85%|65%|35%/.test(msg), `старая пятиступенчатая лестница не должна протекать: ${msg}`);
+});
+
+test("v5.4: первое сообщение о смене доли после выкладки объясняет правило детекторов — один раз", () => {
+  const prevLedger = ledgerAt(1);
+  const base = stateOf(panelOf([ind({})]));
+  const { panel: p } = canonPanel(decisionOf({ rung: 2, since: "2026-10-29", composite: 15.2 }), prevLedger);
+  const ev = allocEvents(diff({ ...base, ledger: prevLedger }, p));
+  assert.equal(ev.length, 1);
+  assert.ok(ev[0].causes.includes("Правило детекторов v5.4: события стройки (разрешения, сети, протесты) долю больше не двигают"), ev[0].causes.join(" | "));
+  assert.deepEqual(ev[0].ruleNotes, ["v5.4-detectors"]);
+  assert.match(renderMessage(ev[0], "к"), /события стройки \(разрешения, сети, протесты\) долю больше не двигают/);
+  const again = allocEvents(diff({ ...base, ledger: prevLedger, rule_notes: { "v5.4-detectors": "2026-10-29T15:00:00Z" } }, p));
+  assert.ok(!again[0].causes.some((c) => /Правило детекторов/.test(c)), "второй раз пояснения нет");
+  assert.equal(pendingRuleNotes({}, Date.parse("2027-01-15T12:00:00Z")).length, 0, "после срока пояснение не добавляется");
+  assert.equal(pendingRuleNotes({}, Date.parse("2026-10-27T12:00:00Z")).length, 0, "до выкладки — тоже");
 });
 
 test("первый канонический прогон без журнала — база, а не сообщение", () => {

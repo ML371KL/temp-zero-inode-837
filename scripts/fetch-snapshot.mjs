@@ -43,7 +43,7 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
    v5.0: + force majeure / stargate / ai campus / ai factory / bankrupt / chapter 11 / tender /
    wrote down — новые формы событий (форс-мажор Oracle 24.09 префильтр пропускал, если в
    заголовке не было «data center»). */
-const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik/i;
+const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik|lease|gigawatt|\bgw\b/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
 const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
@@ -363,7 +363,7 @@ async function main(){
   }
 
   /* ── серверный LLM-судья кандидатов ──
-     fh:newsVer: [заголовок, "fact"|"opinion"|"unverified", tсуда, subject, type]; старые записи
+     fh:newsVer: [заголовок, "fact"|"opinion"|"unverified", tсуда, subject, type, driver]; старые записи
      [h,"fact"|"opinion",t] страница читает как есть (subject нет → атрибуция по алиасам).
      v5.0: судья возвращает класс, компанию-подлежащее (тикер корзины или "none") и тип события;
      ленту ему НЕ сообщаем — именно она путала атрибуцию. Отказ («opinion»/«unverified») живёт в
@@ -375,12 +375,16 @@ async function main(){
     const prevVer=((prevSnap&&prevSnap.responses&&prevSnap.responses["fh:newsVer"])||[])
       .filter(e=>Array.isArray(e)&&e.length>=3&&e[2]>nowSec-(e[1]==="fact"?ttl.fact:ttl.neg));
     const known=new Map(prevVer.map(e=>[e[0],e]));
+    /* v5.4: у факта кэша без причины (driver — шестой элемент) судья переспрашивается ОДИН раз: новая запись
+       получает шестой элемент всегда ("" — судья причину не дал, тогда страница берёт правила) */
+    const noDriver=e=>e&&e[1]==="fact"&&e.length<6;
     const fresh=[]; const seenH=new Set();
-    for(const c of CAND.slice().sort((a,b)=>(!!b.sym-!!a.sym)||((b.t||0)-(a.t||0))))
-      if(!known.has(c.h)&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);}
+    for(const c of CAND.slice().sort((a,b)=>(!!b.sym-!!a.sym)||(!!noDriver(known.get(b.h))-!!noDriver(known.get(a.h)))||((b.t||0)-(a.t||0))))
+      if((!known.has(c.h)||noDriver(known.get(c.h)))&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);}
     if(OPENROUTER_KEY&&fresh.length&&!late()){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
       try{
-        const batch=fresh.slice(0,40), rows=batch.map((c,i)=>[c.kind+i,c.h]);
+        /* v5.4: пачка 15 (было 40) — промпт с причинами длиннее, а таймаут прежний; остаток досудят следующие сборки */
+        const batch=fresh.slice(0,15), rows=batch.map((c,i)=>[c.kind+i,c.h]);
         const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
           body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:4000,messages:[{role:"system",content:CL.JUDGE_SYS},{role:"user",content:CL.judgePrompt(rows)}]}),
@@ -393,7 +397,7 @@ async function main(){
         const got=CL.parseJudge(txt,rows.map(x=>x[0]));
         if(!got.size) throw new Error("нет JSON");
         batch.forEach((c,i)=>{const v=got.get(c.kind+i);    /* не вернувшийся в ответе — досудится следующей сборкой */
-          if(v) known.set(c.h,v.subject?[c.h,v.cls,nowSec,v.subject,v.type]:[c.h,v.cls,nowSec]);});
+          if(v) known.set(c.h,v.subject?[c.h,v.cls,nowSec,v.subject,v.type,v.driver||""]:[c.h,v.cls,nowSec]);});
         LLM_JUDGED=got.size;
         console.log("LLM-судья: рассужено "+LLM_JUDGED+" из "+batch.length+" новых кандидатов ("+OPENROUTER_MODEL+")");
       }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }

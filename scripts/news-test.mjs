@@ -23,7 +23,7 @@ const cyc=n=>JSON.parse(page.match(new RegExp(n+":\\s*(\\[[^\\]]*\\])"))[1]);
 const CONFIG={CYCLE:{capexTickers:cyc("capexTickers"),bdcTickers:cyc("bdcTickers")}};
 const blk=page.match(/\/\* ⟦NEWS-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/NEWS-CORE⟧ \*\//);
 if(!blk){console.error("нет блока ⟦NEWS-CORE⟧ в docs/index.html");process.exit(1);}
-const C=new Function("CONFIG",blk[1]+"\nreturn {newsMatch,newsClass,newsSubject,newsEvents,newsTally,judgePrompt,parseJudge,verEntry,divLeg,HIT_RX,VER_TTL,CO_TICKERS};")(CONFIG);
+const C=new Function("CONFIG",blk[1]+"\nreturn {newsMatch,newsClass,newsSubject,newsEvents,newsTally,newsDet,newsDriver,ruleDriver,JUDGE_DRIVERS,divEvent,judgePrompt,parseJudge,verEntry,divLeg,HIT_RX,VER_TTL,CO_TICKERS};")(CONFIG);
 
 let fails=0;
 const ok=(cond,msg)=>{if(!cond){fails++;console.log("  ✗ "+msg);}};
@@ -166,7 +166,7 @@ console.log("3) события и компании");
 {
   const T0=1790856977;
   const mk=(h,feed,t,src="Yahoo")=>{const m=C.newsMatch(h,[feed],src),k=m.capex?"capex":"bdc",x=m[k];
-    return x?{h,feed,t,src,cls:C.newsClass(x,h,src,null),sym:C.newsSubject(x,k,null)}:null;};
+    return x?{h,feed,t,src,cls:C.newsClass(x,h,src,null),sym:C.newsSubject(x,k,null),driver:C.newsDriver(x,h,null)}:null;};
   /* Broadcom/Anthropic: не кандидат вовсе; склейка — на синтетических записях одного класса */
   const ev0=C.newsEvents([
     {h:"Broadcom to lend Anthropic up to $42 billion to lease chips, in latest circular investing deal",t:T0,cls:"fact",sym:null,feed:"MSFT"},
@@ -178,10 +178,12 @@ console.log("3) события и компании");
            mk("Intel cuts capex forecast again","MSFT",T0,"Reuters"),
            mk("Intel cuts capex forecast again","AMZN",T0+10,"Reuters")].filter(Boolean);
   const t1=C.newsTally(a);
-  ok(t1.fSyms.join()==="ORCL"&&t1.fN===1,"форс-мажор Oracle в двух лентах → одна компания, одно событие (fSyms="+t1.fSyms+", fN="+t1.fN+")");
+  ok(t1.fric.syms.join()==="ORCL"&&t1.fric.n===1&&t1.fN===0,"форс-мажор Oracle в двух лентах → одна компания, одно событие, трение (fric="+JSON.stringify(t1.fric)+", fN="+t1.fN+")");
   ok(t1.uSyms.length===0&&t1.out>=1,"«Intel cuts capex» в лентах MSFT/AMZN → вне корзины, не тикер");
   const b=[...a,mk("Microsoft cuts fiscal 2027 capex guidance","MSFT",T0+7200,"Reuters")];
-  ok(C.newsTally(b).fSyms.length===2,"Oracle + Microsoft → две компании (СРАБОТАЛ)");
+  ok(C.newsTally(b).fSyms.join()==="MSFT","Oracle (трение) + Microsoft (срезка) → одна компания-отступление");
+  const b2=[...b,mk("Meta cuts 2027 capex guidance","META",T0+9000,"Reuters")];
+  ok(C.newsTally(b2).fSyms.length===2&&C.newsDet(C.newsTally(b2),"capex").st==="fired","Microsoft + Meta (срезки) → две компании (СРАБОТАЛ)");
   const c=C.newsEvents([{h:"Microsoft cuts capex guidance",t:T0,cls:"fact",sym:"MSFT"},{h:"Meta cuts capex guidance",t:T0,cls:"fact",sym:"META"}]);
   ok(c.length===2,"разные компании в одну секунду не склеиваются");
   const via=judge("Microsoft supplier Intel cuts capex","Reuters",["MSFT"],null);
@@ -254,6 +256,88 @@ console.log("6) HIT_RX ⊇ словари кандидатов");
     if(m.capex||m.bdc||m.soft){cand++;if(!C.HIT_RX.test(h))miss.push(h);}}
   ok(!miss.length,"кандидаты вне HIT_RX: "+miss.slice(0,5).join(" | "));
   console.log("   заголовков проверено: "+heads.size+", кандидатов: "+cand);
+}
+
+/* ── 7) v5.4: причина события; пороги — только по отступлениям ── */
+console.log("7) причина события и счёт по отступлениям (v5.4)");
+{
+  const J=JSON.parse(readFileSync("scripts/fixtures/news-2026-10.json","utf-8"));
+  const one=x=>{const m=C.newsMatch(x.h,x.feeds,x.src),k=m.capex?"capex":"bdc",mm=m[k],v=x.ver?C.verEntry(x.ver):null;
+    return {k,h:x.h,t:x.t,src:x.src,cls:C.newsClass(mm,x.h,x.src,v),sym:C.newsSubject(mm,k,v),driver:C.newsDriver(mm,x.h,v)};};
+  const all=J.items.map(one), capex=all.filter(x=>x.k==="capex");
+  const by=pre=>all.find(x=>x.h.startsWith(pre))||{};
+  /* реальные заголовки октября: ни один факт стройки не отступление */
+  const hard=capex.filter(x=>(x.cls==="fact"||x.cls==="unverified")&&x.sym);
+  ok(hard.length>=25,"фактов и неподтверждённых стройки в фикстуре: "+hard.length);
+  ok(!hard.some(x=>x.driver==="retreat"),"факты стройки октября — не отступление: "+hard.filter(x=>x.driver==="retreat").map(x=>x.h).join(" | "));
+  for(const pre of ["Oracle Invokes Force Majeure on a Data Center It Says Is Still on Schedule","Oracle invokes ‘force majeure’ on Project Jupiter, but says",
+    "Google's $15 Billion Finland AI Push Hits Roadblock as Regulators","Finnish Authorities Order Google to Halt","Google ordered to halt work on two data centers",
+    "Oracle trucks natural gas to data centers","Microsoft drops Nscale’s Loughton AI data center over interconnection delay",
+    "Amazon Just Walked Away From a $427 Million Data Center Plan After Neighbors"])
+    ok(by(pre).driver==="friction","трение: "+pre+" → "+by(pre).driver);
+  ok(by("Microsoft Scraps UK Data Center Deal With Nscale").driver==="unclear","одна площадка без причины → без причины");
+  /* окно 28.10 (14 дней): капекс спокоен, трения MSFT и AMZN, кластер Amazon целиком — трение */
+  const win=capex.filter(x=>x.t>Date.UTC(2026,9,14)/1000), T=C.newsTally(win), D=C.newsDet(T,"capex");
+  ok(D.st==="calm"&&D.pts===0,"октябрьский набор → капекс СПОКОЙНО, 0 (st="+D.st+", pts="+D.pts+")");
+  ok(T.fric.syms.join()==="AMZN,MSFT","трения стройки у AMZN и MSFT: "+T.fric.syms);
+  const amz=T.ev.filter(e=>e.sym==="AMZN"&&e.cls!=="opinion");
+  ok(amz.length===1&&amz[0].dup===3&&amz[0].driver==="friction","кластер Amazon ($427 млн, три пересказа) — одно событие, трение ("+amz.map(e=>e.dup+"/"+e.driver)+")");
+  /* окно 7.10 (форс-мажор Oracle + остановка Google): прежнее правило — СРАБОТАЛ, новое — СПОКОЙНО */
+  const w7=capex.filter(x=>x.t>Date.UTC(2026,8,23)/1000&&x.t<Date.UTC(2026,9,8,12)/1000), T7=C.newsTally(w7);
+  ok(T7.fric.syms.includes("ORCL")&&T7.fric.syms.includes("GOOGL")&&C.newsDet(T7,"capex").st==="calm","7.10: Oracle и Google — трения, капекс СПОКОЙНО");
+  /* синтетические отступления */
+  const syn=(h,feed,src="Reuters",ver=null)=>one({h,feeds:[feed],src,t:1793000000,ver});
+  const meta=syn("Meta lowers 2027 capital expenditure outlook as AI returns disappoint","META");
+  ok(meta.cls==="fact"&&meta.sym==="META"&&meta.driver==="retreat","Meta снижает прогноз капекса → факт-отступление ("+meta.cls+"/"+meta.driver+")");
+  const lease=syn("Microsoft cancels leases totaling 2 GW, TD Cowen says","MSFT");
+  ok(lease.cls==="unverified"&&lease.sym==="MSFT"&&lease.driver==="retreat","отмена аренды на 2 ГВт по отчёту → неподтв. отступление ("+lease.cls+"/"+lease.driver+")");
+  ok(C.HIT_RX.test("Microsoft cancels leases totaling 2 GW, TD Cowen says"),"префильтр пропускает отмену аренды на 2 ГВт");
+  ok(!C.newsMatch("Meta exits office leases amid AI push",["META"],"Reuters").capex,"аренда офисов — не кандидат");
+  const goog=syn("Alphabet cuts 2027 capex guidance as cloud demand cools","GOOGL");
+  const ev2=x=>({...x,cls:x.cls});
+  ok(C.newsDet(C.newsTally([ev2(meta),ev2(goog)]),"capex").pts===-15,"два факта-отступления у разных компаний → −15");
+  ok(C.newsDet(C.newsTally([ev2(meta)]),"capex").pts===-5,"один факт-отступление → −5");
+  ok(C.newsDet(C.newsTally([ev2(lease),{...ev2(lease),h:"Meta pulls back on data center leases, sources say",sym:"META",cls:"unverified",driver:"retreat"}]),"capex").st==="watch","неподтверждённые отступления у двух компаний → НАБЛЮДЕНИЕ");
+  ok(C.newsDet(C.newsTally([{...ev2(meta),driver:"friction"},{...ev2(goog),driver:"unclear"}]),"capex").pts===0,"трение и «без причины» → 0");
+  /* BDC: гейт — отступление, срезка — «срезка выплат», приостановка — отступление */
+  const gate=syn("Blue Owl halts redemptions at private credit fund","OBDC"), cut=syn("FS KKR cuts quarterly distribution to $0.48 from $0.70","FSK"),
+        cut2=syn("Ares Capital reduces regular quarterly dividend to $0.40","ARCC"), susp=syn("Golub Capital BDC suspends dividend","GBDC");
+  ok(gate.driver==="retreat"&&cut.driver==="reset"&&cut2.driver==="reset"&&susp.driver==="retreat","BDC: гейт/срезка/приостановка → "+[gate.driver,cut.driver,cut2.driver,susp.driver]);
+  const TB=C.newsTally([cut,cut2]);
+  ok(C.newsDet(TB,"bdc").pts===0&&TB.reset.syms.length===2,"две срезки выплат → BDC 0, видны как срезки");
+  ok(C.newsDet(C.newsTally([gate,susp]),"bdc").pts===-15,"гейт + приостановка у разных BDC → −15");
+  ok(C.newsDet(C.newsTally([cut]),"bdc",["MFIC"]).pts===-4,"приостановка по данным выплат — факт-отступление (−4 при одной)");
+  ok(C.divEvent({fresh:true})==="reset"&&C.divEvent({fresh:false,susp:{fresh:true}})==="retreat"&&C.divEvent({fresh:false,susp:{fresh:false}})===null&&C.divEvent(null)===null,"divEvent: срезка → reset, приостановка → retreat");
+  /* судья: driver в ответе и без него; записи кэша на 3, 5 и 6 элементах */
+  const ids=["C0","C1","B2"];
+  const p=C.parseJudge('{"verdicts":[{"id":"C0","cls":"fact","subject":"MSFT","type":"dc_delay","driver":"friction"},{"id":"C1","cls":"fact","subject":"META","type":"capex_cut","driver":"RETREAT"},{"id":"B2","cls":"fact","subject":"FSK","type":"dividend_cut","driver":"bogus"}]}',ids);
+  ok(p.get("C0").driver==="friction"&&p.get("C1").driver==="retreat"&&p.get("B2").driver===null,"parseJudge: driver нормализуется, мусор → null");
+  ok(C.parseJudge('{"verdicts":[{"id":"C0","cls":"fact","subject":"MSFT","type":"dc_delay"}]}',ids).get("C0").driver===null,"parseJudge без driver → null (причина по правилам)");
+  const e3=C.verEntry(["h","fact",1]),e5=C.verEntry(["h","fact",1,"MSFT","dc_delay"]),e6=C.verEntry(["h","fact",1,"MSFT","dc_delay","friction"]),e6b=C.verEntry(["h","fact",1,"MSFT","dc_delay",""]);
+  ok(e3&&e5&&e6&&e6b&&e3.driver===null&&e5.driver===null&&e6.driver==="friction"&&e6b.driver===null&&e5.subject==="MSFT","verEntry на 3, 5 и 6 элементах");
+  const mN=C.newsMatch("Microsoft drops Nscale’s Loughton AI data center over interconnection delay",["MSFT"],"Reuters").capex;
+  ok(C.newsDriver(mN,"Microsoft drops Nscale’s Loughton AI data center over interconnection delay",{cls:"fact",driver:"retreat"})==="friction","явное трение в заголовке сильнее «retreat» судьи");
+  const mA=C.newsMatch("Amazon.com (AMZN) Cancels $427 Million Loudoun County Data Center Project",["AMZN"],"Reuters").capex;
+  ok(C.newsDriver(mA,"x",{cls:"fact",driver:"retreat"})==="retreat"&&C.newsDriver(mA,"Amazon.com (AMZN) Cancels $427 Million Loudoun County Data Center Project",{cls:"fact",driver:"friction"})==="friction","без слов трения решает судья");
+  const pr=C.judgePrompt([["C0","x"]]);
+  ok(/"driver"/.test(pr)&&/"retreat"/.test(pr)&&/"friction"/.test(pr)&&/"reset"/.test(pr)&&/"unclear"/.test(pr),"промпт несёт поле driver и четыре причины");
+  /* правила A5 без вердикта */
+  const R=C.ruleDriver;
+  const rules=[["Microsoft trims capex guidance","capex_cut","retreat"],["Meta records impairment on AI servers","impairment","retreat"],["Blue Owl caps withdrawals","redemption_gate","retreat"],
+    ["FS KKR cuts distribution","dividend_cut","reset"],["Golub suspends distribution","dividend_cut","retreat"],["MidCap eliminates dividend","dividend_cut","retreat"],
+    ["Microsoft pauses Wisconsin data center amid permitting delays","dc_delay","friction"],["Meta delays data center as AI demand cools","dc_delay","retreat"],
+    ["Amazon cancels data center project","dc_delay","unclear"],["Microsoft cancels $10 billion data center project","dc_delay","retreat"],
+    ["Meta cancels data center leases","dc_delay","retreat"],["Oracle delays data center, says still on track","dc_delay","friction"],
+    ["Oracle declares force majeure on Texas data center","dc_delay","friction"],["CoreWeave files for Chapter 11 bankruptcy","other","retreat"],
+    ["Alphabet halts data center after residents protest","dc_delay","friction"],["Microsoft scales back data center build-out","dc_delay","retreat"]];
+  for(const [h,t,want] of rules) ok(R(h,t)===want,"правило: «"+h+"» ("+t+") → "+R(h,t)+", ждали "+want);
+  ok(C.JUDGE_DRIVERS.join()==="retreat,friction,reset,unclear","четыре причины");
+  /* сборщик: факт кэша без driver переспрашивается один раз */
+  const srv=readFileSync("scripts/fetch-snapshot.mjs","utf-8"), nd=srv.match(/const noDriver=(e=>[^;\n]+);/);
+  ok(nd,"в сборщике есть noDriver");
+  if(nd){const noDriver=new Function("return "+nd[1])();
+    ok(noDriver(["h","fact",1,"MSFT","dc_delay"])&&noDriver(["h","fact",1])&&!noDriver(["h","fact",1,"MSFT","dc_delay",""])&&!noDriver(["h","opinion",1,"MSFT","dc_delay"]),"переспрос: факты без 6-го элемента — да, с ним и не-факты — нет");}
+  ok(/v\.driver\|\|""\]/.test(srv),"сборщик пишет шестой элемент driver");
 }
 
 console.log(fails?("ПРОВАЛ: "+fails+" ошибок"):"OK: все проверки пройдены");

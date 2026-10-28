@@ -5,7 +5,7 @@ on:
 jobs:
   selftest:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       # v5.0: самопроверка берёт ТОТ ЖЕ промпт и разбор, что боевые судьи (сборщик и страница), — блок
       # ⟦NEWS-CORE⟧ из docs/index.html. Раньше здесь жила своя копия старого промпта {"confirmed":[…]},
@@ -29,14 +29,26 @@ jobs:
           const blk=page.match(/\/\* ⟦NEWS-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/NEWS-CORE⟧ \*\//);
           if(!blk){console.error("нет блока ⟦NEWS-CORE⟧ в docs/index.html");process.exit(1);}
           const C=new Function("CONFIG",blk[1]+"\nreturn {judgePrompt,parseJudge,JUDGE_SYS};")(CONFIG);
-          /* ожидания: B0 — факт ARCC; B1 — листикл (не факт); C0 — факт ORCL (форс-мажор); C1 — вопрос (не факт) */
+          /* ожидания: B0 — факт ARCC; B1 — листикл (не факт); C0 — факт ORCL (форс-мажор); C1 — вопрос (не факт).
+             v5.4: причина (driver) — обязательно C2 (Nscale, подключение к сети) → friction и C3 (Meta, прогноз капекса) → retreat;
+             остальные строки — для оценки, держит ли модель причину (в итог «пройдена» не входят) */
           const rows=[["B0","Ares Capital cuts quarterly dividend to $0.40 from $0.48"],["B1","3 BDCs that could cut dividends next year"],
-                      ["C0","Oracle declares force majeure on Stargate data center in Texas"],["C1","Will Meta take an impairment on Reality Labs?"]];
+                      ["C0","Oracle declares force majeure on Stargate data center in Texas"],["C1","Will Meta take an impairment on Reality Labs?"],
+                      ["C2","Microsoft drops Nscale’s Loughton AI data center over interconnection delay"],
+                      ["C3","Meta lowers 2027 capital expenditure outlook as AI returns disappoint"],
+                      ["C4","Amazon Just Walked Away From a $427 Million Data Center Plan After Neighbors Fought Back"],
+                      ["C5","Finnish Authorities Order Google to Halt Construction on Massive AI Data Center Projects"],
+                      ["C6","Oracle Invokes Force Majeure on a Data Center It Says Is Still on Schedule"],
+                      ["C7","Microsoft cancels leases totaling 2 GW, TD Cowen says"],
+                      ["C8","Amazon.com (AMZN) Cancels $427 Million Loudoun County Data Center Project"],
+                      ["B2","Blue Owl caps withdrawals from private credit fund as redemption requests surge"],
+                      ["B3","Golub Capital BDC suspends its quarterly distribution"]];
+          const WANT={B0:"reset",C0:"friction",C2:"friction",C3:"retreat",C4:"friction",C5:"friction",C6:"friction",C7:"retreat",C8:"unclear",B2:"retreat",B3:"retreat"};
           const t0=Date.now();
           fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
             headers:{"Content-Type":"application/json","Authorization":"Bearer "+KEY,"X-Title":"Razlom-26 selftest"},
             body:JSON.stringify({model:MODEL,max_tokens:4000,messages:[{role:"system",content:C.JUDGE_SYS},{role:"user",content:C.judgePrompt(rows)}]}),
-            signal:AbortSignal.timeout(90000)})
+            signal:AbortSignal.timeout(170000)})  /* v5.4: 13 строк — рассуждающей модели нужно больше 90 с */
           .then(async r=>{
             const txt=await r.text();
             console.log("HTTP",r.status,"за",Date.now()-t0,"мс · модель:",MODEL);
@@ -47,9 +59,13 @@ jobs:
             const got=C.parseJudge(c,rows.map(x=>x[0]));
             if(got.size<rows.length){console.error("РАЗОБРАНО "+got.size+" из "+rows.length+" — модель не следует формату");process.exit(1);}
             const v=id=>got.get(id)||{};
+            for(const [id,h] of rows){const x=v(id);console.log(id.padEnd(3),String(x.cls).padEnd(10),String(x.subject).padEnd(5),String(x.driver).padEnd(9),(WANT[id]?(x.driver===WANT[id]?"✓":"✗ ждали "+WANT[id]):"").padEnd(18),h.slice(0,90));}
+            const dOk=Object.keys(WANT).filter(id=>v(id).driver===WANT[id]).length;
+            console.log("причина совпала: "+dOk+" из "+Object.keys(WANT).length);
             const correct=v("B0").cls==="fact"&&v("B0").subject==="ARCC"&&v("B1").cls!=="fact"
-                        &&v("C0").cls==="fact"&&v("C0").subject==="ORCL"&&v("C1").cls!=="fact";
-            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факты распознаны с верной компанией, мнение и вопрос отклонены"
+                        &&v("C0").cls==="fact"&&v("C0").subject==="ORCL"&&v("C1").cls!=="fact"
+                        &&v("C2").driver==="friction"&&v("C3").driver==="retreat";
+            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факты распознаны с верной компанией, мнение и вопрос отклонены, причина Nscale — трение, Meta — отступление"
                                :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(Object.fromEntries(got)));
           }).catch(e=>{console.error("СБОЙ:",String(e));process.exit(1);});
           EOF

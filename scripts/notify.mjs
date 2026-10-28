@@ -88,6 +88,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
                той же дате наблюдения = ревизия, о ней сообщаем отдельно.
    Ни то, ни другое не ставится рыночным котировкам: у них «значение изменилось» — не событие,
    они меняются непрерывно. Для них остаётся только смена зоны/балла (и вердикт/детекторы).  */
+/* v5.4: пояснение к правилу панели — одной строкой в ПЕРВОМ сообщении о смене доли после выкладки. Срок «until»
+   не даёт вспомнить о правиле через полгода; доставленное записывается в состояние (rule_notes) и не повторяется. */
+const RULE_NOTES = [
+  { id: "v5.4-detectors", from: "2026-10-28", until: "2026-12-31",
+    text: "Правило детекторов v5.4: события стройки (разрешения, сети, протесты) долю больше не двигают" },
+];
+function pendingRuleNotes(prevState, nowMs = Date.now()) {
+  const seen = (prevState && prevState.rule_notes) || {};
+  const day = new Date(nowMs).toISOString().slice(0, 10);
+  return RULE_NOTES.filter((n) => !seen[n.id] && day >= n.from && day <= n.until);
+}
+
 const MACRO_CADENCE = {
   // водопровод и Казначейство
   sofr_iorb: { scheduled: true, revisable: true, release: "NY Fed · SOFR", cadence: "каждый рабочий день" },
@@ -1535,6 +1547,8 @@ function diff(prevState, panel) {
         ? "Аварийный переключатель: защита включается немедленно, независимо от оценок"
         : `Сводная оценка рынка ${signed(curAlloc.score)} по шкале от −100 до +100${finite(curAlloc.lead) ? `, опережающие показатели ${signed(curAlloc.lead)}` : ""}`);
     }
+    const ruleNotes = pendingRuleNotes(prevState, Date.parse(panel.snapshot_at || panel.generated_at || "") || Date.now());
+    for (const n of ruleNotes) causes.push(n.text);
     const regimeFrom = canon ? regimeWordOf(prevAlloc) : "";
     const regimeTo = canon ? regimeWordOf(curAlloc) : "";
     events.push({
@@ -1557,6 +1571,7 @@ function diff(prevState, panel) {
           ].filter(Boolean).join("\n")
         : "",
       causes,
+      ruleNotes: ruleNotes.map((n) => n.id),
       stability: stabilityLines(prevAlloc, curAlloc, prevState),
       note: "",
     });
@@ -2215,9 +2230,10 @@ async function main() {
   const trend = appendTrend(prev.alloc_trend, panel);
   const allocChanges = appendChanges(prev.alloc_changes, panel, prev.allocation);
   let baseline = null; // сдвигается один раз в самом конце — до тех пор пишем старую базу
+  let ruleNotesSeen = { ...(prev.rule_notes || {}) };   // v5.4: пояснения к правилу, уже доставленные
   const persist = async () => {
     await mkdir(dirname(STATE_PATH), { recursive: true });
-    await writeFile(STATE_PATH, JSON.stringify({ ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges }, null, 1));
+    await writeFile(STATE_PATH, JSON.stringify({ ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen }, null, 1));
   };
 
   let sent = 0;
@@ -2242,6 +2258,7 @@ async function main() {
         sent++;
         sentIndex[sentKey(ev)] = new Date().toISOString();
         if (ev.revisedPoints) revisedSeen = rememberRevised(revisedSeen, [ev], now);
+        for (const id of ev.ruleNotes || []) ruleNotesSeen = { ...ruleNotesSeen, [id]: new Date().toISOString() };
         await persist(); // индекс доставленного — сразу на диск, база сдвинется в конце
         if (i < capped.length - 1) await sleep(SEND_GAP_MS);
       }
@@ -2261,5 +2278,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+export { pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };
