@@ -38,4 +38,23 @@ assert.ok(block(restoreAt).split("\n").some((line) => line.trim() === "razlom26-
 // Скрипт обязан класть состояние именно туда, откуда его сохраняет кэш.
 assert.match(y, /^\s*NOTIFY_STATE:\s*\.notify\/state\.json\s*$/m, "NOTIFY_STATE должен совпадать с путём кэша");
 
+// Красные тесты не глушат ни рассылку, ни журнал решений (аудит ботов 28.10.2026, C5; та же схема, что в 838).
+// Раньше тест-шаг блокировал весь прогон: и сообщения о доле, и единственного писателя ветки ledger.
+{
+  const TESTS = /^\s*- name:\s*Тесты уведомлений\s*\n\s*id:\s*selftest\s*\n\s*continue-on-error:\s*true\s*\n\s*run:\s*\|\s*\n\s*node scripts\/notify-test\.mjs\s*$/m;
+  const RED = /^\s*- name:\s*Красный прогон при упавших тестах\s*\n\s*if:\s*always\(\)\s*&&\s*steps\.selftest\.outcome\s*==\s*'failure'\s*\n[\s\S]*?^\s*exit 1\s*$/m;
+  const LEDGER = /^\s*- name:\s*Записать журнал решений в ветку ledger\s*\n\s*if:\s*\$\{\{\s*!cancelled\(\)\s*\}\}\s*$/m;
+  const testsAt = y.match(TESTS), redAt = y.match(RED), ledgerAt = y.match(LEDGER);
+  assert.ok(testsAt, "тесты уведомлений: шаг с id selftest и continue-on-error — красный тест не должен останавливать рассылку");
+  assert.ok(testsAt.index < sendAt.index, "тесты обязаны идти до рассылки: их исход включает осторожный режим");
+  assert.match(y, /^\s*NOTIFY_SELFTEST:\s*\$\{\{\s*steps\.selftest\.outcome\s*\}\}\s*$/m, "исход тестов обязан доходить до скрипта: по нему включается осторожный режим");
+  assert.ok(ledgerAt, "журнал решений пишется при любом исходе рассылки, кроме отмены (!cancelled())");
+  assert.ok(redAt, "упавший тест обязан красить прогон отдельным шагом с always()");
+  for (const [name, at] of [["рассылки", sendAt], ["сохранения состояния", saveAt], ["записи журнала", ledgerAt]]) {
+    assert.ok(at.index < redAt.index, `красный шаг обязан стоять после ${name}: иначе красный тест снова глушил бы её`);
+  }
+  // ни один шаг до рассылки и журнала не должен валить прогон из-за тестов
+  assert.doesNotMatch(y.slice(0, sendAt.index), /steps\.selftest\.outcome\s*==\s*'failure'[\s\S]*?exit 1/, "проверка исхода тестов с exit 1 до рассылки снова заблокировала бы её");
+}
+
 console.log("notify.yml: инварианты состояния уведомлений соблюдены");
