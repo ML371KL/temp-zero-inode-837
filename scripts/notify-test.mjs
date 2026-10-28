@@ -432,6 +432,42 @@ test("карточка вне MACRO_CADENCE молчит (ни релиза, н�
   assert.equal(mute(() => diff(stateOf(before), after)).length, 0, "новая карточка без записи в календаре не уходит наружу");
 });
 
+test("VIX выходит по закрытию, а не по первой котировке дня: одно сообщение CBOE на закрытие", () => {
+  // Хронология 21–22.10.2026 по боевым снимкам: VIX за 20.10 приходит во FRED в 13:46 UTC 21.10, а с 13:56
+  // страница кладёт поверх ряда котировку 21.10 с пометкой «интрадей (~15 мин)». Раньше «вышли новые данные»
+  // уходили по этой котировке, а дата термструктуры прыгала между закрытием и котировкой.
+  const LIVE = " · интрадей (~15 мин)";
+  const card = (id, value, d, live) => ({ id, name: id, value, value_num: Number(String(value).replace(",", ".")), unit: "", delta: (id === "vix" ? "VIX 17,9" : "VIX 17,9 / VIX3M 19,7") + (live ? LIVE : ""),
+    zone: "норма", score: 0, observed_at: d, source: "fred.stlouisfed.org", note: "", degraded: false, voting: true, lead: false, series: [] });
+  const run = (vix, vt) => fromPageRaw({ generated_at: "2026-10-22T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" }, indicators: [card("vix", ...vix), card("vixterm", ...vt)] });
+  let state = stateOf(run(["+2,5", "2026-10-20"], ["0,91", "2026-10-20"]));
+  const step = (vix, vt) => {
+    const panel = run(vix, vt);
+    const ev = diff(state, panel);
+    state = snapshotState(panel, state);
+    return ev;
+  };
+  assert.equal(step(["+2,0", "2026-10-21", true], ["0,93", "2026-10-21", true]).length, 0, "первая котировка дня — не публикация");
+  assert.equal(step(["+2,4", "2026-10-21", true], ["0,91", "2026-10-20"]).length, 0, "термструктура вернулась к закрытию 20.10 — не новость");
+  assert.equal(step(["+3,4", "2026-10-21", true], ["0,96", "2026-10-21", true]).length, 0);
+  const ev = step(["+1,8", "2026-10-21"], ["0,97", "2026-10-21"]);
+  assert.equal(ev.length, 1, "закрытие 21.10 — одно сообщение на обе карточки");
+  assert.equal(ev[0].title, "Индексы волатильности CBOE");
+  assert.match(ev[0].detail, /21\.10\.2026/);
+  assert.deepEqual(ev[0].moves.map((m) => `${m.before}→${m.after}`), ["+2,5→+1,8", "0,91→0,97"], "«было» — прошлое ЗАКРЫТИЕ, а не котировка");
+  assert.equal(step(["+3,6", "2026-10-22", true], ["0,95", "2026-10-22", true]).length, 0);
+});
+
+test("пометка котировки на странице — та, которую ждёт уведомитель", () => {
+  const html = readFileSync(new URL("../docs/index.html", import.meta.url), "utf8");
+  for (const [id, c] of Object.entries(MACRO_CADENCE).filter(([, c]) => c.close)) {
+    const block = html.split(`addInd({id:"${id}"`)[1]?.split("addInd({id:")[0] || "";
+    assert.match(block, /интрадей \(~15 мин\)/, `${id}: без пометки котировки в подписи уведомитель примет её за закрытие`);
+  }
+  assert.notEqual(releaseOf({ id: "cor1m", release: MACRO_CADENCE.cor1m.release }), releaseOf({ id: "vix", release: MACRO_CADENCE.vix.release }),
+    "COR1M выходит вечером своим файлом: под общим заголовком было бы два «Индекса CBOE» за одну дату");
+});
+
 test("путь ФРС выходит одним сообщением с кривой — это тот же H.15, а не «Данные ФРС»", () => {
   const card = (id, v, d) => ind({ id, value: v, value_num: Number(String(v).replace(",", ".").replace("−", "-")), observed_at: d, source: "fred.stlouisfed.org", ...MACRO_CADENCE[id] });
   const was = stateOf(panelOf([card("curve", "0,52", "2026-10-22"), card("policy", "−40", "2026-10-22")]));

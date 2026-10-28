@@ -108,8 +108,13 @@ const MACRO_CADENCE = {
   // рынок
   spx: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
   spx_mom: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
-  vix: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня" },
-  vixterm: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня" },
+  // close — публикация есть ТОЛЬКО официальное закрытие. Страница кладёт поверх ряда FRED задержанную
+  // котировку текущего дня и помечает это в подписи «интрадей (~15 мин)»; такой прогон публикацией не
+  // считается, а база сравнения держит последнее закрытие (см. fromPageRaw и snapshotState). Раньше VIX
+  // «выходил» по первой котировке дня (13:46–13:56 UTC), а дата термструктуры прыгала между закрытием и
+  // котировкой — отсюда два сообщения CBOE в одном прогоне.
+  vix: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
+  vixterm: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
   breadth: { scheduled: false, revisable: false, release: "котировки", cadence: "внутридневные" },
   // макро-цикл
   payrolls: { scheduled: true, revisable: true, release: "BLS Employment Situation", cadence: "ежемесячно" },
@@ -132,7 +137,9 @@ const MACRO_CADENCE = {
   ai_bet: { scheduled: false, revisable: false, release: "котировки", cadence: "торговый день" },
   bdc_px: { scheduled: false, revisable: false, release: "котировки", cadence: "торговый день" },
   cot_es: { scheduled: true, revisable: false, release: "CFTC COT", cadence: "пятница, позиции на вторник" },
-  cor1m: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня" },
+  // свой файл CBOE, обновляется вечером в день торгов — на полсуток раньше закрытия VIX во FRED; под общим
+  // «CBOE» выходило бы два сообщения «Индексы волатильности CBOE» за одну и ту же дату
+  cor1m: { scheduled: true, revisable: false, release: "CBOE COR1M", cadence: "закрытие торгового дня" },
   tp10: { scheduled: true, revisable: false, release: "ФРС · модель Ким–Райта", cadence: "рабочие дни, с лагом" },
   flows: { scheduled: true, revisable: false, release: "Минфин США · TIC", cadence: "ежемесячно, лаг ~45 дней" },
   quadrant: { scheduled: true, revisable: false, release: "ФРБ Чикаго · CFNAI", cadence: "ежемесячно" },
@@ -242,6 +249,7 @@ const RELEASE_HUMAN = {
   "фрс · модель ким–райта": "Срочная премия облигаций США (ФРС)",
   "минфин сша · tic": "Потоки капитала в США (Минфин, TIC)",
   "cftc cot": "Отчёт CFTC о позициях во фьючерсах",
+  "cboe cor1m": "Ожидаемая корреляция акций США (CBOE)",
   sloos: "Опрос ФРС о банковском кредитовании",
   eia: "Цены на нефть (EIA)",
   "закрытие рынка США": "Закрытие рынка США",
@@ -675,6 +683,8 @@ function fromPageRaw(raw) {
       release: c ? c.release : "",
       cadence: c?.cadence || "",
       ...(c ? {} : { unlisted: true }),
+      // последняя точка — котировка поверх официального ряда закрытий (см. close в MACRO_CADENCE)
+      ...(c?.close && /интрадей/i.test(String(i.delta || "")) ? { intraday: true } : {}),
       points: compactSeries(series),
     };
   });
@@ -1445,6 +1455,9 @@ function diff(prevState, panel) {
     // источника, а не о рынке. Сообщать об этом — значит слать шум при каждом сбое сети раннера
     // (FRED и Stooq режут раннеры GitHub, у страницы на них штатные резервы).
     if (i.degraded || was.degraded) continue;
+    // Котировка поверх ряда закрытий (VIX в часы торгов) — не публикация: сравнение ждёт закрытия, а
+    // база держит прошлое закрытие (snapshotState).
+    if (i.intraday) continue;
 
     const zoneChanged =
       (i.zone != null && was.zone != null && i.zone !== was.zone) ||
@@ -2826,9 +2839,15 @@ function pruneSent(sent, now) {
   return out;
 }
 
-function snapshotState(panel) {
+// prev — прошлая база: у карточки, которая сейчас показывает котировку поверх ряда закрытий (intraday),
+// в базе остаётся последнее ЗАКРЫТИЕ, иначе следующее закрытие той же даты не было бы «новыми данными».
+function snapshotState(panel, prev = null) {
   const indicators = {};
   for (const i of panel.indicators || []) {
+    if (i.intraday) {
+      if (prev?.indicators?.[i.id]) indicators[i.id] = prev.indicators[i.id];
+      continue;
+    }
     indicators[i.id] = {
       value: i.value,
       value_num: i.value_num,
@@ -3061,7 +3080,7 @@ async function main(io = {}) {
   }
 
   if (dry) revisedSeen = rememberRevised(revisedSeen, events.filter((e) => e.revisedPoints), now);
-  baseline = snapshotState(panel);
+  baseline = snapshotState(panel, prev);
   await persist();
   console.log(dry ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);
   // Учёт ИИ-разборов (блок 5б): тревога при отказе API по доступу и строка за прошлую неделю — в канал
