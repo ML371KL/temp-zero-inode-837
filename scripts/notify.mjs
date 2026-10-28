@@ -802,7 +802,7 @@ const isRung = (r) => Number.isInteger(r) && r >= 0 && r <= 2;
 // она бессмысленна, — ступень. Лишние поля будущих версий не срезаются.
 const validMemory = (m) => !!m && typeof m === "object" && !Array.isArray(m) && isRung(m.rung);
 const round = (x, k) => (finite(x) ? Math.round(x * 10 ** k) / 10 ** k : null);
-const signed = (x, k = 1) => (finite(x) ? `${x > 0 ? "+" : x < 0 ? "−" : ""}${Math.abs(x).toFixed(k).replace(".", ",")}` : "—");
+const signed = (x, k = 1) => (finite(x) ? `${x > 0 ? "+" : x < 0 ? "−" : ""}${fmtNum(Math.abs(x), { digits: k, fixed: true })}` : "—");
 const regimeWordOf = (a) => a?.regimeWord || REGIME_WORD[a?.regime] || "";
 
 // Прошлый журнал. `null` в файле — честное «ветки ещё нет» (так его пишет воркфлоу); строка
@@ -1060,12 +1060,14 @@ function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, funds = 
 
 /* ==================================== 3. СОБЫТИЯ ==================================== */
 
+// Эмодзи — по общему стандарту сообщений (29.10.2026): 🔔 смена доли (и поправка владельца),
+// ⚠️ сигнал риска, 🗓 выход статистики, ℹ️ пересчёт истории и служебное. Одна — в начале заголовка.
 const KIND = {
-  allocation: { emoji: "🎯", label: "изменение доли капитала" },
+  allocation: { emoji: "🔔", label: "изменение доли капитала" },
   risk: { emoji: "⚠️", label: "сигнал риска" },
-  service: { emoji: "🛠", label: "служебное сообщение" },
-  release: { emoji: "📊", label: "вышли новые данные" },
-  revision: { emoji: "♻️", label: "пересмотр опубликованных данных" },
+  service: { emoji: "ℹ️", label: "служебное сообщение" },
+  release: { emoji: "🗓", label: "вышли новые данные" },
+  revision: { emoji: "ℹ️", label: "пересмотр опубликованных данных" },
 };
 
 // Порядок важен: сначала то, что меняет вывод, потом то, что его питает.
@@ -1100,19 +1102,47 @@ function sameNum(a, b) {
   return Math.abs(a - b) <= scale * 1e-9;
 }
 
+/* ---- Числа, даты и время для читателя (стандарт сообщений 29.10.2026) ----
+   Число в тексте пишет ОДНА функция — fmtNum, остальные её обёртки: десятичная запятая, разряды
+   неразрывным пробелом с 10 000 (четырёхзначные слитно: «2391,72»), типографский минус, «+» у
+   изменения. До 29.10.2026 здесь был toLocaleString: он делил и четырёхзначные («1 234») и ставил
+   дефис вместо минуса. Время — только московское с пометкой, год — только не текущий. */
+const NBSP = " ";
+const MINUS = "−";
+// digits — знаков после запятой не больше; fixed — ровно столько (нули держатся: «0,50»); sign — «+».
+function fmtNum(x, { digits = 1, sign = false, fixed = false } = {}) {
+  if (!finite(x)) return "—";
+  const [int, frac = ""] = Math.abs(x).toFixed(digits).split(".");
+  const tail = fixed ? frac : frac.replace(/0+$/, "");
+  const zero = /^0*$/.test(int + tail);
+  const body = (int.length >= 5 ? int.replace(/\B(?=(\d{3})+$)/g, NBSP) : int) + (tail ? `,${tail}` : "");
+  return (zero ? "" : x < 0 ? MINUS : sign ? "+" : "") + body;
+}
+
 // Читаемое число для точки ряда: у карточек разный масштаб (хешрейт 7·10²⁰ H/s и MVRV 1,8
 // живут рядом), поэтому крайние порядки уходят в экспоненту, остальное — обычным числом.
 function fmtPoint(v) {
   if (!finite(v)) return "—";
   const a = Math.abs(v);
-  if (a !== 0 && (a >= 1e7 || a < 1e-3)) return v.toExponential(3).replace(".", ",").replace("e+", "·10^").replace("e-", "·10^−");
-  const digits = a >= 100 ? 1 : a >= 1 ? 2 : 4;
-  return v.toLocaleString("ru-RU", { maximumFractionDigits: digits });
+  if (a !== 0 && (a >= 1e7 || a < 1e-3)) return v.toExponential(3).replace(".", ",").replace("e+", "·10^").replace("e-", "·10^−").replace(/^-/, MINUS);
+  return fmtNum(v, { digits: a >= 100 ? 1 : a >= 1 ? 2 : 4 });
 }
 
-const dayLabel = (t) => new Date(Number(t)).toISOString().slice(0, 10);
-// В сообщении дата читается человеком, а не машиной: 27.05.2026 вместо 2026-05-27.
-const ruDay = (t) => { const d = new Date(Number(t)); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`; };
+// «Текущий год» — год снимка, по которому собрано сообщение, а не часов машины: иначе тесты на
+// фикстурах 2026 года покраснели бы в 2027-м. Задаётся в diff() и main(); без них — сейчас.
+let REF_MS = null;
+const MSK_MS = 3 * 3600e3;
+const p2 = (n) => String(n).padStart(2, "0");
+const refYear = () => new Date((REF_MS ?? Date.now()) + MSK_MS).getUTCFullYear();
+const dm = (d) => `${p2(d.getUTCDate())}.${p2(d.getUTCMonth() + 1)}${d.getUTCFullYear() === refYear() ? "" : `.${d.getUTCFullYear()}`}`;
+// Дата наблюдения для читателя: «27.05», чужой год — «27.05.2025». Дата календарная (полночь UTC
+// у ряда), поэтому сдвига пояса у неё нет — в отличие от момента (ruMoment).
+const ruDay = (t) => dm(new Date(Number(t)));
+// Момент для читателя — по Москве: «28.10, 14:05 МСК».
+const ruMoment = (t) => {
+  const d = new Date(Number(t) + MSK_MS);
+  return `${dm(d)}, ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())} МСК`;
+};
 
 // Переписанная история: сравниваем ТЕ ЖЕ метки времени в старом и новом ряду. Точки от
 // последней запомненной и новее не считаются — последняя точка суток ещё формируется, её
@@ -1497,6 +1527,8 @@ function diff(prevState, panel) {
   // тем, что страница насчитала в прошлый раз с нуля. Лестницы разных версий (5 ступеней старой
   // полосы и 3 канонические) между собой не сравниваются: «85% → 100%» на переходе — не смена.
   const curAlloc = panel.allocation || null;
+  // «текущий год» дат сообщения — год этого снимка (см. REF_MS)
+  REF_MS = Date.parse(panel.snapshot_at || panel.generated_at || "") || null;
   const prevAlloc = curAlloc?.canonical
     ? canonicalBase(prevState)
     : prevState.allocation?.canonical ? null : prevState.allocation || null;
@@ -1632,7 +1664,7 @@ function diff(prevState, panel) {
             name: (span ? `${ruDay(c.t)} · ` : "") + slot.names.join(" · "),
             before: fmtPoint(c.before),
             after: fmtPoint(c.after),
-            delta: finite(c.pct) ? `${c.pct > 0 ? "+" : "−"}${Math.abs(c.pct).toFixed(Math.abs(c.pct) < 1 ? 2 : 1).replace(".", ",")}%` : "",
+            delta: finite(c.pct) ? `${c.pct > 0 ? "+" : MINUS}${Math.abs(c.pct).toFixed(Math.abs(c.pct) < 1 ? 2 : 1).replace(".", ",")}%` : "",
           });
         }
       }
@@ -1816,7 +1848,7 @@ function diff(prevState, panel) {
         title: detectorHuman(d.name),
         before: DET_LABEL[from] || from,
         after: DET_LABEL[to] || to,
-        detail: String(d.inputs || "").slice(0, 260),
+        detail: detectorInputs(d.inputs).slice(0, 260),
         note: d.note || "",
       });
     }
@@ -1844,6 +1876,9 @@ function diff(prevState, panel) {
   const kept = events.filter((ev) => KIND_ORDER.includes(ev.kind));
   if (kept.length !== events.length) console.log(`тип события выключен в KIND_ORDER (в рассылку не идёт): ${events.length - kept.length}`);
   kept.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+  // Время события для подвала — момент снимка, на котором посчитана панель (своего времени у событий нет).
+  const at = Date.parse(stamp) || REF_MS || Date.now();
+  for (const ev of kept) if (!finite(ev.at)) ev.at = at;
   return kept;
 }
 
@@ -1854,11 +1889,30 @@ const esc = (s) =>
 
 function fmtValue(i) {
   // Панели форматируют дробную часть по-разному (BTC-панель — точкой, макро — запятой), и в
-  // соседних строках одного сообщения это выглядело неряшливо. Приводим к русской записи,
-  // не трогая ничего, кроме разделителя между цифрами.
+  // соседних строках одного сообщения это выглядело неряшливо. Приводим к русской записи:
+  // десятичная запятая здесь, минус, доллар и пробелы — в typo().
   const v = String(i.value ?? "").trim().replace(/(\d)\.(\d)/g, "$1,$2");
-  return i.unit && !v.includes(i.unit) ? `${v} ${i.unit}` : v;
+  return typo(i.unit && !v.includes(i.unit) ? `${v} ${i.unit}` : v);
 }
+
+// Подписи и строки, которые пишет страница («-0,50», «107,89 $», «1 147 б.п.», «0,5 %»), — к записи
+// стандарта: типографский минус, доллар перед числом («$107,89»), неразрывный пробел перед
+// тыс./млн/млрд/трлн и б.п./п.п. и в разрядах (четырёхзначные слитно), процент слитно. Повторный
+// проход ничего не меняет. Десятичную точку функция не трогает: в чужом тексте она бывает и в датах.
+function typo(s) {
+  return String(s ?? "")
+    .replace(/(^|[\s(«"/:;=≈~])[-–](?=\$?\d)/g, `$1${MINUS}`)
+    .replace(/(?<![\d,])(\d{1,3})((?: \d{3})+)(?!\d)/g, (m, a, b) => a + b.replace(/ /g, NBSP))
+    .replace(/(?<![\d, ])(\d) (\d{3})(?![\d ])/g, "$1$2")
+    .replace(/(\d) (тыс\.|млн|млрд|трлн|б\.п\.|п\.п\.)/g, `$1${NBSP}$2`)
+    .replace(/([+−]?)(\d[\d ]*(?:,\d+)?)((?: (?:тыс\.|млн|млрд|трлн))?)[  ]\$(?![A-Za-z0-9])/g, "$1$$$2$3")
+    .replace(/(\d)[  ]%/g, "$1%");
+}
+
+// Счётчик условий детектора по-русски: «условий 2/4» → «условий 2 из 4», дробь — через запятую,
+// служебная приписка страницы о судье новостей («LLM-судья сервера ✓ …») читателю не нужна.
+const detectorInputs = (s) => typo(String(s || "").split(/\s*·\s*/).filter((p) => p && !/LLM|судья|вердикт/i.test(p))
+  .join(" · ").replace(/(\d+)\s*\/\s*(\d+)/g, "$1 из $2").replace(/(\d)\.(\d)/g, "$1,$2").replace(/\s*\(вне балла\)/g, "").trim());
 
 function fmtScore(s) {
   if (s == null) return "—";
@@ -1898,21 +1952,35 @@ function templateComment(ev) {
     return "Первоисточник переписал уже опубликованные данные задним числом: картина прошлого изменилась, хотя новых событий не происходило.";
   }
   if (NO_COMMENT.has(ev.kind)) return "";
-  // Разбора от модели нет — значит и осмысления не будет. Честнее дать короткую справку о
-  // смысле показателя и прямо сказать, что разбор недоступен, чем выдавать словарное определение
-  // за анализ. Формулировка «Что это за показатель» из первой версии была именно этой ошибкой:
-  // читатель ждал вывода, а получал определение, которое и так знает.
+  // Разбора от модели нет — значит и осмысления не будет. Остаётся короткая справка о смысле
+  // показателя: шаблон идёт курсивом и без «💬» (это знак ИИ-разбора), поэтому за анализ он себя не
+  // выдаёт и оговорка «разбор недоступен» ему не нужна. Нечего сказать — строки нет вовсе.
+  // Имя показателя уже стоит в строке движения — справка начинается с самого смысла.
   const plain = (ev.plain || [])[0];
   const notable = (ev.moves || []).some((m) => /движение/.test(m.delta || ""));
-  const tail = notable ? " Движение для этого показателя нерядовое." : "";
-  return plain
-    ? `${plain}.${tail} (Разбор недоступен — комментатор не ответил.)`
-    : `Вышли новые данные первоисточника.${tail} (Разбор недоступен — комментатор не ответил.)`;
+  const tail = notable ? "Движение для этого показателя нерядовое." : "";
+  const cut = plain ? plain.indexOf(" — ") : -1;
+  const gist = cut >= 0 ? plain.slice(cut + 3) : plain || "";
+  return [gist ? `${gist.charAt(0).toUpperCase()}${gist.slice(1)}.` : "", tail].filter(Boolean).join(" ");
 }
 
-function renderMessage(ev, comment) {
-  const k = KIND[ev.kind] || { emoji: "•", label: ev.kind };
-  const head = `${k.emoji} <b>${esc(ev.title)}</b>`;
+// Пометка панели — первым словом заголовка: 837 и 838 пишут одним ботом. Имя — как на карточке хаба.
+const PANEL_TAG = "Рынок США";
+const PANEL_URL = "https://tzi-837.pages.dev/";
+// Сообщение, ушедшее позже события на столько, получает строку «⏳ С опозданием на …»: прогон
+// рассылки отстал от снимка (простой Actions, очередь раннеров).
+const LATE_MS = 60 * 60e3;
+const lateSpan = (h) => (h < 72 ? `${fmtNum(h, { digits: h < 10 ? 1 : 0 })} ч` : `${fmtNum(h / 24, { digits: 0 })} сут`);
+// Подвал — одна строка: ссылка на панель и время события по Москве.
+const footer = (ms) => `<a href="${PANEL_URL}">Открыть панель</a> · ${ruMoment(finite(ms) ? ms : Date.now())}`;
+const headLine = (emoji, title) => `${emoji} <b>${esc(PANEL_TAG)} · ${esc(title)}</b>`;
+
+// comment — ИИ-разбор (идёт после «💬»); opts.note — шаблон на его месте (курсивом, без «💬»);
+// opts.sentAt — момент отправки, по нему ставится строка об опоздании.
+function renderMessage(ev, comment, { note = "", sentAt = null } = {}) {
+  const k = KIND[ev.kind] || { emoji: "ℹ️", label: ev.kind };
+  const head = headLine(k.emoji, ev.title);
+  const late = finite(sentAt) && finite(ev.at) && sentAt - ev.at >= LATE_MS ? `⏳ С опозданием на ${lateSpan((sentAt - ev.at) / 3600e3)}` : "";
   const move = ev.before || ev.after ? `${esc(ev.before || "—")} → <b>${esc(ev.after || "—")}</b>` : "";
   const moves = (ev.moves || [])
     .map((m) => `• ${esc(m.name)}: ${esc(m.before)} → <b>${esc(m.after)}</b>${m.delta ? ` <i>(${esc(m.delta)})</i>` : ""}`)
@@ -1927,50 +1995,58 @@ function renderMessage(ev, comment) {
       : (ev.stability || []).map((s) => `• ${esc(s)}`).join("\n");
   const lines = [
     head,
+    late,
     move,
     moves,
-    ev.detail ? esc(ev.detail) : "",
+    ev.detail ? esc(typo(ev.detail)) : "",
     causes ? `\n<b>Что за этим стоит</b>\n${causes}` : "",
     stability ? `\n<b>Насколько это устойчиво</b>\n${stability}` : "",
   ].filter(Boolean);
-  if (ev.indicator?.observed_at) lines.push(`<i>данные на ${esc(ev.indicator.observed_at)}${ev.indicator.source ? " · " + esc(ev.indicator.source) : ""}</i>`);
-  // служебному сообщению разбор не положен — без пустого «💬»
-  if (comment) {
-    lines.push("");
-    lines.push("💬 " + esc(comment));
-  }
-  return clipTelegram(lines.join("\n"));
+  // дата пересмотра уже стоит в строке события; второй строкой — только источник
+  if (ev.indicator?.source) lines.push(`<i>источник: ${esc(sourceLabel(ev.indicator.source))}</i>`);
+  // служебному сообщению разбор не положен — без пустого «💬». Типографика разбора — та же, что у
+  // остального сообщения: смысл и числа ответа проверены блоком 5б, здесь меняются только знаки.
+  if (comment) lines.push("", "💬 " + esc(typo(comment)));
+  else if (note) lines.push("", `<i>${esc(note)}</i>`);
+  // Подвал не срезается: длинное тело режется по границе строки до него.
+  const tail = footer(ev.at);
+  return `${clipTelegram(lines.join("\n"), TG_TEXT_LIMIT - tail.length - 2)}\n\n${tail}`;
 }
 
 /* ================================== 5. КОММЕНТАРИИ ================================== */
 
-const LLM_SYSTEM = `Ты — независимый экономический аналитик. К тебе приходят свежие данные, и ты объясняешь читателю, что они означают. Читатель умный, но не финансист: он знает, что такое инфляция и ставка, но не обязан помнить устройство рынка кредитных спредов.
+// Промпт разбора — по разделу 6 стандарта сообщений (29.10.2026): что это значит → почему важно →
+// на что смотреть дальше. До «ФОРМАТ:» — предметная часть: её числа блок 5б считает данными модели,
+// поэтому чисел в ней нет; запись чисел и предел длины — после «ФОРМАТ:».
+const LLM_SYSTEM = `Ты пишешь короткий разбор к уведомлению о рынке акций США, американской экономике и денежном рынке. Читатель видит строку факта — что изменилось и на сколько — и твой абзац под ней. Он умный, но не финансист: знает, что такое инфляция и ставка, но не обязан помнить устройство рынка кредитных спредов или денежного рынка.
 
-ЯЗЫК ОТВЕТА — ТОЛЬКО РУССКИЙ. Думать можешь как угодно, но весь текст ответа обязан быть на русском языке. Английские фразы недопустимы; общепринятые сокращения (ФРС, ВВП, ETF) — можно. НИКОГДА не смешивай латиницу и кириллицу внутри одного слова: у английского термина либо есть русский эквивалент («количественное ужесточение»), либо пиши его целиком латиницей.
+ЗАДАЧА — сказать то, чего в строке факта нет, простыми словами. Три шага, по предложению на каждый:
+· Что это значит. Одно предложение-вывод своими словами, а не пересказ строки факта. Термин при первом упоминании — с короткой расшифровкой прямо в тексте.
+· Почему это важно. Насколько движение необычно на фоне recent_history (рядовое так и назови) и что из market_now прямо относится к этому движению — подтверждает его или ему противоречит. Натянутых связей не строй: один верный довод лучше трёх притянутых.
+· На что смотреть дальше. Только условно: «если …, то …» — с конкретным признаком из входа, который подтвердит или опровергнет картину.
+Четвёртое предложение — только если без него вывод непонятен. Если в событии несколько строк, скажи о главной и не теряй ту, что меняет вывод. Готовых формул не повторяй: у каждого события свой вывод.
 
-ТВОЯ ЗАДАЧА — осмыслить движение, а не пересказать его:
-· что за ним стоит по существу и почему оно могло произойти;
-· насколько оно значительно на фоне последних месяцев (динамика передана в recent_history);
-· как это вяжется с соседними показателями из market_now — другой картины текущей обстановки у тебя нет;
-· какие сценарии из этого следуют и по каким признакам их можно будет различить.
+НЕ НУЖНО:
+· пересказывать определение показателя: оно в what_it_is, и читатель его знает;
+· общие слова: «важно для инвесторов», «рынок будет следить», «стоит отметить», «в целом», «на фоне неопределённости»;
+· повторять числа строки факта без вывода из них;
+· обещать движение цены, называть, куда пойдёт рынок, судить, разворот это или нет, и выдавать догадку о намерениях участников за факт — вместо этого назови признак, который покажет;
+· всё, чего нет во входе: решения, заявления, события, консенсус аналитиков, прогнозы — твои знания о текущих событиях могли устареть;
+· приказы «покупайте / продавайте», канцелярит и оговорки.
 
-Ты СВОБОДЕН рассуждать, связывать факты и делать выводы. Рядовое движение назови рядовым одной фразой и не раздувай. Важное — объясни, почему оно важное, и доведи мысль до вывода.
+ЧИСЛА — только из своего события и из panel_context. Округлять можно только знаки после запятой, целые — как во входе. Разность и отношение двух чисел своего события — тоже можно, но со словами «на …» или «в … раза» и без знака доллара перед числом: единица — словом после числа. Год — только из дат входа. Нужного числа во входе нет — скажи качественно.
 
-ЧЕГО ДЕЛАТЬ НЕЛЬЗЯ:
-· Начинать со слов «Что это за показатель» и вообще пересказывать определение — читателю нужен смысл, а не словарь.
-· Упоминать панель, дашборд, баллы, зоны, композит, ядро, ячейки, ворота, якоря, детекторы, вклад в оценку и имена полей входа — читатель о них не знает.
-· Выдумывать числа, консенсус аналитиков и прогнозы, которых тебе не давали. Про ожидания рынка можно говорить только качественно.
-· Приводить числа, которых нет во входных данных. Число бери только из своего события и из panel_context (округлять можно; отношение и разность двух данных чисел — тоже можно); год — только из дат входа.
-· Канцелярит, дисклеймеры, «важно отметить», «стоит подчеркнуть», «в заключение».
-· Приказы «покупайте / продавайте» — объясняй механику и последствия.
-· Утверждать, куда пойдёт рынок, и выдавать догадку о намерениях участников за факт. Говори «может означать», «если …, то …» и называй, что подтвердит или опровергнет версию.
-· Упоминать решения, заявления и события, которых нет во входных данных: твои знания о текущих событиях могли устареть.
+СЛОВА. Только русский язык; общепринятые сокращения (ФРС, ВВП, ETF, VIX) можно, латиницу и кириллицу в одном слове не смешивай. Английские слова и выражения из входа (carry trade, spread) переводи по смыслу. Не называй устройство расчёта: панель, дашборд, баллы, зоны, композит, ядро, ячейки, ворота, якоря, детекторы, монитор, вклад в оценку и имена полей входа читателю неизвестны.
 
-ДАТА. Сегодняшняя дата по Москве — в поле today. Даты данных — в самих событиях. Не называй событие свежим или давним, не сверившись с этими датами.
+ЕСЛИ СОБЫТИЕ — ИЗМЕНЕНИЕ ДОЛИ АКЦИЙ. Причины уже посчитаны и стоят в сообщении (why_changed), режим и действие — в detail, устойчивость — в stability. Других причин не придумывай и готовые строки не пересказывай. Скажи, что смена значит для позиции, что за рыночный сдвиг за ней стоит и какой признак во входе ближе всего к тому, чтобы её отменить. Слова «режим», «ступень», «норма», «поправка владельца» здесь допустимы — они стоят в самом сообщении.
 
-ФОРМАТ: 2–4 предложения живого русского на событие, вместе не длиннее 600 знаков. Термин — с короткой расшифровкой прямо в тексте при первом употреблении.
+ЕСЛИ СОБЫТИЕ — СИГНАЛ РИСКА. Что сошлось или разошлось — в detail. Скажи простыми словами, о каком риске речь, что во входе его подтверждает или снимает и какой признак покажет, что риск вернулся. Вместо «детектор» говори «сигнал».
 
-ПРОВЕРКА. Ответ проверяется машинно: предложение с числом не из входа, прогнозом или внутренним словом вырезается, всё сверх 4 предложений и 600 знаков отрезается с конца. Самое важное ставь первым.
+ДАТА. Сегодняшняя дата по Москве — в поле today, даты данных — в самих событиях. Не называй данные свежими или давними, не сверившись с ними.
+
+ФОРМАТ: 2–4 предложения живого русского на событие, вместе не длиннее 600 знаков; лучше 300–450. Самое важное — первым. Числа по-русски: десятичная запятая, минус «−», доллар перед числом («$935 млрд»), а в разности — словом после числа («на 49 млрд долларов»), процент слитно. Служебные обозначения входа (H.15, SOFR − IORB, «200D», «блок …») переводи в слова, где можно: «ставка денежного рынка против ставки ФРС по резервам», «200-дневная средняя».
+
+ПРОВЕРКА. Ответ проверяется машинно: предложение с числом не из входа, прогнозом без «если» или внутренним словом вырезается, всё сверх 4 предложений и 600 знаков отрезается с конца.
 
 ОТВЕТ строго такой структурой, без вступлений и заголовков:
 ===0===
@@ -1989,7 +2065,7 @@ function llmContext(panel) {
 }
 // У карточек с официальным закрытием значение карточки — производная (у VIX — изменение за 30 дней), а имя в
 // словаре — сам индекс; модели уходит то же закрытие, что и читателю в строке «вышли новые данные».
-const closeText = (i) => (i.close ? `${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")}${i.close.unit ? ` ${i.close.unit}` : ""} (${i.close.word || "закрытие"} ${ruDay(Date.parse(i.close.d))})` : "");
+const closeText = (i) => (i.close ? typo(`${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")}${i.close.unit ? ` ${i.close.unit}` : ""} (${i.close.word || "закрытие"} ${ruDay(Date.parse(i.close.d))})`) : "");
 
 // Какая модель реально ответила — нужно для честной подписи в проверке связи.
 let LAST_MODEL = "";
@@ -3013,17 +3089,17 @@ function appendTrend(prev, panel) {
 function pingMessage(panel) {
   const det = (panel.detectors || []).filter((d) => d.state !== "calm");
   return [
-    "✅ <b>Проверка связи</b>",
+    headLine("ℹ️", "Проверка связи"),
     "Бот подключён, уведомления настроены.",
     "",
-    `Сейчас на панели: <b>${esc(panel.verdict?.word || "—")}</b>`,
+    `Сейчас: <b>${esc(panel.verdict?.word || "—")}</b>`,
     panel.verdict?.extra ? esc(panel.verdict.extra) : "",
     panel.allocation && finite(panel.allocation.pct)
       ? `Доля ${panel.assetWord || "рискового актива"} сейчас: <b>${panel.allocation.pct}%</b>${panel.allocation.canonical ? " стратегической нормы" : ""}`
       : "",
     ownerText(panel.allocation),
     `Показателей под наблюдением: ${(panel.indicators || []).length}`,
-    det.length ? `Детекторы не в покое: ${esc(det.map((d) => `${d.name} (${DET_LABEL[d.state] || d.state})`).join(", "))}` : "Все детекторы спокойны",
+    det.length ? `Сигналы риска не в покое: ${esc(det.map((d) => `${detectorHuman(d.name)} (${DET_LABEL[d.state] || d.state})`).join(", "))}` : "Сигналы риска спокойны",
   ]
     .filter(Boolean)
     .join("\n");
@@ -3096,7 +3172,8 @@ async function main(io = {}) {
         ? `Комментатор работает (${LAST_MODEL || resolveModel()}). Пример разбора:\n<i>${esc(got[0].slice(0, 600))}</i>`
         : `Комментатор НЕ ответил (${resolveModel()}) — сообщения пойдут без разбора, причина в логе прогона`;
     }
-    const text = `${pingMessage(panel)}\n\n${verdictLine}`;
+    REF_MS = Date.parse(panel.snapshot_at || panel.generated_at || "") || null;
+    const text = `${pingMessage(panel)}\n\n${verdictLine}\n\n${footer(Date.now())}`;
     if (DRY) console.log(text.replace(/<[^>]+>/g, ""));
     else await sendTelegram(text); // обрезку под предел Telegram делает сам транспорт
     console.log(DRY ? "пинг: dry-run, ничего не отправлено" : "пинг отправлен");
@@ -3121,6 +3198,7 @@ async function main(io = {}) {
   const dry = io.deliver ? false : DRY;
   const first = !prev.indicators;
   const now = Date.now();
+  REF_MS = Date.parse(panel.snapshot_at || panel.generated_at || "") || null;
   const sentIndex = pruneSent(prev.sent, now);
   let revisedSeen = prev.revised_points || {};
   // Прошлый журнал — второй источник базы для канонической доли (первый — объявленная ступень).
@@ -3148,6 +3226,7 @@ async function main(io = {}) {
       queue = [{
         kind: "service",
         key: `selftest@${selftestAlertAt}`,
+        at: now,
         title: "Тесты уведомлений не проходят",
         before: "",
         after: "",
@@ -3191,8 +3270,9 @@ async function main(io = {}) {
     console.log(`комментарии: ${llm ? `модель (${LAST_MODEL || resolveModel()})` : "шаблон"}`);
     for (let i = 0; i < capped.length; i++) {
       const ev = capped[i];
-      const comment = (llm && llm[i]) || templateComment(ev);
-      const text = renderMessage(ev, comment);
+      // разбор модели — после «💬»; на месте отказа или брака — шаблон курсивом
+      const comment = (llm && llm[i]) || null;
+      const text = renderMessage(ev, comment, { note: comment ? "" : templateComment(ev), sentAt: now });
       if (dry) {
         const plain = text
           .replace(/<[^>]+>/g, "")
@@ -3239,5 +3319,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
+export { fmtNum, ruMoment, typo, PANEL_TAG, PANEL_URL, LLM_SYSTEM, CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };
