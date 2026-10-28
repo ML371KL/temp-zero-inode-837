@@ -2218,6 +2218,9 @@ async function sendNexusEvent(text, eventId, occurredAt, opts = {}) {
   }
 }
 
+// Экспорт транспорта — отдельной инструкцией: общая строка export в конце файла общая для многих правок.
+export { sendTelegram, sendNexusEvent, clipTelegram, telegramPlain, TG_TIMEOUT_MS, NEXUS_TIMEOUT_MS };
+
 /* ================================ 7. СОСТОЯНИЕ И MAIN ================================ */
 
 // Идемпотентность: база сравнения двигается ОДИН раз в конце прогона, а список уже доставленных
@@ -2490,5 +2493,4 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
 }
 
 export { detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR,
-  sendTelegram, sendNexusEvent, clipTelegram, telegramPlain, TG_TIMEOUT_MS, NEXUS_TIMEOUT_MS };
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };
