@@ -2593,6 +2593,27 @@ async function guardSendOps(text) {
 }
 /* ============================== конец проверки разбора ============================== */
 
+/* Внутренняя шкала панели — читателю, но не модели. В сообщении о доле стоят «Сводная оценка рынка +8,0 по
+   шкале от −100 до +100» и «вернуть 100% нормы может рост сводной оценки рынка до −7»: так панель называет
+   причину своего решения. Промпт запрещает модели композит и баллы, а получив их числом во входе, она их
+   пересказывает. Поэтому строки со шкалой уходят модели смыслом: решение по совокупности показателей,
+   возврат доли — при улучшении (ухудшении) обстановки. Прочие строки со шкалой не передаются вовсе. */
+const INTERNAL_SCALE = /по шкале от|сводн\S* оценк|композит|\bбалл/i;
+const MODEL_WHOLE = "решение принято по совокупности показателей, а не по одному из них";
+function modelLines(lines) {
+  const out = [];
+  for (const raw of lines || []) {
+    const l = String(raw);
+    if (!INTERNAL_SCALE.test(l)) { out.push(l); continue; }
+    if (/^Сводная оценка рынка/.test(l)) { if (!out.includes(MODEL_WHOLE)) out.push(MODEL_WHOLE); continue; }
+    const back = l.match(/^вернуть (\d+)% нормы может (рост|падение) сводной оценки рынка[^—]*(— с подтверждением на следующей торговой сессии)?/);
+    if (back) { out.push(`вернуть ${back[1]}% нормы может ${back[2] === "рост" ? "улучшение" : "ухудшение"} обстановки${back[3] ? ` ${back[3]}` : ""}`); continue; }
+    const need = l.match(/^обстановке нужно (улучшиться|ухудшиться)( ещё)? на .*?, (чтобы .*)$/);
+    if (need) { out.push(`обстановке нужно ${need[2] ? "ещё " : ""}заметно ${need[1]}, ${need[3]}`); continue; }
+  }
+  return out;
+}
+
 // Разбор пачки событий одним запросом: модель получает все события сразу и отвечает блоками
 // «===N===». Возвращает массив комментариев (null на месте отброшенного) либо null — тогда все
 // сообщения идут с шаблоном. spend — запись суточного расхода из состояния (см. claudeAsk).
@@ -2620,9 +2641,9 @@ async function llmComments(events, panel, { spend = null, week = null } = {}) {
         detail: e.detail,
         what_it_is: (e.plain || []).join("; ").slice(0, 700) || undefined,
         recent_history: (e.history || []).join("; ").slice(0, 900) || undefined,
-        why_changed: (e.causes || []).join("; ").slice(0, 600) || undefined,
+        why_changed: modelLines(e.causes).join("; ").slice(0, 600) || undefined,
         stability: e.stability?.[0]?.tier
-          ? { verdict: TIER[e.stability[0].tier].word, why: e.stability[0].reason }
+          ? { verdict: TIER[e.stability[0].tier].word, why: modelLines(e.stability[0].reason) }
           : undefined,
       })),
     },
