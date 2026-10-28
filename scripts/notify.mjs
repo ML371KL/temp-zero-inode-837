@@ -108,8 +108,12 @@ const MACRO_CADENCE = {
   // рынок
   spx: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
   spx_mom: { scheduled: true, revisable: false, release: "закрытие рынка США", cadence: "торговый день" },
-  vix: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня" },
-  vixterm: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня" },
+  // close — публикация есть ТОЛЬКО официальное закрытие (см. CLOSE_OF). Страница кладёт поверх ряда FRED
+  // задержанную котировку текущего дня, и дата карточки сдвигалась с первой котировкой: VIX «выходил» в
+  // 13:46–13:56 UTC с внутридневным значением, а дата термструктуры прыгала между закрытием и котировкой —
+  // отсюда два сообщения CBOE в одном прогоне.
+  vix: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
+  vixterm: { scheduled: true, revisable: false, release: "CBOE", cadence: "закрытие торгового дня", close: true },
   breadth: { scheduled: false, revisable: false, release: "котировки", cadence: "внутридневные" },
   // макро-цикл
   payrolls: { scheduled: true, revisable: true, release: "BLS Employment Situation", cadence: "ежемесячно" },
@@ -125,6 +129,35 @@ const MACRO_CADENCE = {
   oil: { scheduled: true, revisable: false, release: "EIA", cadence: "рабочие дни" },
   cny: { scheduled: true, revisable: false, release: "фиксинг ЕЦБ", cadence: "рабочий день" },
   dxy: { scheduled: true, revisable: false, release: "ФРС H.10", cadence: "пакет по понедельникам" },
+  // путь ставки ФРС (в балле): 2-летка из того же H.15, что кривая и реальная доходность
+  policy: { scheduled: true, revisable: false, release: "ФРС H.15", cadence: "каждый рабочий день" },
+  // «Контекст» — справочные карточки вне балла. Публикации идут как публикации; котировки корзин молчат.
+  credit_q: { scheduled: true, revisable: false, release: "ICE BofA", cadence: "каждый рабочий день" },
+  ai_bet: { scheduled: false, revisable: false, release: "котировки", cadence: "торговый день" },
+  bdc_px: { scheduled: false, revisable: false, release: "котировки", cadence: "торговый день" },
+  cot_es: { scheduled: true, revisable: false, release: "CFTC COT", cadence: "пятница, позиции на вторник" },
+  // свой файл CBOE, обновляется вечером в день торгов — на полсуток раньше закрытия VIX во FRED; под общим
+  // «CBOE» выходило бы два сообщения «Индексы волатильности CBOE» за одну и ту же дату
+  cor1m: { scheduled: true, revisable: false, release: "CBOE COR1M", cadence: "закрытие торгового дня" },
+  tp10: { scheduled: true, revisable: false, release: "ФРС · модель Ким–Райта", cadence: "рабочие дни, с лагом" },
+  flows: { scheduled: true, revisable: false, release: "Минфин США · TIC", cadence: "ежемесячно, лаг ~45 дней" },
+  quadrant: { scheduled: true, revisable: false, release: "ФРБ Чикаго · CFNAI", cadence: "ежемесячно" },
+};
+
+/* Официальное закрытие карточек с close: true — прямо из рядов FRED, которые страница держит в кэше
+   (fredCached; PAGE_EXTRACTOR отдаёт их хвосты полем closes). Значение карточки для этого не годится:
+   поверх закрытия страница кладёт котировку нового дня, и 27.10.2026 FRED выложил закрытие за 26.10 в
+   13:37–13:46 UTC, а в 13:46 на карточке уже стояла котировка 27.10 — «чистого» закрытия не было ни в одном
+   прогоне. Сообщение выходит, когда в ряду FRED появилось закрытие новой даты, и несёт официальные числа:
+   уровень VIX и отношение VIX/VIX3M в один день (так их считает и сама карточка термструктуры). */
+const CLOSE_SERIES = ["VIXCLS", "VXVCLS"];
+const CLOSE_OF = {
+  vix: (c) => { const a = c?.VIXCLS?.at(-1); return a ? { d: a.d, v: a.v, digits: 1 } : null; },
+  vixterm: (c) => {
+    const b = new Map((c?.VXVCLS || []).map((p) => [p.d, p.v]));
+    const a = [...(c?.VIXCLS || [])].reverse().find((p) => b.get(p.d) > 0);
+    return a ? { d: a.d, v: a.v / b.get(a.d), digits: 2 } : null;
+  },
 };
 
 /* ====================== 1b. ЧЕЛОВЕЧЕСКИЕ НАЗВАНИЯ ПОКАЗАТЕЛЕЙ ======================
@@ -134,7 +167,9 @@ const MACRO_CADENCE = {
    панели (зоны, баллы, вклад в композит) во внешние сообщения не попадает вовсе.
 
    Правило пополнения: новый показатель — новая запись здесь, иначе в сообщение уедет
-   внутренняя подпись карточки и читатель снова получит «китайскую ногу».              */
+   внутренняя подпись карточки и читатель снова получит «китайскую ногу».
+   sn — имя ряда карточки, когда ряд — не та величина, что её значение (значение «Фазы цикла» — сочетание
+   рост × инфляция, а ряд — CFNAI): им подписываются строки «Пересчёта истории».            */
 const HUMAN = {
   // --- макро-панель ---
   sofr_iorb: { t: "Стоимость суточных займов в долларах против ставки ФРС по резервам", p: "дорого ли банкам занимать доллары на ночь: рост — свободных резервов в системе всё меньше" },
@@ -167,6 +202,15 @@ const HUMAN = {
   oil: { t: "Нефть WTI", p: "цена энергии — прямой вход в инфляцию и в издержки компаний" },
   cny: { t: "Курс доллара к юаню: изменение за 60 дней", p: "ослабление юаня означает, что Китай экспортирует дефляцию и напряжение на мировые рынки" },
   dxy: { t: "Курс доллара к корзине валют: изменение за 60 дней", p: "дорогой доллар ужесточает финансовые условия для всего мира" },
+  policy: { t: "Доходность 2-летних облигаций США минус верхняя граница ставки ФРС", p: "как рынок видит путь ставки ФРС на два года вперёд: выше нуля — закладывает повышения, ниже — снижения" },
+  credit_q: { t: "Разрыв спредов облигаций с рейтингом CCC и BB (США)", p: "насколько дороже занимают самые слабые компании по сравнению с крепкими «мусорными»: расширение — стресс в нижнем слое кредита, даже когда средний спред спокоен" },
+  ai_bet: { t: "Акции крупнейших инвесторов в ИИ против S&P 500 за 3 месяца", p: "насколько рынок верит в окупаемость расходов на ИИ", quiet: true },
+  bdc_px: { t: "Акции фондов частного кредита (BDC) против S&P 500 за 3 месяца", p: "цены и выплаты публичных фондов частного кредита реагируют на проблемы заёмщиков раньше их отчётности", quiet: true },
+  cot_es: { t: "Позиции спекулянтов во фьючерсах на S&P 500 (CFTC)", p: "чистая длинная позиция крупных спекулянтов в доле открытого интереса; крайности — толпа в лонге или массовый выход — исторически чаще совпадали с разворотами" },
+  cor1m: { t: "Ожидаемая корреляция акций S&P 500 на месяц (CBOE COR1M)", p: "насколько синхронно, судя по ценам опционов, рынок ждёт движения крупнейших акций: высокая — продают всё подряд, низкая — каждая бумага живёт своей жизнью" },
+  tp10: { t: "Срочная премия 10-летних облигаций США: изменение за 3 месяца", p: "надбавка за долгий срок владения облигацией сверх ожидаемого пути ставки ФРС (оценка ФРС по модели Ким–Райта); её рост удорожает длинные деньги независимо от решений ФРС", sn: "Срочная премия 10-летних облигаций США (уровень, б.п.)" },
+  flows: { t: "Покупки иностранцами долгосрочных ценных бумаг США за 3 месяца (TIC)", p: "сколько иностранные инвесторы вложили в американские облигации и акции; данные выходят с лагом около полутора месяцев", sn: "Чистые покупки иностранцами долгосрочных бумаг США за месяц, млрд $" },
+  quadrant: { t: "Фаза цикла США: деловая активность и базовая инфляция", p: "куда одновременно движутся рост (индекс ФРБ Чикаго CFNAI) и базовая инфляция: от сочетания зависит, какие активы исторически чувствовали себя лучше", sn: "Индекс деловой активности ФРБ Чикаго (CFNAI), среднее за 3 месяца" },
   // --- BTC-панель ---
   liquidity_regime: { t: "Чистая ликвидность ФРС", p: "сколько долларов от ФРС реально доступно рынкам", rel: "Баланс ФРС" },
   netliq_4w: { t: "Чистая ликвидность ФРС за 4 недели", p: "краткосрочное направление долларовой ликвидности", rel: "Баланс ФРС" },
@@ -218,6 +262,11 @@ const RELEASE_HUMAN = {
   "ny fed": "ФРБ Нью-Йорка",
   "ny fed · sofr": "Денежный рынок США (ФРБ Нью-Йорка)",
   "фрб чикаго": "Финансовые условия (ФРБ Чикаго)",
+  "фрб чикаго · cfnai": "Деловая активность США (ФРБ Чикаго)",
+  "фрс · модель ким–райта": "Срочная премия облигаций США (ФРС)",
+  "минфин сша · tic": "Потоки капитала в США (Минфин, TIC)",
+  "cftc cot": "Отчёт CFTC о позициях во фьючерсах",
+  "cboe cor1m": "Ожидаемая корреляция акций США (CBOE)",
   sloos: "Опрос ФРС о банковском кредитовании",
   eia: "Цены на нефть (EIA)",
   "закрытие рынка США": "Закрытие рынка США",
@@ -326,6 +375,14 @@ function compactSeries(series) {
     const v = Number(p?.v);
     if (finite(t) && finite(v)) out[t] = v;
   }
+  return Object.keys(out).length ? out : null;
+}
+
+// Точки ряда не новее дня закрытия: котировка поверх ряда не должна решать, «заметное» ли движение.
+function pointsUpTo(points, day) {
+  if (!points) return points;
+  const lim = Date.parse(`${day}T00:00:00Z`);
+  const out = Object.fromEntries(Object.entries(points).filter(([t]) => Number(t) <= lim));
   return Object.keys(out).length ? out : null;
 }
 
@@ -493,6 +550,23 @@ const PAGE_EXTRACTOR = `(() => {
   // Время снимка, на котором посчитана страница: им помечаются события риска, чтобы повторный
   // прогон ТОГО ЖЕ снимка не слал их дважды, а настоящий повтор на новом снимке — слал.
   try { out.snapshot_at = state.lastSnapGen || ""; } catch (e) { out.snapshot_at = ""; }
+  // Официальные закрытия (VIX, VIX3M) — хвосты рядов FRED из кэша страницы, без котировки поверх.
+  out.closes = {};
+  for (const k of ${JSON.stringify(CLOSE_SERIES)}) {
+    try {
+      const s = (typeof fredCached === "function" && fredCached(k)) || [];
+      out.closes[k] = s.slice(-5).map(p => ({ d: new Date(p.d).toISOString().slice(0, 10), v: Number(p.v) })).filter(p => p.v > 0);
+    } catch (e) { out.closes[k] = []; }
+  }
+  // Поставщики данных: ключи снимка, которые сервер не смог обновить (failed: «ключ — причина») или
+  // отдал из старого кэша (stale_keys). От них страница уходит на резервные источники, и ряд карточки
+  // меняется целиком — это смена источника, а не пересмотр (см. providersSwitched).
+  try {
+    const prov = {};
+    for (const f of (SNAP && SNAP.failed) || []) prov[String(f).split(" — ")[0].trim()] = "failed";
+    for (const k of Object.keys((SNAP && SNAP.stale_keys) || {})) prov[k] = prov[k] || "stale";
+    out.providers = prov;
+  } catch (e) { out.providers = null; }
   // Закрытия S&P для дневника вердиктов: берём у страницы, а не качаем заново.
   try {
     const s = (typeof fredCached === "function" && fredCached("SP500")) || ((state.data || {}).spx || {}).series || [];
@@ -612,15 +686,44 @@ async function fromLivePage(url, { writer = null } = {}) {
       .catch(() => console.log("::warning::state.decision не устоялось за 20 с — журнал в этом прогоне не пишется"));
     const raw = await page.evaluate(PAGE_EXTRACTOR);
     if (errors.length) console.error("page errors:", errors.slice(0, 3).join(" | "));
-    const indicators = raw.indicators.map((i) => {
-      const c = MACRO_CADENCE[i.id] || { scheduled: true, revisable: false, release: "", cadence: "" };
-      const { series, ...rest } = i;
-      return { ...rest, scheduled: c.scheduled, revisable: c.revisable, release: c.release, cadence: c.cadence || "", points: compactSeries(series) };
-    });
-    return { ...raw, source: "page", assetWord: "акций", indicators };
+    return fromPageRaw(raw);
   } finally {
     await browser.close();
   }
+}
+
+// Снятое со страницы (PAGE_EXTRACTOR) → общая форма панели: календарь публикации из MACRO_CADENCE,
+// ряд — в компактную карту точек. Отдельно от браузера — чтобы тесты и реплей истории снимков шли
+// той же проекцией, что и бой.
+//
+// Карточка, которой нет в MACRO_CADENCE, НЕ публикация: ни релизов, ни пересмотров, только строка в
+// логе. Прежнее умолчание «плановая» отправляло каждую новую карточку страницы наружу как «вышли
+// новые данные» с заголовком-доменом («finance.yahoo.com», «Данные ФРС») и внутренней подписью — так
+// за неделю 21–28.10.2026 ушли котировки корзин ИИ и BDC. Молчание новой карточки видно в логе, а
+// лишнее сообщение читатель уже получил.
+function fromPageRaw(raw) {
+  const unlisted = raw.indicators.filter((i) => !MACRO_CADENCE[i.id]).map((i) => i.id);
+  if (unlisted.length) console.log(`ВНИМАНИЕ: карточки страницы вне MACRO_CADENCE — ${unlisted.join(", ")} (публикациями не считаются: ни релизов, ни пересмотров; добавьте их в MACRO_CADENCE и HUMAN)`);
+  const noHuman = raw.indicators.filter((i) => !HUMAN[i.id]).map((i) => i.id);
+  if (noHuman.length) console.log(`ВНИМАНИЕ: нет человеческого имени у карточек — ${noHuman.join(", ")} (в сообщение уйдёт внутренняя подпись; добавьте их в HUMAN)`);
+  const noClose = raw.indicators.filter((i) => MACRO_CADENCE[i.id]?.close && !CLOSE_OF[i.id]?.(raw.closes)).map((i) => i.id);
+  if (noClose.length) console.log(`::warning::официальное закрытие не прочитано из рядов FRED страницы — ${noClose.join(", ")}: публикации по ним в этом прогоне нет, база держит прошлое закрытие`);
+  const indicators = raw.indicators.map((i) => {
+    const c = MACRO_CADENCE[i.id];
+    const { series, ...rest } = i;
+    return {
+      ...rest,
+      scheduled: c ? c.scheduled : false,
+      revisable: c ? c.revisable : false,
+      release: c ? c.release : "",
+      cadence: c?.cadence || "",
+      ...(c ? {} : { unlisted: true }),
+      // официальное закрытие (см. CLOSE_OF); null — ряд FRED не прочитан, публикации в этом прогоне нет
+      ...(c?.close ? { close: CLOSE_OF[i.id]?.(raw.closes) || null } : {}),
+      points: compactSeries(series),
+    };
+  });
+  return { ...raw, source: "page", assetWord: "акций", indicators };
 }
 
 async function readPanel({ writer = null } = {}) {
@@ -942,12 +1045,20 @@ function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, funds = 
 const KIND = {
   allocation: { emoji: "🎯", label: "изменение доли капитала" },
   risk: { emoji: "⚠️", label: "сигнал риска" },
+  service: { emoji: "🛠", label: "служебное сообщение" },
   release: { emoji: "📊", label: "вышли новые данные" },
   revision: { emoji: "♻️", label: "пересмотр опубликованных данных" },
 };
 
 // Порядок важен: сначала то, что меняет вывод, потом то, что его питает.
-const KIND_ORDER = ["allocation", "risk", "release", "revision"];
+const KIND_ORDER = ["allocation", "risk", "service", "release", "revision"];
+// Служебное сообщение короткое и самодостаточное: разбор модели ему не нужен.
+const NO_COMMENT = new Set(["service"]);
+// Что идёт в осторожном режиме, когда тесты уведомлений не прошли (см. main): смена доли и сигналы
+// риска — их мало, и ключ каждого привязан к моменту события. Публикации и пересмотры, где ошибка
+// кода способна дать лавину, придерживаются.
+const SAFE_KINDS = new Set(["allocation", "risk"]);
+const SELFTEST_ALERT_EVERY_MS = 24 * 3600 * 1000;
 
 const DET_LABEL = { calm: "спокоен", watch: "наблюдение", fired: "СРАБОТАЛ", good: "подтверждён" };
 
@@ -988,21 +1099,48 @@ const ruDay = (t) => { const d = new Date(Number(t)); return `${String(d.getUTCD
 // Переписанная история: сравниваем ТЕ ЖЕ метки времени в старом и новом ряду. Точки от
 // последней запомненной и новее не считаются — последняя точка суток ещё формируется, её
 // изменение это ход рынка, а не ревизия.
+// Порог значимости пересмотра точки, в процентах от её величины (перенесён из 838, где выведен из
+// 38 сообщений за 19.07–10.10.2026: у 22 наибольший сдвиг был меньше 0,1 %, и сообщение печатало два
+// одинаковых числа). У этой панели та же пыль у рядов в миллиардах долларов: резервы, TGA, RRP.
+const REVISION_MIN_PCT = 0.1;
+// Доля переписанных точек, начиная с которой это уже не пересмотр, а другой ряд целиком.
+const WHOLESALE_SHARE = 0.5;
+
+// Край окна тоже не сравнивается: самая старая точка нового ряда. Страница считает ряды по окну
+// источника, и первая точка окна бывает неполной — у SRF окно «последние 6 операций», и при сдвиге
+// окна самый старый день теряет утреннюю операцию (22.10.2026 «0,011 → 0 (−100%)» за 19.10, 23.10 то же
+// за 20.10). У длинных рядов это точка полугодовой давности, и её пересмотр ничего не стоит.
 function seriesRevisions(wasPoints, curPoints) {
-  if (!wasPoints || !curPoints) return [];
+  const out = { changed: [], compared: 0, dust: 0 };
+  if (!wasPoints || !curPoints) return out;
   const frontier = Math.max(...Object.keys(wasPoints).map(Number));
-  const changed = [];
+  const edge = Math.min(...Object.keys(curPoints).map(Number));
   for (const [tRaw, oldV] of Object.entries(wasPoints)) {
     const t = Number(tRaw);
-    if (!finite(t) || t >= frontier) continue;
+    if (!finite(t) || t >= frontier || t <= edge) continue;
     const newV = curPoints[tRaw];
     if (!finite(newV) || !finite(oldV)) continue;
+    out.compared++;
     const scale = Math.max(Math.abs(oldV), Math.abs(newV), 1e-12);
     if (Math.abs(newV - oldV) <= scale * 1e-9) continue;
-    changed.push({ t, before: oldV, after: newV, pct: oldV === 0 ? null : ((newV / oldV - 1) * 100) });
+    const top = Math.max(Math.abs(oldV), Math.abs(newV));
+    if ((Math.abs(newV - oldV) / top) * 100 < REVISION_MIN_PCT) { out.dust++; continue; }
+    // Процент — от МОДУЛЯ прежнего значения: у отрицательных величин «новое/старое − 1» давало
+    // перевёрнутый знак (NFCI −0,49 → −0,48 печатался «−2,0%», SOFR−IORB −3 → −28 — «+833%»).
+    out.changed.push({ t, before: oldV, after: newV, pct: oldV === 0 ? null : ((newV - oldV) / Math.abs(oldV)) * 100 });
   }
-  changed.sort((a, b) => a.t - b.t);
-  return changed;
+  out.changed.sort((a, b) => a.t - b.t);
+  return out;
+}
+
+// Сменился ли поставщик данных между прогонами. Своего поля «источник набора» у снимка этой панели нет,
+// зато есть то, от чего страница уходит на резерв: ключи, которые сервер не смог обновить (failed), и
+// ключи из старого кэша (stale_keys). Отсутствие ключа — «в порядке». 22.10.2026 13:08 fx:JPY упал по
+// таймауту, страница взяла курс иены из FRED H.10 вместо фиксинга ЕЦБ, и весь ряд «переписался».
+function providersSwitched(was, cur) {
+  if (!was || !cur) return false;
+  for (const k of new Set([...Object.keys(was), ...Object.keys(cur)])) if ((was[k] || "ok") !== (cur[k] || "ok")) return true;
+  return false;
 }
 
 // Названия детекторов у панелей внутренние («Слом маржинального спроса»); наружу идёт то же
@@ -1322,8 +1460,11 @@ function diff(prevState, panel) {
   const releaseGroups = [];
   const revisedSeries = [];
   const bounced = [];
+  const switched = [];
+  let dust = 0;
   const seenRevised = prevState.revised_points || {};
   const prevInd = prevState.indicators || {};
+  const providerSwitch = providersSwitched(prevState.providers, panel.providers);
 
   // Изменения внутри панели (вердикт, зоны показателей, детекторы) сами по себе НЕ рассылаются:
   // это внутренняя кухня. Они собираются как объяснение к единственному внешнему событию о самой
@@ -1378,7 +1519,18 @@ function diff(prevState, panel) {
     // Релиз: вышли новые данные И значение действительно изменилось.
     // Одна публикация первоисточника обычно двигает несколько карточек (H.15 — сразу пять,
     // ETF — четыре), поэтому релизы собираются в ОДНО сообщение на публикацию, а не на карточку.
-    if (i.scheduled && dateAdvanced && changed && !HUMAN[i.id]?.quiet) {
+    // У карточек с официальным закрытием (VIX) публикация — новая дата в ряду FRED, а не дата карточки:
+    // та сдвигается с первой котировкой дня. В строку сообщения идёт само закрытие.
+    if (MACRO_CADENCE[i.id]?.close && i.scheduled) {
+      const a = was.close, b = i.close;
+      if (a && b && b.d > a.d && !sameNum(a.v, b.v) && !HUMAN[i.id]?.quiet) {
+        const shown = (x) => x.v.toFixed(b.digits ?? 2).replace(".", ",");
+        releaseGroups.push({
+          i: { ...i, observed_at: b.d, value: shown(b), value_num: b.v, unit: "", points: pointsUpTo(i.points, b.d) },
+          was: { ...was, observed_at: a.d, value: shown(a), value_num: a.v, unit: "" },
+        });
+      }
+    } else if (i.scheduled && dateAdvanced && changed && !HUMAN[i.id]?.quiet) {
       releaseGroups.push({ i, was });
     }
     // Ревизия: дата наблюдения та же, а значение переписали.
@@ -1399,7 +1551,20 @@ function diff(prevState, panel) {
     // Наблюдение из прода: mempool.space пересчитывает оценку хешрейта за один и тот же день
     // туда-обратно между двумя значениями. Возврат к уже показанному значению — не новость,
     // а качок источника, поэтому такие точки отсеиваются (факт остаётся в логе).
-    const rewritten = (HUMAN[i.id]?.quiet ? [] : seriesRevisions(was.points, i.points)).filter((c) => {
+    if (HUMAN[i.id]?.quiet || i.unlisted) continue;
+    const rev = seriesRevisions(was.points, i.points);
+    dust += rev.dust;
+    if (!rev.changed.length) continue;
+    // Смена источника — не пересмотр. Страница, уйдя на резерв, отдаёт ДРУГОЙ ряд, и сравнение точек
+    // выдавало это за «первоисточник переписал уже опубликованные данные». Признаки: у карточки сменилась
+    // строка источника либо в такт смены поставщика (см. providersSwitched) ряд переписан целиком.
+    const sourceMoved = !!(i.source && was.source && i.source !== was.source);
+    const wholesale = rev.compared >= 6 && rev.changed.length / rev.compared >= WHOLESALE_SHARE;
+    if (sourceMoved || (wholesale && providerSwitch)) {
+      switched.push(`${i.name}: ${sourceMoved ? `${sourceLabel(was.source)} → ${sourceLabel(i.source)}` : "сменился поставщик данных"}, точек с другим значением: ${rev.changed.length}`);
+      continue;
+    }
+    const rewritten = rev.changed.filter((c) => {
       const seen = seenRevised[`${i.id}|${c.t}`]?.v;
       if (Array.isArray(seen) && seen.some((v) => sameNum(v, c.after))) {
         bounced.push(`${i.name} за ${ruDay(c.t)}: значение вернулось к ранее показанному`);
@@ -1429,7 +1594,8 @@ function diff(prevState, panel) {
         const sig = changed.map((c) => `${c.t}|${c.before}|${c.after}`).join(";");
         if (!bySignature.has(sig)) bySignature.set(sig, { names: [], changed, sources: new Set() });
         const slot = bySignature.get(sig);
-        slot.names.push(humanTitle(i.id, i.name));
+        // ряд карточки бывает не той величиной, что её значение (у «Фазы цикла» — CFNAI): sn называет сам ряд
+        slot.names.push(HUMAN[i.id]?.sn || humanTitle(i.id, i.name));
         if (i.source) slot.sources.add(sourceLabel(i.source));
       }
       const span = g.from !== g.to;
@@ -1547,6 +1713,11 @@ function diff(prevState, panel) {
     console.log(`качки источника (в рассылку не идут): ${bounced.length}`);
     for (const b of bounced) console.log(`  · ${b}`);
   }
+  if (switched.length) {
+    console.log(`смена источника ряда (не пересмотр, в рассылку не идёт): ${switched.length}`);
+    for (const s of switched) console.log(`  · ${s}`);
+  }
+  if (dust) console.log(`пересчёт истории меньше ${String(REVISION_MIN_PCT).replace(".", ",")} % (в рассылку не идёт): точек ${dust}`);
 
   // ---- Доля капитала: что стало, почему и насколько это устойчиво ----
   if (allocMoved) {
@@ -1643,8 +1814,12 @@ function diff(prevState, panel) {
       note: "",
     });
   }
-  events.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
-  return events;
+  // Тип, убранный из KIND_ORDER, не рассылается вовсе: так работает «тумблер шума» из
+  // УВЕДОМЛЕНИЯ.md. Раньше список задавал только порядок, и убранный тип уезжал в начало пачки.
+  const kept = events.filter((ev) => KIND_ORDER.includes(ev.kind));
+  if (kept.length !== events.length) console.log(`тип события выключен в KIND_ORDER (в рассылку не идёт): ${events.length - kept.length}`);
+  kept.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+  return kept;
 }
 
 /* ================================= 4. ТЕКСТ СООБЩЕНИЙ ================================= */
@@ -1697,6 +1872,7 @@ function templateComment(ev) {
   if (ev.kind === "revision") {
     return "Первоисточник переписал уже опубликованные данные задним числом: картина прошлого изменилась, хотя новых событий не происходило.";
   }
+  if (NO_COMMENT.has(ev.kind)) return "";
   // Разбора от модели нет — значит и осмысления не будет. Честнее дать короткую справку о
   // смысле показателя и прямо сказать, что разбор недоступен, чем выдавать словарное определение
   // за анализ. Формулировка «Что это за показатель» из первой версии была именно этой ошибкой:
@@ -1733,8 +1909,11 @@ function renderMessage(ev, comment) {
     stability ? `\n<b>Насколько это устойчиво</b>\n${stability}` : "",
   ].filter(Boolean);
   if (ev.indicator?.observed_at) lines.push(`<i>данные на ${esc(ev.indicator.observed_at)}${ev.indicator.source ? " · " + esc(ev.indicator.source) : ""}</i>`);
-  lines.push("");
-  lines.push("💬 " + esc(comment));
+  // служебному сообщению разбор не положен — без пустого «💬»
+  if (comment) {
+    lines.push("");
+    lines.push("💬 " + esc(comment));
+  }
   return clipTelegram(lines.join("\n"));
 }
 
@@ -1780,9 +1959,12 @@ function llmContext(panel) {
   const named = (panel.indicators || [])
     .filter((i) => HUMAN[i.id] && i.value)
     .slice(0, 20)
-    .map((i) => `${humanTitle(i.id, i.name)}: ${fmtValue(i)}`);
+    .map((i) => `${humanTitle(i.id, i.name)}: ${closeText(i) || fmtValue(i)}`);
   return { market_now: named };
 }
+// У карточек с официальным закрытием значение карточки — производная (у VIX — изменение за 30 дней), а имя в
+// словаре — сам индекс; модели уходит то же закрытие, что и читателю в строке «вышли новые данные».
+const closeText = (i) => (i.close ? `${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")} (закрытие ${ruDay(Date.parse(i.close.d))})` : "");
 
 // Какая модель реально ответила — нужно для честной подписи в проверке связи.
 let LAST_MODEL = "";
@@ -2470,6 +2652,27 @@ async function guardSendOps(text) {
 }
 /* ============================== конец проверки разбора ============================== */
 
+/* Внутренняя шкала панели — читателю, но не модели. В сообщении о доле стоят «Сводная оценка рынка +8,0 по
+   шкале от −100 до +100» и «вернуть 100% нормы может рост сводной оценки рынка до −7»: так панель называет
+   причину своего решения. Промпт запрещает модели композит и баллы, а получив их числом во входе, она их
+   пересказывает. Поэтому строки со шкалой уходят модели смыслом: решение по совокупности показателей,
+   возврат доли — при улучшении (ухудшении) обстановки. Прочие строки со шкалой не передаются вовсе. */
+const INTERNAL_SCALE = /по шкале от|сводн\S* оценк|композит|\bбалл/i;
+const MODEL_WHOLE = "решение принято по совокупности показателей, а не по одному из них";
+function modelLines(lines) {
+  const out = [];
+  for (const raw of lines || []) {
+    const l = String(raw);
+    if (!INTERNAL_SCALE.test(l)) { out.push(l); continue; }
+    if (/^Сводная оценка рынка/.test(l)) { if (!out.includes(MODEL_WHOLE)) out.push(MODEL_WHOLE); continue; }
+    const back = l.match(/^вернуть (\d+)% нормы может (рост|падение) сводной оценки рынка[^—]*(— с подтверждением на следующей торговой сессии)?/);
+    if (back) { out.push(`вернуть ${back[1]}% нормы может ${back[2] === "рост" ? "улучшение" : "ухудшение"} обстановки${back[3] ? ` ${back[3]}` : ""}`); continue; }
+    const need = l.match(/^обстановке нужно (улучшиться|ухудшиться)( ещё)? на .*?, (чтобы .*)$/);
+    if (need) { out.push(`обстановке нужно ${need[2] ? "ещё " : ""}заметно ${need[1]}, ${need[3]}`); continue; }
+  }
+  return out;
+}
+
 // Разбор пачки событий одним запросом: модель получает все события сразу и отвечает блоками
 // «===N===». Возвращает массив комментариев (null на месте отброшенного) либо null — тогда все
 // сообщения идут с шаблоном. spend — запись суточного расхода из состояния (см. claudeAsk).
@@ -2497,9 +2700,9 @@ async function llmComments(events, panel, { spend = null, week = null } = {}) {
         detail: e.detail,
         what_it_is: (e.plain || []).join("; ").slice(0, 700) || undefined,
         recent_history: (e.history || []).join("; ").slice(0, 900) || undefined,
-        why_changed: (e.causes || []).join("; ").slice(0, 600) || undefined,
+        why_changed: modelLines(e.causes).join("; ").slice(0, 600) || undefined,
         stability: e.stability?.[0]?.tier
-          ? { verdict: TIER[e.stability[0].tier].word, why: e.stability[0].reason }
+          ? { verdict: TIER[e.stability[0].tier].word, why: modelLines(e.stability[0].reason) }
           : undefined,
       })),
     },
@@ -2716,10 +2919,14 @@ function pruneSent(sent, now) {
   return out;
 }
 
-function snapshotState(panel) {
+// prev — прошлая база: официальное закрытие, которое в этом прогоне не прочиталось (close === null),
+// переносится из неё — иначе следующее закрытие сравнивать было бы не с чем.
+function snapshotState(panel, prev = null) {
   const indicators = {};
   for (const i of panel.indicators || []) {
+    const close = i.close !== undefined ? (i.close ? { d: i.close.d, v: i.close.v } : prev?.indicators?.[i.id]?.close || null) : undefined;
     indicators[i.id] = {
+      ...(close !== undefined ? { close } : {}),
       value: i.value,
       value_num: i.value_num,
       unit: i.unit,
@@ -2741,6 +2948,8 @@ function snapshotState(panel) {
     indicators,
     detectors,
     revisions: panel.revisions || [],
+    // поставщики данных этого прогона — база для providersSwitched (смена источника ≠ пересмотр)
+    ...(panel.providers ? { providers: panel.providers } : {}),
   };
 }
 
@@ -2793,13 +3002,24 @@ function pingMessage(panel) {
     .join("\n");
 }
 
-async function main() {
-  const ping = process.env.NOTIFY_PING === "1";
+// io — швы для прогона без браузера, сети и диска (тесты, воспроизведение на истории снимков):
+//   panel      — готовая проекция панели вместо чтения страницы (см. fromPageRaw);
+//   ledger     — прошлый журнал решений вместо файла NOTIFY_LEDGER_IN (null — «ветки ещё нет»);
+//   saveLedger — куда отдать новую версию журнала вместо файла NOTIFY_LEDGER_OUT;
+//   snapshot   — снимок для запасных закрытий S&P и фондов вместо docs/snapshot.json;
+//   state      — состояние прошлого запуска вместо файла (null — «состояния нет»);
+//   saveState  — куда отдать состояние вместо записи файла;
+//   deliver    — получатель готового сообщения вместо Telegram и NEXUS. С ним прогон идёт БОЕВОЙ
+//                веткой (индекс доставленного, запись состояния после каждой отправки), но ни
+//                токен, ни сеть не нужны.
+// В бою main() вызывается без аргументов.
+async function main(io = {}) {
+  const ping = process.env.NOTIFY_PING === "1" && !io.panel;
   // Файл прошлого прогона не должен уехать в ветку шагом коммита ЭТОГО прогона: новая версия
   // журнала появляется заново только тогда, когда этот прогон её действительно построил.
-  if (!ping) await rm(LEDGER_OUT, { force: true });
-  const prevLedger = await readLedger(LEDGER_IN);
-  const panel = await readPanel({ writer: { memory: validMemory(prevLedger?.memory) ? prevLedger.memory : null } });
+  if (!ping && !io.saveLedger) await rm(LEDGER_OUT, { force: true });
+  const prevLedger = io.ledger !== undefined ? io.ledger : await readLedger(LEDGER_IN);
+  const panel = io.panel || (await readPanel({ writer: { memory: validMemory(prevLedger?.memory) ? prevLedger.memory : null } }));
 
   let ledgerNext = null;
   let ledgerDirty = false;
@@ -2808,7 +3028,7 @@ async function main() {
     const day = panel.decision?.dataAsOf;
     const fundsGap = Object.keys(DIARY_FUNDS).some((k) => closeOn(panel.fund_points?.[k], day) === null);
     const snap = !panel.snapshot_at || closeOn(panel.spx_points, day) === null || fundsGap
-      ? await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH)
+      ? (io.panel ? io.snapshot ?? null : await readJSON(PAGE_DIR ? join(PAGE_DIR, "snapshot.json") : SNAPSHOT_PATH))
       : null;
     panel.snapshot_at = panel.snapshot_at || snap?.generated_at || "";
     const spx = closeOn(panel.spx_points, day) ?? closeOn(snapshotSpx(snap), day);
@@ -2860,14 +3080,18 @@ async function main() {
   // Telegram. Сообщение о смене при этом не теряется — его база (state.allocation) сдвигается
   // только после удачной рассылки, см. canonicalBase.
   if (ledgerNext && ledgerDirty) {
-    await mkdir(dirname(LEDGER_OUT), { recursive: true });
-    await writeFile(LEDGER_OUT, formatLedger(ledgerNext));
-    console.log(`журнал решений: ступень ${ledgerNext.memory.rung}, смен ${ledgerNext.transitions.length}, дневник ${ledgerNext.diary.length} сес. → ${LEDGER_OUT}`);
+    if (io.saveLedger) await io.saveLedger(ledgerNext);
+    else {
+      await mkdir(dirname(LEDGER_OUT), { recursive: true });
+      await writeFile(LEDGER_OUT, formatLedger(ledgerNext));
+    }
+    console.log(`журнал решений: ступень ${ledgerNext.memory.rung}, смен ${ledgerNext.transitions.length}, дневник ${ledgerNext.diary.length} сес. → ${io.saveLedger ? "io" : LEDGER_OUT}`);
   } else if (ledgerNext) {
     console.log("журнал решений: существенных изменений нет — коммита в ветку не будет");
   }
 
-  const prev = (await readJSON(STATE_PATH)) || {};
+  const prev = io.state !== undefined ? io.state || {} : (await readJSON(STATE_PATH)) || {};
+  const dry = io.deliver ? false : DRY;
   const first = !prev.indicators;
   const now = Date.now();
   const sentIndex = pruneSent(prev.sent, now);
@@ -2879,6 +3103,32 @@ async function main() {
   if (first) console.log("первый прогон: зафиксирована база, уведомления начнутся со следующего изменения");
   if (all.length !== events.length) console.log(`уже доставлено ранее и пропущено: ${all.length - events.length}`);
   console.log(`событий: ${events.length}`);
+
+  // Осторожный режим: тесты уведомлений в этом прогоне не прошли (исход шага передаёт notify.yml).
+  // Раньше красный тест останавливал весь прогон — и все сообщения, включая смену доли, и запись журнала
+  // решений, единственным писателем которого этот скрипт и является. Теперь журнал пишется как обычно
+  // (выше, до рассылки), смена доли и сигналы риска идут — их мало, и ключ каждого привязан к моменту
+  // события; публикации и пересмотры, где ошибка кода способна дать лавину, не рассылаются, а о самом сбое
+  // раз в сутки приходит служебное сообщение. Без состояния оно не шлётся: помнить «уже сказано» нечем.
+  let queue = events;
+  let selftestAlertAt = prev.selftest_alert_at || "";
+  if ((io.selftest ?? process.env.NOTIFY_SELFTEST) === "failure") {
+    queue = events.filter((ev) => SAFE_KINDS.has(ev.kind));
+    console.log(`тесты уведомлений не прошли — осторожный режим: публикаций и пересмотров не разослано ${events.length - queue.length}`);
+    const lastAt = Date.parse(selftestAlertAt);
+    if (!first && !(finite(lastAt) && now - lastAt < SELFTEST_ALERT_EVERY_MS)) {
+      selftestAlertAt = new Date(now).toISOString();
+      queue = [{
+        kind: "service",
+        key: `selftest@${selftestAlertAt}`,
+        title: "Тесты уведомлений не проходят",
+        before: "",
+        after: "",
+        detail: "Идут только сообщения о смене доли и сигналы риска. Публикации и пересмотры данных не рассылаются, пока тесты не починены. Журнал решений пишется как обычно. Причина — в журнале прогона «Уведомления в Telegram».",
+        note: "",
+      }, ...queue];
+    }
+  }
 
   const trend = appendTrend(prev.alloc_trend, panel);
   const allocChanges = appendChanges(prev.alloc_changes, panel, prev.allocation);
@@ -2892,15 +3142,22 @@ async function main() {
   // доступе уходят в канал ошибок в конце прогона.
   const llmWeek = prev.llm_week && typeof prev.llm_week === "object" && !Array.isArray(prev.llm_week) ? prev.llm_week : {};
   const persist = async () => {
+    const state = { ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen, llm_spend: llmSpend, llm_week: llmWeek };
+    if (selftestAlertAt) state.selftest_alert_at = selftestAlertAt;
+    if (io.saveState) return io.saveState(state);
     await mkdir(dirname(STATE_PATH), { recursive: true });
-    await writeFile(STATE_PATH, JSON.stringify({ ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen, llm_spend: llmSpend, llm_week: llmWeek }, null, 1));
+    await writeFile(STATE_PATH, JSON.stringify(state, null, 1));
   };
 
   let sent = 0;
-  if (events.length) {
-    const capped = events.slice(0, MAX_EVENTS);
-    if (events.length > MAX_EVENTS) console.log(`ПРЕДОХРАНИТЕЛЬ: событий ${events.length} > ${MAX_EVENTS}, отправляются первые ${MAX_EVENTS} по важности`);
-    const llm = await llmComments(capped, panel, { spend: llmSpend, week: llmWeek });
+  if (queue.length) {
+    const capped = queue.slice(0, MAX_EVENTS);
+    if (queue.length > MAX_EVENTS) console.log(`ПРЕДОХРАНИТЕЛЬ: событий ${queue.length} > ${MAX_EVENTS}, отправляются первые ${MAX_EVENTS} по важности`);
+    // Разбор нужен не всем событиям: служебному сообщению модель не нужна.
+    const ask = capped.map((ev, idx) => ({ ev, idx })).filter((x) => !NO_COMMENT.has(x.ev.kind));
+    const got = ask.length ? await llmComments(ask.map((x) => x.ev), panel, { spend: llmSpend, week: llmWeek }) : null;
+    const llm = got ? new Array(capped.length).fill(null) : null;
+    if (got) ask.forEach((x, k) => { llm[x.idx] = got[k] || null; });
     // Оплаченный запрос — на диск сразу, до рассылки: упавший на Telegram прогон не должен
     // стереть его из суточного расхода. База сравнения при этом не двигается (baseline ещё null).
     await persist();
@@ -2909,33 +3166,38 @@ async function main() {
       const ev = capped[i];
       const comment = (llm && llm[i]) || templateComment(ev);
       const text = renderMessage(ev, comment);
-      if (DRY) {
+      if (dry) {
         const plain = text
           .replace(/<[^>]+>/g, "")
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
         console.log("\n--- сообщение " + (i + 1) + " ---\n" + plain);
       } else {
-        await sendTelegram(text);
-        await sendNexusEvent(text, sentKey(ev), panel.generated_at);
+        if (io.deliver) await io.deliver(text, ev);
+        else {
+          await sendTelegram(text);
+          await sendNexusEvent(text, sentKey(ev), panel.generated_at);
+        }
         console.log(`  → отправлено: ${KIND[ev.kind]?.label || ev.kind} · ${ev.title}${ev.before || ev.after ? ` (${ev.before || "—"} → ${ev.after || "—"})` : ""} · комментарий: ${llm && llm[i] ? "модель" : "шаблон"}`);
         sent++;
         sentIndex[sentKey(ev)] = new Date().toISOString();
         if (ev.revisedPoints) revisedSeen = rememberRevised(revisedSeen, [ev], now);
         for (const id of ev.ruleNotes || []) ruleNotesSeen = { ...ruleNotesSeen, [id]: new Date().toISOString() };
         await persist(); // индекс доставленного — сразу на диск, база сдвинется в конце
-        if (i < capped.length - 1) await sleep(SEND_GAP_MS);
+        if (i < capped.length - 1 && !io.deliver) await sleep(SEND_GAP_MS);
       }
     }
   }
 
-  if (DRY) revisedSeen = rememberRevised(revisedSeen, events.filter((e) => e.revisedPoints), now);
-  baseline = snapshotState(panel);
+  if (dry) revisedSeen = rememberRevised(revisedSeen, queue.filter((e) => e.revisedPoints), now);
+  baseline = snapshotState(panel, prev);
   await persist();
-  console.log(DRY ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);
+  console.log(dry ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);
   // Учёт ИИ-разборов (блок 5б): тревога при отказе API по доступу и строка за прошлую неделю — в канал
   // ошибок. Каждым прогоном: неделя без событий — тоже неделя, а недоставленное уйдёт следующим.
-  if (!DRY) {
-    const out = await guardOpsTick(llmWeek, now, "837", guardSendOps, "секрет ANTHROPIC_API_KEY в настройках репозитория (Actions).");
+  // Сухой прогон и прогон через io.deliver (тесты, реплей) в канал ошибок не пишут; тесты подставляют io.sendOps.
+  const sendOps = io.sendOps || (dry || io.deliver ? null : guardSendOps);
+  if (sendOps) {
+    const out = await guardOpsTick(llmWeek, now, "837", sendOps, "секрет ANTHROPIC_API_KEY в настройках репозитория (Actions).");
     if (out.length) {
       console.log(`канал ошибок: ${out.join("; ")}`);
       await persist();
@@ -2950,5 +3212,5 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   });
 }
 
-export { detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
+export { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, RULE_NOTES, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE, guardCheck, gParseBlocks, guardReview, guardRecord, guardOpsTick, guardWeekLine, guardWeekOf, guardAccessProblem,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, REGIME_WORD, PAGE_EXTRACTOR };

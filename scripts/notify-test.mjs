@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 process.env.NOTIFY_LLM_MAX_RETRIES = "0";
 process.env.NOTIFY_LLM_TIMEOUT_MS = "1500";
 for (const k of ["NOTIFY_MODEL", "NOTIFY_LLM_EFFORT", "NOTIFY_LLM_DAILY_USD", "ANTHROPIC_BASE_URL"]) delete process.env[k];
-const { detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+const { CLOSE_OF, main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR,
   guardCheck, gParseBlocks, guardRecord, guardOpsTick, guardWeekOf } = await import("./notify.mjs");
 
@@ -72,6 +72,20 @@ const stateOf = (panel) => snapshotState(panel);
 test("первый прогон не рассылает историю", () => {
   const panel = panelOf([ind({})]);
   assert.equal(diff({}, panel).length, 0, "пустое состояние не должно порождать событий");
+});
+
+test("тумблер шума: тип, убранный из KIND_ORDER, не рассылается", () => {
+  // УВЕДОМЛЕНИЯ.md обещает именно это; раньше список задавал только порядок, и убранный тип уезжал в начало пачки.
+  const before = stateOf(panelOf([ind({ value: "1", value_num: 1 })]));
+  const after = panelOf([ind({ value: "2", value_num: 2, observed_at: "2026-07-21" })]);
+  const at = KIND_ORDER.indexOf("release");
+  KIND_ORDER.splice(at, 1);
+  try {
+    assert.equal(mute(() => diff(before, after)).length, 0, "релизы выключены — событий нет");
+  } finally {
+    KIND_ORDER.splice(at, 0, "release");
+  }
+  assert.equal(diff(before, after).length, 1, "с полным списком релиз приходит");
 });
 
 test("новая карточка не порождает событие задним числом", () => {
@@ -351,6 +365,149 @@ test("у каждого показателя макро-панели есть ч
   assert.deepEqual(missing, [], `без записи в словаре в сообщение уедет внутренняя подпись карточки: ${missing}`);
 });
 
+// Карточки самой страницы: addInd({id:"…", …}) в docs/index.html. Полнота словаря проверяется по НИМ, а не по
+// ключам MACRO_CADENCE: так девять карточек «Контекста» и «Пути ФРС» неделю уходили наружу как «вышли новые
+// данные» с заголовками «finance.yahoo.com» и «Данные ФРС» — таблица их просто не знала, и тест молчал.
+const PAGE_CARDS = (() => {
+  const html = readFileSync(new URL("../docs/index.html", import.meta.url), "utf8");
+  const parts = html.split(/^addInd\(\{id:"/m).slice(1);
+  return parts.map((p) => {
+    const body = p.slice(0, 4000);
+    return { id: body.match(/^([a-z0-9_]+)"/)[1], notify: !/^[^\n]*\bnotify:\s*false\b/.test(body), host: ((body.match(/link:"https?:\/\/([^/"]+)/) || [])[1] || "") };
+  });
+})();
+
+test("каждая карточка страницы есть в календаре публикаций и в словаре человеческих имён", () => {
+  assert.ok(PAGE_CARDS.length >= 35, `карточки страницы не разобрались из docs/index.html: ${PAGE_CARDS.length}`);
+  const cards = PAGE_CARDS.filter((c) => c.notify);
+  const noCadence = cards.filter((c) => !MACRO_CADENCE[c.id]).map((c) => c.id);
+  const noHuman = cards.filter((c) => !HUMAN[c.id]).map((c) => c.id);
+  assert.deepEqual(noCadence, [], `карточки без записи в MACRO_CADENCE (считаются непубликуемыми и молчат): ${noCadence}`);
+  assert.deepEqual(noHuman, [], `карточки без человеческого имени (в сообщение уедет внутренняя подпись): ${noHuman}`);
+  // и наоборот: запись календаря без карточки — опечатка в id, карточка с ней не сойдётся никогда
+  const ids = new Set(PAGE_CARDS.map((c) => c.id));
+  const stale = Object.keys(MACRO_CADENCE).filter((id) => !ids.has(id));
+  assert.deepEqual(stale, [], `записи MACRO_CADENCE без карточки на странице: ${stale}`);
+});
+
+test("заголовок публикации каждой плановой карточки — человеческий, а не домен и не «Данные ФРС»", () => {
+  const bad = [];
+  for (const c of PAGE_CARDS.filter((x) => x.notify && MACRO_CADENCE[x.id]?.scheduled && !HUMAN[x.id]?.quiet)) {
+    const title = releaseOf({ id: c.id, release: MACRO_CADENCE[c.id].release, source: c.host });
+    if (/\.[a-z]{2,}\b/i.test(title) || /^(Данные ФРС|Источник данных)$/.test(title)) bad.push(`${c.id} → ${title}`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("котировки корзин и прочие рыночные цены не рассылаются как публикации", () => {
+  // Правило владельца: всё, что публикуется по календарю, приходит сразу; молчат только непрерывные котировки.
+  for (const id of ["ai_bet", "bdc_px", "bizd", "breadth", "spx", "spx_mom", "goldreal", "btc"]) {
+    assert.ok(HUMAN[id]?.quiet || !MACRO_CADENCE[id]?.scheduled, `${id}: котировка обязана молчать`);
+  }
+  for (const c of PAGE_CARDS.filter((x) => x.notify && /yahoo/i.test(x.host))) {
+    assert.ok(HUMAN[c.id]?.quiet || !MACRO_CADENCE[c.id]?.scheduled, `${c.id}: цены Yahoo — котировка, не публикация`);
+  }
+  const was = stateOf(panelOf([ind({ id: "ai_bet", value: "-4,1", value_num: -4.1, observed_at: "2026-10-22", ...MACRO_CADENCE.ai_bet })]));
+  const now = panelOf([ind({ id: "ai_bet", value: "-6,3", value_num: -6.3, observed_at: "2026-10-23", ...MACRO_CADENCE.ai_bet })]);
+  assert.equal(diff(was, now).length, 0, "сдвиг корзины ИИ за день — не «вышли новые данные»");
+});
+
+test("карточка вне MACRO_CADENCE молчит (ни релиза, ни пересчёта истории) и громко пишет об этом в лог", () => {
+  const raw = (v, d, pts) => ({
+    generated_at: "2026-10-23T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [{ id: "brand_new", name: "Новая внутренняя карточка", value: v, value_num: Number(v), unit: "", delta: "", zone: "норма", score: null,
+      observed_at: d, source: "finance.yahoo.com", note: "", degraded: false, voting: false, lead: false, series: pts }],
+  });
+  const pts = (last) => [1, 2, 3, 4, 5, 6, 7].map((k) => ({ t: Date.UTC(2026, 9, 10 + k), v: k === 7 ? last : k * 10 + (last > 100 ? 1 : 0) }));
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let before, after;
+  try {
+    before = fromPageRaw(raw("1", "2026-10-22", pts(70)));
+    after = fromPageRaw(raw("2", "2026-10-23", pts(170)));
+  } finally { console.log = realLog; }
+  assert.equal(after.indicators[0].scheduled, false);
+  assert.ok(logs.some((l) => /вне MACRO_CADENCE — brand_new/.test(l)), `нет громкой строки в логе: ${logs}`);
+  assert.equal(mute(() => diff(stateOf(before), after)).length, 0, "новая карточка без записи в календаре не уходит наружу");
+});
+
+test("VIX выходит по закрытию FRED, а не по первой котировке дня: одно сообщение CBOE на закрытие", () => {
+  // Хронология боевых снимков 21–27.10.2026: закрытие VIX за день D приходит во FRED около 13:40 UTC дня D+1, а
+  // с 13:46–13:56 страница кладёт поверх ряда котировку D+1. Раньше «вышли новые данные» уходили по этой
+  // котировке, а дата термструктуры прыгала между закрытием и котировкой. 27.10 закрытие за 26.10 пришло, когда
+  // на карточке уже стояла котировка 27.10, — значение карточки закрытия не показало ни в одном прогоне.
+  const LIVE = " · интрадей (~15 мин)";
+  const card = (id, value, d, live) => ({ id, name: id, value, value_num: Number(String(value).replace(",", ".")), unit: "", delta: "VIX" + (live ? LIVE : ""),
+    zone: "норма", score: 0, observed_at: d, source: "fred.stlouisfed.org", note: "", degraded: false, voting: true, lead: false, series: [] });
+  const closes = (vix, vxv) => ({ VIXCLS: vix.map(([d, v]) => ({ d, v })), VXVCLS: vxv.map(([d, v]) => ({ d, v })) });
+  const run = (vix, vt, c) => mute(() => fromPageRaw({ generated_at: "2026-10-27T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [card("vix", ...vix), card("vixterm", ...vt)], closes: c }));
+  const C20 = closes([["2026-10-19", 17.1], ["2026-10-20", 17.9]], [["2026-10-19", 19.5], ["2026-10-20", 19.7]]);
+  const C21 = closes([["2026-10-20", 17.9], ["2026-10-21", 18.6]], [["2026-10-20", 19.7], ["2026-10-21", 19.6]]);
+  let state = stateOf(run(["+2,5", "2026-10-20"], ["0,91", "2026-10-20"], C20));
+  const step = (vix, vt, c) => {
+    const panel = run(vix, vt, c);
+    const ev = diff(state, panel);
+    state = snapshotState(panel, state);
+    return ev;
+  };
+  assert.equal(step(["+2,0", "2026-10-21", true], ["0,93", "2026-10-21", true], C20).length, 0, "первая котировка дня — не публикация");
+  assert.equal(step(["+2,4", "2026-10-21", true], ["0,91", "2026-10-20"], C20).length, 0, "дата термструктуры вернулась к закрытию — не новость");
+  // закрытие за 21.10 пришло во FRED, когда на карточке уже котировка 22.10
+  const ev = step(["+3,4", "2026-10-22", true], ["0,96", "2026-10-22", true], C21);
+  assert.equal(ev.length, 1, "закрытие 21.10 — одно сообщение на обе карточки");
+  assert.equal(ev[0].title, "Индексы волатильности CBOE");
+  assert.match(ev[0].detail, /21\.10\.2026/);
+  assert.deepEqual(ev[0].moves.map((m) => `${m.name}: ${m.before}→${m.after}`), [`${HUMAN.vix.t}: 17,9→18,6`, `${HUMAN.vixterm.t}: 0,91→0,95`], "в строке — официальные закрытия, а не котировка");
+  assert.equal(step(["+1,8", "2026-10-21"], ["0,95", "2026-10-21"], C21).length, 0, "то же закрытие на карточке без котировки — уже сказано");
+  assert.equal(step(["+3,6", "2026-10-22", true], ["0,95", "2026-10-22", true], C21).length, 0);
+});
+
+testAsync("контекст модели называет VIX уровнем закрытия, а не изменением карточки за 30 дней", async () => {
+  const panel = mute(() => fromPageRaw({ generated_at: "2026-10-27T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [{ id: "vix", name: "VIX: изменение за 30 дн.", value: "+3,5", value_num: 3.5, unit: "", delta: "VIX 18,9 · интрадей (~15 мин)", zone: "норма", score: 0,
+      observed_at: "2026-10-27", source: "fred.stlouisfed.org", note: "", degraded: false, voting: true, lead: false, series: [] }],
+    closes: { VIXCLS: [{ d: "2026-10-26", v: 18.4 }], VXVCLS: [] } }));
+  const { seen, impl } = capture(reply("===0===\nтекст"));
+  await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
+  const ctx = JSON.parse(seen[0].body.messages[0].content).panel_context.market_now;
+  assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10.2026)`]);
+});
+
+test("закрытие не прочиталось — публикации нет, база держит прошлое закрытие", () => {
+  const card = (id) => ({ id, name: id, value: "1", value_num: 1, unit: "", delta: "", zone: "норма", score: 0, observed_at: "2026-10-21", source: "", note: "", degraded: false, voting: true, lead: false, series: [] });
+  const run = (c) => mute(() => fromPageRaw({ generated_at: "2026-10-22T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" }, indicators: [card("vix")], closes: c }));
+  let state = stateOf(run({ VIXCLS: [{ d: "2026-10-20", v: 17.9 }] }));
+  const p1 = run({});
+  assert.equal(diff(state, p1).length, 0);
+  state = snapshotState(p1, state);
+  assert.deepEqual(state.indicators.vix.close, { d: "2026-10-20", v: 17.9 }, "прошлое закрытие не потеряно");
+  const ev = diff(state, run({ VIXCLS: [{ d: "2026-10-21", v: 18.6 }] }));
+  assert.equal(ev.length, 1);
+  assert.equal(`${ev[0].moves[0].before}→${ev[0].moves[0].after}`, "17,9→18,6");
+});
+
+test("закрытия берутся из тех рядов FRED, на которых стоят карточки страницы", () => {
+  const html = readFileSync(new URL("../docs/index.html", import.meta.url), "utf8");
+  const block = (id) => html.split(`addInd({id:"${id}"`)[1]?.split("addInd({id:")[0] || "";
+  assert.match(block("vix"), /fred\("VIXCLS"\)\)\.slice\(\)/, "VIX: котировка кладётся поверх КОПИИ ряда — кэш FRED остаётся чистым закрытием");
+  assert.match(block("vixterm"), /fred\("VIXCLS"\)[\s\S]*fred\("VXVCLS"\)/, "термструктура — VIX к VIX3M по закрытиям FRED");
+  assert.match(html, /const fredCached=s=>FREDCACHE\[s\]/, "кэш рядов FRED, из которого уведомитель берёт закрытия");
+  for (const [id, c] of Object.entries(MACRO_CADENCE).filter(([, c]) => c.close)) assert.ok(Object.keys(CLOSE_OF).includes(id), `${id}: у карточки с close нет правила закрытия`);
+  assert.notEqual(releaseOf({ id: "cor1m", release: MACRO_CADENCE.cor1m.release }), releaseOf({ id: "vix", release: MACRO_CADENCE.vix.release }),
+    "COR1M выходит вечером своим файлом CBOE: под общим заголовком было бы два «Индекса CBOE» за одну дату");
+});
+
+test("путь ФРС выходит одним сообщением с кривой — это тот же H.15, а не «Данные ФРС»", () => {
+  const card = (id, v, d) => ind({ id, value: v, value_num: Number(String(v).replace(",", ".").replace("−", "-")), observed_at: d, source: "fred.stlouisfed.org", ...MACRO_CADENCE[id] });
+  const was = stateOf(panelOf([card("curve", "0,52", "2026-10-22"), card("policy", "−40", "2026-10-22")]));
+  const ev = diff(was, panelOf([card("curve", "0,55", "2026-10-23"), card("policy", "−37", "2026-10-23")]));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].title, "Доходности гособлигаций США (ФРС)");
+  assert.deepEqual(ev[0].moves.map((m) => m.name), [HUMAN.curve.t, HUMAN.policy.t]);
+});
+
 const allocOf = (pct, blocks, extra = {}) => ({
   pct,
   bands: { adverse: -20, supportive: 20 },
@@ -470,8 +627,8 @@ const withPoints = (pts, o = {}) => ind({ series: undefined, points: pts, ...o }
 const day = (iso) => Date.parse(iso + "T00:00:00Z");
 
 test("переписанная точка ряда показывается с датой и «было → стало»", () => {
-  const before = stateOf(panelOf([withPoints({ [day("2026-05-27")]: 100, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]));
-  const after = panelOf([withPoints({ [day("2026-05-27")]: 115, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]);
+  const before = stateOf(panelOf([withPoints({ [day("2026-05-26")]: 90, [day("2026-05-27")]: 100, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]));
+  const after = panelOf([withPoints({ [day("2026-05-26")]: 90, [day("2026-05-27")]: 115, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]);
   const ev = diff(before, after);
   assert.equal(ev.length, 1);
   assert.equal(ev[0].kind, "revision");
@@ -511,7 +668,7 @@ test("дребезг последнего знака не выдаётся за 
 });
 
 test("возврат точки к уже показанному значению — не сообщение, а качок источника", () => {
-  const pts = (v) => ({ [day("2026-05-27")]: v, [day("2026-05-28")]: 200, [day("2026-05-29")]: 300 });
+  const pts = (v) => ({ [day("2026-05-26")]: 50, [day("2026-05-27")]: v, [day("2026-05-28")]: 200, [day("2026-05-29")]: 300 });
   const s0 = stateOf(panelOf([withPoints(pts(100))]));
   const first = diff(s0, panelOf([withPoints(pts(115))]));
   assert.equal(first.length, 1, "первый пересмотр показывается");
@@ -525,6 +682,61 @@ test("возврат точки к уже показанному значени�
   assert.equal(diff(s2, panelOf([withPoints(pts(130))])).length, 1, "новое, ещё не показанное значение — событие");
 });
 
+test("пересчёт отрицательного ряда печатает знак по сути: −0,49 → −0,48 — это рост, −3 → −28 — падение", () => {
+  // NFCI и SOFR−IORB отрицательны; «новое/старое − 1» переворачивало знак: −0,49 → −0,48 выходило «−2,0%».
+  const pts = (a, b) => ({ [day("2026-10-01")]: -0.5, [day("2026-10-08")]: a, [day("2026-10-15")]: b, [day("2026-10-22")]: -0.47 });
+  const ev = diff(stateOf(panelOf([withPoints(pts(-0.49, -0.45))])), panelOf([withPoints(pts(-0.48, -0.45))]));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].moves[0].delta, "+2,0%", "−0,49 → −0,48 — рост на 2 %, а не падение");
+  const ev2 = diff(stateOf(panelOf([withPoints(pts(-3, -1))])), panelOf([withPoints(pts(-28, -1))]));
+  assert.equal(ev2[0].moves[0].delta, "−833,3%");
+});
+
+test("пересмотр меньше 0,1 % — пыль, в рассылку не идёт", () => {
+  // Ряды в миллиардах долларов (резервы, TGA, RRP) пересчитываются в последнем знаке: сообщение печатало
+  // два одинаковых числа «3,177·10^11 → 3,177·10^11».
+  const pts = (v) => ({ [day("2026-10-01")]: 3.1e11, [day("2026-10-08")]: v, [day("2026-10-15")]: 3.2e11 });
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let ev;
+  try { ev = diff(stateOf(panelOf([withPoints(pts(3.1771e11))])), panelOf([withPoints(pts(3.1769e11))])); } finally { console.log = realLog; }
+  assert.equal(ev.length, 0);
+  assert.ok(logs.some((l) => /меньше 0,1 %.*точек 1/.test(l)), `пыль обязана остаться в логе: ${logs}`);
+  assert.equal(diff(stateOf(panelOf([withPoints(pts(3.1771e11))])), panelOf([withPoints(pts(3.19e11))])).length, 1, "0,4 % — уже пересмотр");
+});
+
+test("самая старая точка нового ряда — край окна, не пересмотр (SRF: «последние 6 операций»)", () => {
+  // 22.10.2026: у SRF окно из 6 операций (две в день); при сдвиге окна самый старый день теряет утреннюю
+  // операцию, и выходило «0,011 → 0 (−100%)» за 19.10.
+  const before = stateOf(panelOf([withPoints({ [day("2026-10-19")]: 0.011, [day("2026-10-20")]: 0.067, [day("2026-10-21")]: 0 })]));
+  const after = panelOf([withPoints({ [day("2026-10-19")]: 0, [day("2026-10-20")]: 0.067, [day("2026-10-21")]: 0, [day("2026-10-22")]: 0 })]);
+  assert.equal(diff(before, after).length, 0);
+  // точка внутри окна по-прежнему сравнивается
+  const inner = panelOf([withPoints({ [day("2026-10-19")]: 0.011, [day("2026-10-20")]: 5, [day("2026-10-21")]: 0, [day("2026-10-22")]: 0 })]);
+  assert.equal(diff(before, inner).length, 1);
+});
+
+test("смена поставщика — не пересмотр: ряд целиком другой в такт сбоя ключа снимка", () => {
+  // 22.10.2026 13:08: fx:JPY упал по таймауту, страница взяла курс из FRED H.10, и «переписался» весь ряд иены.
+  const base = {}, other = {};
+  for (let d = 1; d <= 12; d++) { base[day(`2026-10-${String(d).padStart(2, "0")}`)] = 150 + d; other[day(`2026-10-${String(d).padStart(2, "0")}`)] = 150.6 + d; }
+  other[day("2026-10-01")] = base[day("2026-10-01")];
+  const was = stateOf(panelOf([withPoints(base, { id: "jpy" })], { providers: {} }));
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let ev;
+  try { ev = diff(was, panelOf([withPoints(other, { id: "jpy" })], { providers: { "fx:JPY": "failed" } })); } finally { console.log = realLog; }
+  assert.equal(ev.length, 0, "резервный источник — не «первоисточник переписал данные»");
+  assert.ok(logs.some((l) => /смена источника ряда/.test(l)), "факт смены остаётся в логе");
+  // тот же ряд целиком без смены поставщика — пересмотр (NFCI переоценивает всю историю каждую среду)
+  assert.equal(mute(() => diff(was, panelOf([withPoints(other, { id: "jpy" })], { providers: {} }))).length, 1);
+  // смена поставщика без переписанного целиком ряда пересмотр не глушит
+  const one = { ...base, [day("2026-10-05")]: 170 };
+  assert.equal(mute(() => diff(was, panelOf([withPoints(one, { id: "jpy" })], { providers: { "fx:JPY": "failed" } }))).length, 1);
+});
+
 test("память о показанных значениях протухает и не растёт бесконечно", () => {
   const now = Date.parse("2026-07-24T00:00:00Z");
   const old = { "x|1": { v: [1], at: "2026-01-01T00:00:00Z" }, "x|2": { v: [2], at: "2026-07-20T00:00:00Z" } };
@@ -536,8 +748,8 @@ test("память о показанных значениях протухает
 });
 
 test("крупные и мелкие порядки печатаются читаемо", () => {
-  const before = stateOf(panelOf([withPoints({ [day("2026-05-27")]: 7.31e20, [day("2026-05-28")]: 1 })]));
-  const ev = diff(before, panelOf([withPoints({ [day("2026-05-27")]: 8.36e20, [day("2026-05-28")]: 1 })]));
+  const before = stateOf(panelOf([withPoints({ [day("2026-05-26")]: 7e20, [day("2026-05-27")]: 7.31e20, [day("2026-05-28")]: 1 })]));
+  const ev = diff(before, panelOf([withPoints({ [day("2026-05-26")]: 7e20, [day("2026-05-27")]: 8.36e20, [day("2026-05-28")]: 1 })]));
   assert.match(ev[0].moves[0].before, /10\^20/, "хешрейт обязан читаться, а не тянуться двадцатью нулями");
   assert.equal(ev[0].moves[0].delta, "+14,4%");
 });
@@ -1133,14 +1345,14 @@ test("каноническое решение передаёт закрытия 
 /* ---- v5.2.3: плитки вердикта со знаком «−» — настоящее извлечение со страницы на подставном DOM ---- */
 
 // Исполняется ТОТ ЖЕ текст PAGE_EXTRACTOR, что уходит в Chrome; глобали страницы подставлены параметрами.
-const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {} }) => {
+const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {}, snap = null, fred = undefined }) => {
   const els = {
     ...Object.fromEntries(Object.entries(dom).map(([id, t]) => [id, { textContent: t }])),
     actionStrip: { innerText: strip, querySelector: (s) => (s === ".as-pct" ? { textContent: "50%" } : null) },
   };
   const document = { getElementById: (id) => els[id] || null };
   const state = { data, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
-  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], null, undefined);
+  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], snap, fred);
 };
 const TILES = { score: "+0", lead: "-7", coin: "+35", det: "-19" };
 const EXTRA = "опережающие -7 · подтверждающие +35 · детекторы -19";
@@ -1180,6 +1392,28 @@ test("v5.3: карточка с notify:false уведомителю не вид�
   const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), ind, data });
   assert.deepEqual(out.indicators.map((i) => i.id), ["cot_es", "hy"]);
   assert.deepEqual(out.indicators.map((i) => i.voting), [false, true]);
+});
+
+test("пересчёт ряда подписан именем ряда, если ряд — не значение карточки (Фаза цикла → CFNAI)", () => {
+  // 26.10.2026: CFNAI пересмотрен за май–июль, и строка гласила «Фаза цикла …: −0,0267 → −0,0233» — числа CFNAI под
+  // именем сочетания «рост × инфляция».
+  const pts = (v) => ({ [day("2026-04-01")]: -0.05, [day("2026-05-01")]: v, [day("2026-06-01")]: 0.01, [day("2026-07-01")]: 0.02 });
+  const ev = diff(stateOf(panelOf([withPoints(pts(-0.0267), { id: "quadrant" })])), panelOf([withPoints(pts(-0.0233), { id: "quadrant" })]));
+  assert.equal(ev.length, 1);
+  assert.match(ev[0].moves[0].name, /CFNAI/);
+  assert.doesNotMatch(ev[0].moves[0].name, /Фаза цикла/);
+});
+
+test("извлечение со страницы отдаёт поставщиков: сбойные и устаревшие ключи снимка", () => {
+  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), ind: [], data: {},
+    snap: { failed: ["fx:JPY — The operation was aborted due to timeout"], stale_keys: { "fred:NFCI": 3 }, responses: {} } });
+  assert.deepEqual(out.providers, { "fx:JPY": "failed", "fred:NFCI": "stale" });
+});
+
+test("извлечение со страницы отдаёт хвосты официальных рядов закрытий из кэша FRED", () => {
+  const fred = (k) => ({ VIXCLS: [{ d: new Date("2026-10-20T00:00:00Z"), v: 17.9 }, { d: new Date("2026-10-21T00:00:00Z"), v: 18.6 }], VXVCLS: [{ d: new Date("2026-10-21T00:00:00Z"), v: 19.6 }] })[k] || null;
+  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), fred });
+  assert.deepEqual(out.closes, { VIXCLS: [{ d: "2026-10-20", v: 17.9 }, { d: "2026-10-21", v: 18.6 }], VXVCLS: [{ d: "2026-10-21", v: 19.6 }] });
 });
 
 test("проверка связи называет долю в долях нормы", () => {
@@ -1543,6 +1777,74 @@ testAsync("нечитаемый ответ → шаблон, с диагност
   said = await quiet(async () => { out = await withFetch(reply("извините, не могу"), () => llmComments(evs, panel)); });
   assert.equal(out, null);
   assert.match(said, /ответ отброшен — нет меток ===N===; начало: «извините, не могу»/, "в логе должно быть видно, что модель ответила, но ответ не разобрался");
+});
+
+testAsync("внутренняя шкала панели не уходит модели: ни «сводная оценка», ни «по шкале от −100 до +100»", async () => {
+  // Читатель видит строку о сводной оценке в «Что за этим стоит»; модели промпт запрещает композит и баллы, а
+  // получив их числом во входе, она их пересказывала. Смена доли — с замороженным и с открытым возвратом.
+  const base = stateOf(panelOf([ind({})]));
+  const prevLedger = ledgerAt(2);
+  const { panel: p } = canonPanel(decisionOf({ rung: 1, since: "2026-10-01", composite: -14.2, lead: -6 }), prevLedger);
+  const ev = allocEvents(diff({ ...base, ledger: prevLedger }, p));
+  assert.match(ev[0].causes[0], /Сводная оценка рынка −14,2 по шкале от −100 до \+100/, "читателю строка остаётся");
+  const extra = { kind: "allocation", key: "a2", title: "Доля акций сокращена", before: "100% нормы", after: "50% нормы", detail: "",
+    causes: ["Сводная оценка рынка −14,2 по шкале от −100 до +100, опережающие показатели −6,0", "Спред высокодоходных облигаций США: 312 → 355 б.п."],
+    stability: [{ tier: "shaky", reason: ["обстановке нужно улучшиться на 8,4 пункта по шкале от −100 до +100, чтобы доля вернулась на ступень выше",
+      "вернуть 100% нормы может рост сводной оценки рынка до −7 — с подтверждением на следующей торговой сессии", "похожих смен в прошлом было 4, и ни одна не откатилась обратно в течение двух суток"] }] };
+  const { seen, impl } = capture(reply("===0===\nтекст\n===1===\nтекст"));
+  await hush(() => withFetch(impl, () => llmComments([ev[0], extra], p)));
+  const user = JSON.parse(seen[0].body.messages[0].content);
+  const sent = JSON.stringify(user.events);
+  for (const bad of [/по шкале/, /сводн\S* оценк/i, /композит/, /балл/, /−14,2/, /пункт/]) assert.doesNotMatch(sent, bad, `во вход модели протекла внутренняя шкала: ${bad}`);
+  assert.match(user.events[1].why_changed, /по совокупности показателей/, "смысл строки о сводной оценке остаётся");
+  assert.match(user.events[1].why_changed, /Спред высокодоходных облигаций США: 312 → 355/, "человеческие причины передаются как есть");
+  assert.deepEqual(user.events[1].stability.why, [
+    "обстановке нужно заметно улучшиться, чтобы доля вернулась на ступень выше",
+    "вернуть 100% нормы может улучшение обстановки — с подтверждением на следующей торговой сессии",
+    "похожих смен в прошлом было 4, и ни одна не откатилась обратно в течение двух суток",
+  ]);
+});
+
+/* ---- осторожный режим: красные тесты не глушат ни смену доли, ни журнал решений (боевая ветка main через io) ---- */
+const mainRun = async ({ state, selftest, panelExtra = {}, value = "2", ledger = ledgerAt(2), dec = decisionOf({ rung: 1, since: "2026-10-01" }) }) => {
+  const out = { sent: [], texts: [], ledger: null, state: null };
+  const panel = panelOf([ind({ value, value_num: Number(value), observed_at: "2026-07-21" })], { source: "page", decision: dec, snapshot_at: "2026-10-01T20:06:00.000Z", ...panelExtra });
+  await quiet(() => withEnv({ ANTHROPIC_API_KEY: undefined, NOTIFY_SELFTEST: undefined }, () => main({
+    panel, ledger, snapshot: null, state, selftest,
+    saveLedger: (l) => { out.ledger = l; },
+    saveState: (s) => { out.state = JSON.parse(JSON.stringify(s)); },
+    deliver: (text, ev) => { out.sent.push(ev.kind); out.texts.push(text); },
+  })));
+  return out;
+};
+const prevForMain = () => stateOf(panelOf([ind({ value: "1", value_num: 1, observed_at: "2026-07-20" })]));
+
+testAsync("красные тесты: смена доли и журнал решений идут, публикации — нет, служебное сообщение — одно в сутки", async () => {
+  const r = await mainRun({ state: prevForMain(), selftest: "failure" });
+  assert.deepEqual(r.sent, ["service", "allocation"], "служебное сообщение, затем смена доли; публикация придержана");
+  assert.ok(r.ledger && r.ledger.memory.rung === 1, "журнал решений пишется и при красных тестах — сайт держит каноническую ступень по нему");
+  assert.match(r.texts[0], /Тесты уведомлений не проходят/);
+  assert.doesNotMatch(r.texts[0], /💬/, "служебному сообщению разбор не положен");
+  assert.ok(r.state.selftest_alert_at, "время служебного сообщения запоминается");
+  // через час — снова красные тесты и новая публикация: служебного сообщения нет, публикации нет
+  const again = await mainRun({ state: { ...r.state, selftest_alert_at: new Date(Date.now() - 3600e3).toISOString() }, selftest: "failure", value: "3" });
+  assert.deepEqual(again.sent, [], "служебное сообщение — не чаще раза в сутки");
+  // через сутки — снова
+  const day = await mainRun({ state: { ...r.state, selftest_alert_at: new Date(Date.now() - 25 * 3600e3).toISOString() }, selftest: "failure", value: "3" });
+  assert.deepEqual(day.sent, ["service"]);
+});
+
+testAsync("зелёные тесты: рассылка полная, служебного сообщения нет", async () => {
+  const r = await mainRun({ state: prevForMain(), selftest: "success" });
+  assert.deepEqual(r.sent, ["allocation", "release"]);
+  assert.ok(r.ledger);
+  assert.equal(r.state.selftest_alert_at, undefined);
+});
+
+testAsync("красные тесты без состояния: база фиксируется молча, служебного сообщения нет", async () => {
+  const r = await mainRun({ state: null, selftest: "failure" });
+  assert.deepEqual(r.sent, []);
+  assert.ok(r.state.indicators, "база зафиксирована");
 });
 
 testAsync("без ключа модель не дёргается вовсе", async () => {
