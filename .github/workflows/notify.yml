@@ -61,15 +61,20 @@ jobs:
           restore-keys: |
             razlom26-notify-${{ github.ref_name }}-
 
-      - name: Тесты уведомлений
-        run: node scripts/notify-test.mjs
-
-      - name: Chrome для снятия состояния страницы
+      # Зависимости ставятся ОДНОЙ командой и ДО тестов. Одной — потому что каждая следующая
+      # `npm i --no-save` вычищает пакеты, поставленные предыдущей (проверено 28.10.2026: установка
+      # puppeteer-core отдельным шагом снесла бы SDK до рассылки). До тестов — потому что тесты
+      # комментатора идут через настоящий SDK Anthropic (сеть подменена), а тест-шаг здесь блокирует
+      # рассылку. Версия SDK зафиксирована: на ней проверены и форма запроса, и классы ошибок.
+      - name: Chrome и зависимости (puppeteer-core, SDK Anthropic)
         run: |
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser || true)"
           if [ -z "$CHROME" ]; then echo "Chrome на раннере не найден"; exit 1; fi
           echo "CHROME_PATH=$CHROME" >> "$GITHUB_ENV"
-          npm i --no-save --no-package-lock --no-audit --no-fund puppeteer-core
+          npm i --no-save --no-package-lock --no-audit --no-fund puppeteer-core @anthropic-ai/sdk@1.3.0
+
+      - name: Тесты уведомлений
+        run: node scripts/notify-test.mjs
 
       # Журнал решений — память машины ступеней, общая для сайта, Telegram и всех устройств. Без
       # него headless-прогон каждый раз стартовал с пустого localStorage и сеял ступень от сырого
@@ -103,8 +108,13 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          # Комментатор — Claude через SDK Anthropic. Без секрета сообщения идут с шаблоном.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Необязательные переменные репозитория (Variables); незаданная приходит пустой строкой,
+          # и скрипт берёт умолчание: claude-sonnet-5-5, xhigh, потолок 1.5 $ в сутки.
           NOTIFY_MODEL: ${{ vars.NOTIFY_MODEL }}
+          NOTIFY_LLM_EFFORT: ${{ vars.NOTIFY_LLM_EFFORT }}
+          NOTIFY_LLM_DAILY_USD: ${{ vars.NOTIFY_LLM_DAILY_USD }}
           NOTIFY_SOURCE: page
           # Страница поднимается ЛОКАЛЬНО из свежего чекаута: публикация Pages идёт уже после
           # старта уведомлений, и чтение по сети давало данные предыдущего цикла (замер в проде
