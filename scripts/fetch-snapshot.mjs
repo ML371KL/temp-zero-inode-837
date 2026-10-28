@@ -54,12 +54,12 @@ const NEWS_SYMBOLS=[...CAPEX_TICKERS,...BDC_TICKERS];
 const HIT_RX=/capex|capital expenditure|capital spending|data ?cent|ai infrastructure|gpu|server|chip|spend|investment|depreciat|useful li(fe|ves)|impairment|writ(e|es|ten|ing)?[ -]?downs?|wrote[ -]?down|force majeure|stargate|ai (mega-?)?campus|ai factor|bankrupt|chapter 11|dividend|distribution|payout|redemption|withdrawal|tender|exodus|outflow\w*|\bgat(e|es|ed|ing)\b|non[- ]?accrual|navs?\b|default rate|pik|lease|gigawatt|\bgw\b/i;
 
 /* тот же список серий и глубин, что в странице (SERIES_LIMITS) */
-const SERIES={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,WRESBAL:90,
+const SERIES={SOFR:40,IORB:60,WALCL:90,WTREGEN:90,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
   T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:300,DGS2:160,CPILFESL:26,CES0500000003:26,
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
   THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,
-  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,
+  DFEDTARU:240,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,
   UMCSENT:620,W875RX1:26,EXHOSLUSM495S:15,MORTGAGE30US:60,DRCCLACBS:150,DRSFRMACBS:150}; /* CPI/зарплаты 26: запас на дыры ряда при расчёте г/г по датам;
   v4.15: срочная премия Kim-Wright, кастодия ФРС для иностранных ЦБ, TIC чистые покупки, CFNAI — справочный блок «контекст»;
   v5.0: DCOILWTICO 140 → 300 — нефть меряется отношением к своей средней за год (нужно ≥252 торговых дня);

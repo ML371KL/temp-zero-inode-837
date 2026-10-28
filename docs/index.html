@@ -388,7 +388,7 @@
 <div class="wrap">
 
 <header>
-  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.5.0 · макроэкономика · ликвидность · режим риска</span></div>
+  <div class="station"><b>МОНИТОР РЫНКА США</b><span class="num">v5.5.1 · макроэкономика · ликвидность · режим риска</span></div>
   <div class="srcline">
     <span class="srcdots" id="srcdots" title="зелёная точка — прямое подключение; янтарная — через CORS-шлюз (норма для FRED); красная — сбой"></span>
     <span id="updated" class="updated">—</span>
@@ -1093,6 +1093,10 @@
      случаев против 13%. Поправка владельца docs/owner.json, по умолчанию выключена ({"cap":null}): включённая
      {"cap":0|50,"since","until","reason"} даёт действующую долю min(модель, cap) — модель, память ступени и балл
      прежние; строка на полосе доли, поле o в дневнике, обе доли в уведомлениях, по истечении выключается сама.
+   ═ v5.5.1: ставка ФРС на дату (rateAt) раньше окна её ряда — неизвестна: точка спреда SOFR − IORB и пути ФРС выпадает,
+     а не получает самую позднюю (IORB) или самую раннюю (верх коридора) ставку окна. После повышения 17.09.2026 окно
+     ушло за дату повышения, и 14–16.09 «пересчитались» на 25 б.п. неверно (SOFR − IORB −3 → −28, путь ФРС 90 → 65).
+     Глубина рядов ставки в странице и сборщике: IORB 60, DFEDTARU 240 дней — покрывают окна SOFR и 2-летки.
 */
 /* ============ КОНФИГ ============ */
 const CONFIG={
@@ -1304,12 +1308,12 @@ function drawSources(){
 }
 
 /* ============ FRED: кэш между обновлениями + нормализация единиц ============ */
-const SERIES_LIMITS={SOFR:40,IORB:40,WALCL:90,WTREGEN:90,RRPONTSYD:300,WRESBAL:90,
+const SERIES_LIMITS={SOFR:40,IORB:60,WALCL:90,WTREGEN:90,RRPONTSYD:300,WRESBAL:90,
   BAMLH0A0HYM2:520,BAMLC0A0CM:520,SP500:280,VIXCLS:520,SAHMREALTIME:30,CCSA:90,
   T10Y3M:430,DFII10:160,T10YIE:110,DCOILWTICO:300,DGS2:160,CPILFESL:26,CES0500000003:26,
   PAYEMS:20,DTWEXBGS:160,NFCI:120,DRTSCILM:60,GDP:12,DGS10:170,VXVCLS:170,
   THREEFYTP10:160,WMTSECL1:60,FORLTTOTALNET99996:40,CFNAI:40,   /* v4.15: справочный блок «контекст» (срочная премия, кастодия ФРС, TIC, CFNAI) */
-  DFEDTARU:40,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,                 /* v5.0: путь ФРС; расслоение кредита CCC/BB (справочно) */
+  DFEDTARU:240,BAMLH0A3HYC:520,BAMLH0A1HYBB:520,                /* v5.0: путь ФРС; расслоение кредита CCC/BB (справочно). v5.5.1: IORB 60 и DFEDTARU 240 дней — ставка покрывает окна SOFR (40 сессий) и 2-летки (160 сессий) */
   UMCSENT:620,W875RX1:26,EXHOSLUSM495S:15,MORTGAGE30US:60,DRCCLACBS:150,DRSFRMACBS:150, /* v5.3: «Домохозяйства и жильё» (справочно) */
   DEXJPUS:70,DEXCHUS:70,UNRATE:30,RPONTTLD:20};    /* ленивые резервы: не предзагружаются; CPI/зарплаты 26 — запас на дыры ряда для г/г по датам */
 /* Примечание (июль-2026, по внешнему аудиту): FRED может отдавать BAML-серии (HY/IG OAS)
@@ -1376,6 +1380,10 @@ async function fred(series){
   catch(e){ if(c) return c.obs; throw e; }          /* сеть упала — отдаём прошлое значение */
 }
 const fredCached=s=>FREDCACHE[s]?FREDCACHE[s].obs:null; /* синхронный доступ для детекторов */
+/* v5.5.1: ставка на дату — последнее значение ряда не позже даты (ряд по возрастанию). Раньше первой точки окна
+   ставка НЕИЗВЕСТНА (null): прежние «самое позднее» (SOFR − IORB) и «самое раннее» (путь ФРС) значение окна после
+   повышения 17.09.2026 подставляли новую ставку в старые даты, и 14–16.09 «пересчитывались» на 25 б.п. неверно. */
+const rateAt=(rows,d)=>{let v=null;for(const p of rows||[]){if(+p.d<=+d)v=p.v;else break;}return v;};
 /* v5.0: годовая история закрытий из снимка (ypx:SYM = [[ts, close, adjclose]]); живого режима нет — справочный слой */
 const yrows=k=>{const r=SNAP&&SNAP.responses&&SNAP.responses[k];
   return Array.isArray(r)&&r.length>20?r.map(x=>({d:new Date(x[0]*1000),c:+x[1],a:+x[2]})).filter(x=>x.c>0&&x.a>0):null;};
@@ -1459,9 +1467,12 @@ addInd({id:"sofr_iorb",block:"plumb",family:"price",name:"SOFR − IORB (деф�
    }
    const iorb=await fred("IORB");
    const iMap=new Map(iorb.map(p=>[+p.d,p.v]));
-   const spOf=p=>{let iv=iMap.get(+p.d);if(iv==null){const pr=iorb.filter(q=>q.d<=p.d);iv=pr.length?pr[pr.length-1].v:last(iorb).v;}return (p.v-iv)*100;};
+   /* v5.5.1: дата раньше окна IORB — спреда нет (null), точка выпадает из ряда, а не получает нынешний IORB */
+   const spOf=p=>{let iv=iMap.get(+p.d);if(iv==null)iv=rateAt(iorb,p.d);return iv==null?null:(p.v-iv)*100;};
    const sp=spOf(last(sofr));
-   const sp3=sofr.slice(-3).reduce((a,p)=>a+spOf(p),0)/Math.min(3,sofr.length);
+   if(sp==null) throw new Error("EMPTY");
+   const sp3s=sofr.slice(-3).map(spOf).filter(x=>x!=null);
+   const sp3=sp3s.reduce((a,x)=>a+x,0)/sp3s.length;
    state.sofrSpread=sp; state.sofrSpread3=sp3; state.sofrDate=iso(last(sofr).d);
    /* v5.0: балл по среднему за 3 дня и по сдвинутой шкале. Прежняя «0–5 → +1» давала плюс, когда SOFR
       уже на уровне IORB или выше, — ровно признак нехватки резервов (VI–VIII.2019, X–XII.2025); а «<0 → +2»
@@ -1470,7 +1481,7 @@ addInd({id:"sofr_iorb",block:"plumb",family:"price",name:"SOFR − IORB (деф�
    const zi= sp3<=-8?0: sp3<=-3?1: sp3<=3?2: sp3<=10?3:4;
    return {value:fmt(sp,1),delta:"ср₃ "+fmt(sp3,1)+" · SOFR "+fmt(last(sofr).v)+"% / IORB "+fmt(last(iorb).v)+"%",
      note:"SOFR у потолка коридора или выше IORB = резервы дороги, водопровод под давлением.",zi,date:last(sofr).d,
-     series:sofr.slice(-30).map(p=>({d:p.d,v:spOf(p)}))};
+     series:sofr.slice(-30).map(p=>({d:p.d,v:spOf(p)})).filter(p=>p.v!=null)};
  }});
 
 addInd({id:"netliq",block:"plumb",family:"qty",lead:true,staleDays:12,name:"Чистая ликвидность ФРС (баланс − TGA − RRP), Δ13 нед.",unit:"",
@@ -1896,8 +1907,9 @@ addInd({id:"policy",block:"macro",family:"policy",lead:true,name:"Путь ФР�
  link:"https://fred.stlouisfed.org/series/DFEDTARU",
  async load(){
    const g2=await fred("DGS2"), t=await fred("DFEDTARU");
-   const tAt=d=>{let v=t[0].v;for(const p of t){if(p.d<=d)v=p.v;else break;}return v;};
-   const ser=g2.slice(-160).map(p=>({d:p.d,v:(p.v-tAt(p.d))*100}));
+   /* v5.5.1: дата раньше окна ставки — точки нет (rateAt → null), а не «самая ранняя ставка окна» */
+   const ser=g2.slice(-160).map(p=>{const r=rateAt(t,p.d);return r==null?null:{d:p.d,v:(p.v-r)*100};}).filter(Boolean);
+   if(!ser.length) throw new Error("EMPTY");
    const v=last(ser).v; state.policyGap=v;
    const zi= v>100?2: v>50?1:0;
    return {value:sign(v)+fmt(v,0),delta:"2-летка "+fmt(last(g2).v,2)+"% · верх коридора ФРС "+fmt(last(t).v,2)+"%",
