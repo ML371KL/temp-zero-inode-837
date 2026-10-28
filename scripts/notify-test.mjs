@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 process.env.NOTIFY_LLM_MAX_RETRIES = "0";
 process.env.NOTIFY_LLM_TIMEOUT_MS = "1500";
 for (const k of ["NOTIFY_MODEL", "NOTIFY_LLM_EFFORT", "NOTIFY_LLM_DAILY_USD", "ANTHROPIC_BASE_URL"]) delete process.env[k];
-const { detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
+const { main, fromPageRaw, KIND_ORDER, detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
   canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR,
   guardCheck, gParseBlocks, guardRecord, guardOpsTick, guardWeekOf } = await import("./notify.mjs");
 
@@ -349,6 +349,82 @@ test("промежуточное «наблюдение» детектора н�
 test("у каждого показателя макро-панели есть человеческое имя", () => {
   const missing = Object.keys(MACRO_CADENCE).filter((id) => !HUMAN[id]);
   assert.deepEqual(missing, [], `без записи в словаре в сообщение уедет внутренняя подпись карточки: ${missing}`);
+});
+
+// Карточки самой страницы: addInd({id:"…", …}) в docs/index.html. Полнота словаря проверяется по НИМ, а не по
+// ключам MACRO_CADENCE: так девять карточек «Контекста» и «Пути ФРС» неделю уходили наружу как «вышли новые
+// данные» с заголовками «finance.yahoo.com» и «Данные ФРС» — таблица их просто не знала, и тест молчал.
+const PAGE_CARDS = (() => {
+  const html = readFileSync(new URL("../docs/index.html", import.meta.url), "utf8");
+  const parts = html.split(/^addInd\(\{id:"/m).slice(1);
+  return parts.map((p) => {
+    const body = p.slice(0, 4000);
+    return { id: body.match(/^([a-z0-9_]+)"/)[1], notify: !/^[^\n]*\bnotify:\s*false\b/.test(body), host: ((body.match(/link:"https?:\/\/([^/"]+)/) || [])[1] || "") };
+  });
+})();
+
+test("каждая карточка страницы есть в календаре публикаций и в словаре человеческих имён", () => {
+  assert.ok(PAGE_CARDS.length >= 35, `карточки страницы не разобрались из docs/index.html: ${PAGE_CARDS.length}`);
+  const cards = PAGE_CARDS.filter((c) => c.notify);
+  const noCadence = cards.filter((c) => !MACRO_CADENCE[c.id]).map((c) => c.id);
+  const noHuman = cards.filter((c) => !HUMAN[c.id]).map((c) => c.id);
+  assert.deepEqual(noCadence, [], `карточки без записи в MACRO_CADENCE (считаются непубликуемыми и молчат): ${noCadence}`);
+  assert.deepEqual(noHuman, [], `карточки без человеческого имени (в сообщение уедет внутренняя подпись): ${noHuman}`);
+  // и наоборот: запись календаря без карточки — опечатка в id, карточка с ней не сойдётся никогда
+  const ids = new Set(PAGE_CARDS.map((c) => c.id));
+  const stale = Object.keys(MACRO_CADENCE).filter((id) => !ids.has(id));
+  assert.deepEqual(stale, [], `записи MACRO_CADENCE без карточки на странице: ${stale}`);
+});
+
+test("заголовок публикации каждой плановой карточки — человеческий, а не домен и не «Данные ФРС»", () => {
+  const bad = [];
+  for (const c of PAGE_CARDS.filter((x) => x.notify && MACRO_CADENCE[x.id]?.scheduled && !HUMAN[x.id]?.quiet)) {
+    const title = releaseOf({ id: c.id, release: MACRO_CADENCE[c.id].release, source: c.host });
+    if (/\.[a-z]{2,}\b/i.test(title) || /^(Данные ФРС|Источник данных)$/.test(title)) bad.push(`${c.id} → ${title}`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("котировки корзин и прочие рыночные цены не рассылаются как публикации", () => {
+  // Правило владельца: всё, что публикуется по календарю, приходит сразу; молчат только непрерывные котировки.
+  for (const id of ["ai_bet", "bdc_px", "bizd", "breadth", "spx", "spx_mom", "goldreal", "btc"]) {
+    assert.ok(HUMAN[id]?.quiet || !MACRO_CADENCE[id]?.scheduled, `${id}: котировка обязана молчать`);
+  }
+  for (const c of PAGE_CARDS.filter((x) => x.notify && /yahoo/i.test(x.host))) {
+    assert.ok(HUMAN[c.id]?.quiet || !MACRO_CADENCE[c.id]?.scheduled, `${c.id}: цены Yahoo — котировка, не публикация`);
+  }
+  const was = stateOf(panelOf([ind({ id: "ai_bet", value: "-4,1", value_num: -4.1, observed_at: "2026-10-22", ...MACRO_CADENCE.ai_bet })]));
+  const now = panelOf([ind({ id: "ai_bet", value: "-6,3", value_num: -6.3, observed_at: "2026-10-23", ...MACRO_CADENCE.ai_bet })]);
+  assert.equal(diff(was, now).length, 0, "сдвиг корзины ИИ за день — не «вышли новые данные»");
+});
+
+test("карточка вне MACRO_CADENCE молчит (ни релиза, ни пересчёта истории) и громко пишет об этом в лог", () => {
+  const raw = (v, d, pts) => ({
+    generated_at: "2026-10-23T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [{ id: "brand_new", name: "Новая внутренняя карточка", value: v, value_num: Number(v), unit: "", delta: "", zone: "норма", score: null,
+      observed_at: d, source: "finance.yahoo.com", note: "", degraded: false, voting: false, lead: false, series: pts }],
+  });
+  const pts = (last) => [1, 2, 3, 4, 5, 6, 7].map((k) => ({ t: Date.UTC(2026, 9, 10 + k), v: k === 7 ? last : k * 10 + (last > 100 ? 1 : 0) }));
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let before, after;
+  try {
+    before = fromPageRaw(raw("1", "2026-10-22", pts(70)));
+    after = fromPageRaw(raw("2", "2026-10-23", pts(170)));
+  } finally { console.log = realLog; }
+  assert.equal(after.indicators[0].scheduled, false);
+  assert.ok(logs.some((l) => /вне MACRO_CADENCE — brand_new/.test(l)), `нет громкой строки в логе: ${logs}`);
+  assert.equal(mute(() => diff(stateOf(before), after)).length, 0, "новая карточка без записи в календаре не уходит наружу");
+});
+
+test("путь ФРС выходит одним сообщением с кривой — это тот же H.15, а не «Данные ФРС»", () => {
+  const card = (id, v, d) => ind({ id, value: v, value_num: Number(String(v).replace(",", ".").replace("−", "-")), observed_at: d, source: "fred.stlouisfed.org", ...MACRO_CADENCE[id] });
+  const was = stateOf(panelOf([card("curve", "0,52", "2026-10-22"), card("policy", "−40", "2026-10-22")]));
+  const ev = diff(was, panelOf([card("curve", "0,55", "2026-10-23"), card("policy", "−37", "2026-10-23")]));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].title, "Доходности гособлигаций США (ФРС)");
+  assert.deepEqual(ev[0].moves.map((m) => m.name), [HUMAN.curve.t, HUMAN.policy.t]);
 });
 
 const allocOf = (pct, blocks, extra = {}) => ({
