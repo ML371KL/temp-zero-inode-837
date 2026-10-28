@@ -1,6 +1,7 @@
 // Тесты уведомлений. Все фикстуры синтетические и НЕ зависят от текущей даты: проверяется
 // поведение диффера, а не то, что сегодня опубликовал FRED.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 // Транспорт к Claude читает настройки при загрузке модуля, поэтому они задаются ДО импорта (он
 // поэтому динамический). Повторы SDK выключены: заглушка отвечает сразу, а повтор 429/529 с паузой
 // только растягивал бы прогон. Срок разбора сокращён: тест обрыва по сроку ждёт его целиком.
@@ -9,7 +10,8 @@ process.env.NOTIFY_LLM_MAX_RETRIES = "0";
 process.env.NOTIFY_LLM_TIMEOUT_MS = "1500";
 for (const k of ["NOTIFY_MODEL", "NOTIFY_LLM_EFFORT", "NOTIFY_LLM_DAILY_USD", "ANTHROPIC_BASE_URL"]) delete process.env[k];
 const { detDiary, DIARY_DETS, pendingRuleNotes, diff, renderMessage, templateComment, fromSnapshotJSON, snapshotState, llmComments, sentKey, pruneSent, rememberRevised, appendTrend, appendChanges, significance, decisionChanges, thresholdFrom, humanRelease, releaseOf, pingMessage, HUMAN, MACRO_CADENCE,
-  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR } = await import("./notify.mjs");
+  canonicalize, decisionStatus, allocationFromDecision, buildLedger, ledgerChanged, formatLedger, readLedger, closeOn, snapshotSpx, snapshotFunds, fundClosesOn, DIARY_FUNDS, RUNG_PCT, PAGE_EXTRACTOR,
+  guardCheck, gParseBlocks, guardRecord, guardOpsTick, guardWeekOf } = await import("./notify.mjs");
 
 let passed = 0;
 const test = (name, fn) => {
@@ -1285,22 +1287,30 @@ const mskToday = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 
 const evs = [{ kind: "zone", title: "A", before: "1", after: "2", detail: "", note: "" }, { kind: "release", title: "B", before: "", after: "", detail: "", note: "" }];
 const panel = panelOf([ind({})]);
 
-testAsync("комментарии разбираются из ответа модели", async () => {
-  const out = await hush(() => withFetch(reply('[{"i":0,"text":"первый"},{"i":1,"text":"второй"}]'), () => llmComments(evs, panel)));
-  assert.deepEqual(out, ["первый", "второй"]);
+// Разборы в фикстурах длиннее 40 знаков: короче проверка (блок 5б) считает ответ обрубком.
+const R0 = "Разбор первого события: движение рядовое и картину не меняет.";
+const R1 = "Разбор второго события: публикация подтверждает прежнюю картину.";
+
+testAsync("JSON вместо меток — брак ответа: метки ===N=== обязательны (с 29.10.2026)", async () => {
+  // Запасной разбор JSON жил ради бесплатных моделей; Claude держит формат, а нумерация в JSON
+  // не проверяема так же строго, как метки. Ответ без меток на два события — шаблон и строка в логе.
+  let out;
+  const said = await quiet(async () => { out = await withFetch(reply(JSON.stringify([{ i: 0, text: R0 }, { i: 1, text: R1 }])), () => llmComments(evs, panel)); });
+  assert.equal(out, null);
+  assert.match(said, /ответ отброшен — нет меток ===N===/);
 });
 
 testAsync("основной формат — блоки ===N===", async () => {
-  const txt = "===0===\nразбор первого события\n===1===\nразбор второго события";
+  const txt = `===0===\n${R0}\n===1===\n${R1}`;
   const out = await hush(() => withFetch(reply(txt), () => llmComments(evs, panel)));
-  assert.deepEqual(out, ["разбор первого события", "разбор второго события"]);
+  assert.deepEqual(out, [R0, R1]);
 });
 
 testAsync("рассуждение вокруг блоков не мешает разбору", async () => {
-  const txt = "Сначала подумаю: событий два, оба про кредит.\n\n===0===\nпервый текст\n\n===1===\nвторой текст\n";
+  const txt = `Сначала подумаю: событий два, оба про кредит.\n\n===0===\n${R0}\n\n===1===\n${R1}\n`;
   const out = await hush(() => withFetch(reply(txt), () => llmComments(evs, panel)));
-  assert.equal(out[0], "первый текст");
-  assert.equal(out[1], "второй текст");
+  assert.equal(out[0], R0);
+  assert.equal(out[1], R1);
 });
 
 testAsync("размышления модели в разбор не попадают: читаются только текстовые блоки", async () => {
@@ -1308,9 +1318,9 @@ testAsync("размышления модели в разбор не попада
   // размышления — отдельные блоки thinking, и в разбор идёт только text — даже если черновик
   // случайно похож на ответ с разметкой.
   const cot = "The user wants me to analyze two events.\n===0===\nчерновик внутри размышлений\n===1===\nещё черновик";
-  const impl = replyMsg({ content: [{ type: "thinking", thinking: cot, signature: "sig" }, { type: "text", text: "===0===\nразбор первого\n===1===\nразбор второго" }] });
+  const impl = replyMsg({ content: [{ type: "thinking", thinking: cot, signature: "sig" }, { type: "text", text: `===0===\n${R0}\n===1===\n${R1}` }] });
   const out = await hush(() => withFetch(impl, () => llmComments(evs, panel)));
-  assert.deepEqual(out, ["разбор первого", "разбор второго"]);
+  assert.deepEqual(out, [R0, R1]);
 });
 
 testAsync("ответ, оборванный по max_tokens, — шаблон, а не черновик", async () => {
@@ -1344,13 +1354,16 @@ testAsync("ломаный текст отбраковывается: транс�
     let out;
     const said = await quiet(async () => { out = await withFetch(reply(txt), () => llmComments(evs, panel)); });
     assert.equal(out?.[0] ?? null, null, `ломаный текст не должен доходить до читателя: ${txt.slice(10, 60)}`);
-    assert.match(said, /испорчен/, "причина брака обязана быть в логе");
+    assert.match(said, /событие 0: вырезано — (транслит|чужая письменность|латиница внутри слова)/, "причина брака обязана быть в логе");
+    assert.match(said, /событие 0: разбор отброшен — после вырезания осталось предложений: 0/, "и текст отброшенного — тоже");
   }
 });
 
 testAsync("чистый русский разбор с аббревиатурами и именами проходит", async () => {
   const txt = "===0===\nПотоки в биткоин-ETF развернулись: за неделю отток, MVRV ушёл к 18-му перцентилю, а Nasdaq при этом растёт.\n===1===\nВторой разбор тоже чистый, с упоминанием Deribit и обычных сокращений вроде ФРС и ВВП.";
-  const out = await hush(() => withFetch(reply(txt), () => llmComments(evs, panel)));
+  // число из разбора обязано лежать во входе своего события — здесь оно стоит в строке события
+  const withMove = [{ ...evs[0], moves: [{ name: "Оценка рынка биткоина (MVRV)", before: "25-й перцентиль 4 лет", after: "18-й перцентиль 4 лет" }] }, evs[1]];
+  const out = await hush(() => withFetch(reply(txt), () => llmComments(withMove, panel)));
   assert.ok(out[0] && out[1], `нормальный текст с аббревиатурами не должен браковаться: ${JSON.stringify(out)}`);
 });
 
@@ -1501,9 +1514,10 @@ testAsync("суточный потолок исчерпан — запроса �
 });
 
 testAsync("ответ, обёрнутый в markdown-блок, разбирается", async () => {
-  const txt = "```\n===0===\nтекст один\n===1===\nтекст два\n```";
+  const txt = `\`\`\`\n===0===\n${R0}\n===1===\n${R1}\n\`\`\``;
   const out = await hush(() => withFetch(reply(txt), () => llmComments(evs, panel)));
-  assert.equal(out[0], "текст один");
+  assert.equal(out[0], R0);
+  assert.equal(out[1], R1);
 });
 
 testAsync("единственное событие принимает связный текст без маркеров", async () => {
@@ -1513,17 +1527,22 @@ testAsync("единственное событие принимает связн
   assert.equal(out[0], txt, "модель, ответившая без разметки на один вопрос, не должна терять ответ");
 });
 
-testAsync("пропущенный моделью индекс не ломает рассылку", async () => {
-  const out = await hush(() => withFetch(reply('[{"i":1,"text":"только второй"}]'), () => llmComments(evs, panel)));
-  assert.equal(out[0], null, "на пропуск подставится шаблон");
-  assert.equal(out[1], "только второй");
+testAsync("недостающий хвост меток не ломает рассылку, а сбой нумерации бракует ответ", async () => {
+  const out = await hush(() => withFetch(reply(`===0===\n${R0}`), () => llmComments(evs, panel)));
+  assert.equal(out[0], R0);
+  assert.equal(out[1], null, "на пропуск подставится шаблон");
+  // «===1===» у первого события приклеил бы разбор к чужому сообщению — весь ответ в брак
+  let bad;
+  const said = await quiet(async () => { bad = await withFetch(reply(`===1===\n${R0}\n===2===\n${R1}`), () => llmComments(evs, panel)); });
+  assert.equal(bad, null);
+  assert.match(said, /метки ===1=== ===2=== вместо 0…1/);
 });
 
 testAsync("нечитаемый ответ → шаблон, с диагностикой в логе", async () => {
   let out, said = "";
   said = await quiet(async () => { out = await withFetch(reply("извините, не могу"), () => llmComments(evs, panel)); });
   assert.equal(out, null);
-  assert.match(said, /не разобран/, "в логе должно быть видно, что модель ответила, но ответ не разобрался");
+  assert.match(said, /ответ отброшен — нет меток ===N===; начало: «извините, не могу»/, "в логе должно быть видно, что модель ответила, но ответ не разобрался");
 });
 
 testAsync("без ключа модель не дёргается вовсе", async () => {
@@ -1540,6 +1559,71 @@ testAsync("без ключа модель не дёргается вовсе", a
     if (real !== undefined) process.env.ANTHROPIC_API_KEY = real;
   }
 });
+
+/* ---- проверка смысла разбора (блок 5б) и недельный учёт ---- */
+
+// Общие векторы с 838, 842 и 843: тот же файл гоняют тесты Python-копии проверки. Расхождение до
+// буквы причины — значит, копии разошлись.
+test("проверка разбора совпадает с общими векторами 837/838/842/843", () => {
+  const v = JSON.parse(readFileSync(new URL("./llm-guard-vectors.json", import.meta.url), "utf8"));
+  assert.ok(v.check.length >= 30 && v.parse.length >= 5, "векторы на месте");
+  for (const c of v.check) assert.deepEqual(guardCheck(c.text, c.input, c.index, c.strict, c.extra), c.want, c.name);
+  for (const c of v.parse) assert.deepEqual(gParseBlocks(c.text, c.n), [c.want, c.error], c.name);
+});
+
+const numEvent = { kind: "release", title: "Кредитные спреды США", before: "", after: "", detail: "данные за 27.10.2026", note: "",
+  moves: [{ name: "Спред высокодоходных облигаций", before: "952 б.п.", after: "1 147 б.п." }] };
+
+testAsync("фраза с выдуманным числом вырезается, честная разность остаётся, всё — в логе", async () => {
+  // «на 195 б.п.» — разность 1147 и 952 из входа события: прежняя сверка 838 бросала за неё весь разбор.
+  const txt = "===0===\nСпред расширился до 1 147 б.п., на 195 б.п. за месяц. Доходность десятилетних бумаг держится у 4,35 %. Рынок наказывает слабых заёмщиков.";
+  let out;
+  const said = await quiet(async () => { out = await withFetch(reply(txt), () => llmComments([numEvent], panel)); });
+  assert.equal(out[0], "Спред расширился до 1 147 б.п., на 195 б.п. за месяц. Рынок наказывает слабых заёмщиков.");
+  assert.match(said, /событие 0: вырезано — числа не из входа: 4,35: «Доходность десятилетних/);
+});
+
+testAsync("прогноз вне «если» вырезается, внутри «если» — сценарий", async () => {
+  const txt = "===0===\nСпред на 1 147 б.п. у верхней границы. Спреды скорее всего продолжат расширение. Если расширятся и надёжные заёмщики, стресс станет общим.";
+  let out;
+  const said = await quiet(async () => { out = await withFetch(reply(txt), () => llmComments([numEvent], panel)); });
+  assert.equal(out[0], "Спред на 1 147 б.п. у верхней границы. Если расширятся и надёжные заёмщики, стресс станет общим.");
+  assert.match(said, /вырезано — прогноз: скорее всего/);
+});
+
+testAsync("итог обращения ложится в недельный учёт; отказ 401 — тревога, перегрузка — нет", async () => {
+  const week = {};
+  await hush(() => withFetch(reply(`===0===\n${R0}\n===1===\n${R1}`), () => llmComments(evs, panel, { week })));
+  assert.equal(week.cur.week, guardWeekOf(Date.now()));
+  assert.deepEqual([week.cur.asked, week.cur.shown], [2, 2]);
+  assert.ok(Math.abs(week.cur.usd - 0.0104) < 1e-9, `цена ответа: ${week.cur.usd}`);
+  for (const [status, type, text, alarm] of [[401, "authentication_error", "invalid x-api-key", true], [400, "invalid_request_error", "Your credit balance is too low to access the Anthropic API.", true], [529, "overloaded_error", "Overloaded", false]]) {
+    const w = {};
+    await quiet(() => withEnv({ NOTIFY_LLM_MAX_RETRIES: "0" }, () => withFetch(apiError(status, type, text), () => llmComments(evs, panel, { week: w }))));
+    assert.equal(!!w.access, alarm, `${status}: тревога ${alarm ? "нужна" : "не нужна"}`);
+    assert.deepEqual(w.cur.failed, { [`API ${status}`]: 2 });
+  }
+});
+
+testAsync("учёт: тревога один раз, «снова работает», строка за неделю, сбой отправки повторяется", async () => {
+  const MON = Date.parse("2026-10-26T09:00:00Z");
+  const week = {};
+  const sent = [];
+  const send = async (t) => (sent.push(t), true);
+  guardRecord(week, MON, { asked: 1, failed: "API 402", access: { status: 402, kind: "billing_error", message: "payment required" } });
+  await guardOpsTick(week, MON, "837", send, "секрет в Actions.");
+  await guardOpsTick(week, MON + 60e3, "837", send, "секрет в Actions.");
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /837 · ИИ-разбор не работает/);
+  assert.match(sent[0], /кончились кредиты/);
+  guardRecord(week, MON + 3600e3, { asked: 2, summary: { shown: 1, cut: 2, rejected: { "прогноз": 1 } }, usd: 0.03, ok: true });
+  await guardOpsTick(week, MON + 3600e3, "837", send, "");
+  assert.match(sent[1], /837 · ИИ-разбор снова работает/);
+  await guardOpsTick(week, MON + 7 * 864e5, "837", async () => false, "");
+  await guardOpsTick(week, MON + 7 * 864e5 + 60e3, "837", send, "");
+  assert.equal(sent[2], "📊 837 · ИИ-разборы за 26.10–01.11: показано 1 из 3; отбраковано 1 (прогноз 1); вырезано фраз 2; без ответа API 402 1; потрачено $0,03");
+});
+
 
 testAsync("без пакета SDK модуль грузится, а разбор пропускается с понятной строкой в логе", async () => {
   // Копия notify.mjs — во временном каталоге без node_modules: так выглядит прогон без установки.
