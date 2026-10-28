@@ -725,7 +725,7 @@ function fromPageRaw(raw) {
   const noHuman = raw.indicators.filter((i) => !HUMAN[i.id]).map((i) => i.id);
   if (noHuman.length) console.log(`ВНИМАНИЕ: нет человеческого имени у карточек — ${noHuman.join(", ")} (в сообщение уйдёт внутренняя подпись; добавьте их в HUMAN)`);
   const noClose = raw.indicators.filter((i) => MACRO_CADENCE[i.id]?.close && !CLOSE_OF[i.id]?.(raw.closes)).map((i) => i.id);
-  if (noClose.length) console.log(`::warning::официальное закрытие не прочитано из рядов FRED страницы — ${noClose.join(", ")}: публикации по ним в этом прогоне нет, база держит прошлое закрытие`);
+  if (noClose.length) console.log(`::warning::официальное значение не прочитано (ряд FRED страницы или фиксинг ЕЦБ снимка) — ${noClose.join(", ")}: публикации по ним в этом прогоне нет, база держит прошлое значение`);
   const indicators = raw.indicators.map((i) => {
     const c = MACRO_CADENCE[i.id];
     const { series, ...rest } = i;
