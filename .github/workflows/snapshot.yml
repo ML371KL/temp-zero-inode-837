@@ -47,12 +47,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: 24}
+      # SDK Anthropic для серверного LLM-судьи новостей (28.10.2026). Судья необязателен: без пакета
+      # он пропускается строкой в failed[], а сбор идёт дальше — поэтому сбой установки сбор не держит.
+      - name: SDK Anthropic для судьи новостей
+        continue-on-error: true
+        run: npm i --no-save --no-package-lock --no-audit --no-fund @anthropic-ai/sdk@1.3.0
       - name: Сбор данных
         env:
           FRED_KEY:    ${{ secrets.FRED_KEY }}
           FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
-          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}     # опционально: серверный LLM-судья новостей (v4.10)
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # опционально: серверный LLM-судья новостей (Claude)
+          JUDGE_MODEL: ${{ vars.JUDGE_MODEL }}                  # пусто — claude-sonnet-5-5
+          JUDGE_EFFORT: ${{ vars.JUDGE_EFFORT }}                # пусто — xhigh
+          JUDGE_DAILY_MAX: ${{ vars.JUDGE_DAILY_MAX }}          # пусто — 40 запросов в московские сутки
         run: node scripts/fetch-snapshot.mjs
       - name: Публикация снимка
         id: commit

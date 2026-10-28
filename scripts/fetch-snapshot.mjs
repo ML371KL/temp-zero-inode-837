@@ -9,12 +9,20 @@ import {writeFileSync, mkdirSync, readFileSync, existsSync} from "node:fs";
 
 const FRED_KEY   = process.env.FRED_KEY   || "";
 const FINNHUB_KEY= process.env.FINNHUB_KEY|| "";
-/* v4.10: серверный LLM-судья новостных кандидатов (опционально). Секрет OPENROUTER_KEY →
-   каждый прогон дешёвая модель классифицирует НОВЫЕ жёсткие кандидаты (факт/мнение),
+/* v4.10: серверный LLM-судья новостных кандидатов (опционально). Секрет ANTHROPIC_API_KEY →
+   каждый прогон модель классифицирует НОВЫЕ жёсткие кандидаты (факт/мнение, компания, причина),
    вердикты кэшируются в снимке (fh:newsVer) — страница получает проверенные факты
-   без ИИ-ключа во вкладке. Кандидатов обычно 0–3 за прогон ≈ доли цента. */
-const OPENROUTER_KEY  = process.env.OPENROUTER_KEY  || "";
-const OPENROUTER_MODEL= process.env.OPENROUTER_MODEL|| "anthropic/claude-haiku-4.5";
+   без ИИ-ключа во вкладке. Кандидатов обычно 0–3 за прогон.
+   28.10.2026: судит Claude Sonnet 5.5 через SDK Anthropic (решение владельца, как и у комментаторов
+   Telegram), а не OpenRouter; платный дефолт haiku ушёл вместе с ним. Модель и глубина размышлений —
+   JUDGE_MODEL / JUDGE_EFFORT; пустые значения (незаданная переменная) — умолчания. */
+const ANTHROPIC_API_KEY=process.env.ANTHROPIC_API_KEY||"";
+const JUDGE_MODEL =(process.env.JUDGE_MODEL ||"").trim()||"claude-sonnet-5-5";
+const JUDGE_EFFORT=(process.env.JUDGE_EFFORT||"").trim()||"xhigh";
+/* суточный предел ЗАПРОСОВ судьи (московские сутки): отказ модели не должен превращаться в запрос
+   на каждой сборке — при такте 10–20 минут это 72–99 запросов в сутки (аудит 28.10.2026, D8).
+   Счётчик живёт в самом снимке, рядом с кэшем вердиктов (fh:llmDay). Пустое или негодное — 40. */
+const JUDGE_DAILY_MAX=(v=>/^\d+$/.test(v)?Number(v):40)(String(process.env.JUDGE_DAILY_MAX??"").trim());
 const OUT        = process.env.OUT || "docs/snapshot.json";
 /* v4.13.3: состав корзин извлекается из картриджа CYCLE клиента (docs/index.html) — единый
    источник истины: смена цикла правится в одном месте. При сбое извлечения — зашитый резерв. */
@@ -393,17 +401,35 @@ async function main(){
     const fresh=[]; const seenH=new Set();
     for(const c of CAND.slice().sort((a,b)=>(!!b.sym-!!a.sym)||(!!noDriver(known.get(b.h))-!!noDriver(known.get(a.h)))||((b.t||0)-(a.t||0))))
       if((!known.has(c.h)||noDriver(known.get(c.h)))&&!seenH.has(c.h)){seenH.add(c.h);fresh.push(c);}
-    if(OPENROUTER_KEY&&fresh.length&&!late()){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
-      try{
-        /* v5.4: пачка 15 (было 40) — промпт с причинами длиннее, а таймаут прежний; остаток досудят следующие сборки */
+    /* 28.10.2026: суточный счётчик запросов судьи (московские сутки) — из прошлого снимка; запись прошлых
+       суток или чужой формы — счёт с нуля. Причина пропуска называется честно: ключа нет, дедлайн или предел. */
+    const mskDay=new Date(Date.now()+3*3600e3).toISOString().slice(0,10);
+    const pd=prevSnap&&prevSnap.responses&&prevSnap.responses["fh:llmDay"];
+    const llmDay={day:mskDay,n:pd&&pd.day===mskDay&&Number.isInteger(pd.n)&&pd.n>=0?pd.n:0};
+    const skip=!fresh.length?"":!ANTHROPIC_API_KEY?"нет ANTHROPIC_API_KEY":late()?"дедлайн сборки":llmDay.n>=JUDGE_DAILY_MAX?"суточный предел "+JUDGE_DAILY_MAX+" запросов исчерпан":"";
+    if(fresh.length&&!skip){        /* v4.13.5: за дедлайном судья ждёт следующей сборки — вердикты кэша не теряются */
+      /* SDK — динамическим импортом: без пакета сборка идёт как обычно, судья пропускается строкой в failed */
+      let Anthropic=null;
+      try{ ({default:Anthropic}=await import("@anthropic-ai/sdk")); }
+      catch(e){ failed.push("fh:newsVer — LLM-судья: SDK Anthropic не установлен (кэш вердиктов сохранён)"); }
+      if(Anthropic) try{
+        /* v5.4: пачка 15 (было 40) — промпт с причинами длиннее; остаток досудят следующие сборки */
         const batch=fresh.slice(0,15), rows=batch.map((c,i)=>[c.kind+i,c.h]);
-        const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
-          headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENROUTER_KEY,"X-Title":"Razlom-26 snapshot"},
-          body:JSON.stringify({model:OPENROUTER_MODEL,max_tokens:4000,messages:[{role:"system",content:CL.JUDGE_SYS},{role:"user",content:CL.judgePrompt(rows)}]}),
-          signal:AbortSignal.timeout(late()?30000:90000)});  /* v4.13.4: за дедлайном судья ждёт меньше — кандидаты досудит следующая сборка */
-        if(!r.ok) throw new Error("HTTP "+r.status);
-        const j=await r.json();
-        const txt=((j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content)||"").trim();
+        llmDay.n++;                                       /* в предел идёт сам запрос, а не его исход: отказ тоже тратит его */
+        const t0=Date.now();
+        /* тот же вызов, что у комментаторов Telegram: адаптивные размышления, серверный резерв при отказе по
+           политике (fallbacks "default"), повторы перегрузки 408/409/429/5xx/529 — внутри SDK; temperature — 400 */
+        const client=new Anthropic({apiKey:ANTHROPIC_API_KEY,maxRetries:2,timeout:170000,fetch:(...a)=>globalThis.fetch(...a)});
+        const msg=await client.beta.messages.create({model:JUDGE_MODEL,max_tokens:16000,betas:["server-side-fallback-2026-07-01"],fallbacks:"default",
+          thinking:{type:"adaptive"},output_config:{effort:JUDGE_EFFORT},system:CL.JUDGE_SYS,messages:[{role:"user",content:CL.judgePrompt(rows)}]},
+          {signal:AbortSignal.timeout(late()?30000:170000)});  /* v4.13.4: за дедлайном судья ждёт меньше; 170 с — как у самопроверки: 13 строк в 90 с уже не укладывались */
+        const u=msg.usage||{}, usd=((u.input_tokens||0)*2+(u.output_tokens||0)*10)/1e6;   /* $2 / $10 за миллион — Sonnet 5.5 */
+        console.log("LLM-судья: "+msg.model+" · вход "+u.input_tokens+" · выход "+u.output_tokens+", из них размышления "+(u.output_tokens_details&&u.output_tokens_details.thinking_tokens)
+          +" · $"+usd.toFixed(4)+" · "+((Date.now()-t0)/1000).toFixed(1)+" с · stop_reason "+msg.stop_reason+" · запрос "+llmDay.n+" из "+JUDGE_DAILY_MAX+" за сутки");
+        if(msg.stop_reason==="refusal") throw new Error("модель отказалась отвечать (категория "+((msg.stop_details&&msg.stop_details.category)||"не указана")+")");
+        if(msg.stop_reason==="max_tokens") throw new Error("не хватило max_tokens — ответ оборван");
+        /* только текстовые блоки: размышления (thinking) — черновик, а не ответ */
+        const txt=(msg.content||[]).filter(b=>b&&b.type==="text").map(b=>b.text||"").join("").trim();
         /* v4.12/v4.13.4: reasoning-модели пишут {...} в рассуждениях и цитируют пример формата —
            parseJudge берёт плоские объекты по id и при повторе id — ПОСЛЕДНИЙ */
         const got=CL.parseJudge(txt,rows.map(x=>x[0]));
@@ -411,10 +437,19 @@ async function main(){
         batch.forEach((c,i)=>{const v=got.get(c.kind+i);    /* не вернувшийся в ответе — досудится следующей сборкой */
           if(v) known.set(c.h,v.subject?[c.h,v.cls,nowSec,v.subject,v.type,v.driver||""]:[c.h,v.cls,nowSec]);});
         LLM_JUDGED=got.size;
-        console.log("LLM-судья: рассужено "+LLM_JUDGED+" из "+batch.length+" новых кандидатов ("+OPENROUTER_MODEL+")");
-      }catch(e){ failed.push("fh:newsVer — LLM-судья: "+(e&&e.message||e)+" (кэш вердиктов сохранён)"); }
-    } else if(fresh.length){ console.log("LLM-судья пропущен (нет OPENROUTER_KEY): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
+        console.log("LLM-судья: рассужено "+LLM_JUDGED+" из "+batch.length+" новых кандидатов ("+msg.model+")");
+      }catch(e){
+        /* классы ошибок SDK — от частного к общему: срок и обрыв — подклассы APIConnectionError, а тот — APIError;
+           в строку идут код, тип и текст ошибки из тела ответа — ключа в них нет */
+        const why=e instanceof Anthropic.APIUserAbortError||e instanceof Anthropic.APIConnectionTimeoutError?"срок ответа вышел"
+          :e instanceof Anthropic.APIConnectionError?"нет связи с API Anthropic"
+          :e instanceof Anthropic.APIError?"API Anthropic ответил "+e.status+(e.type?" "+e.type:"")+" — "+String((e.error&&e.error.error&&e.error.error.message)||e.message).slice(0,160)
+          :String(e&&e.message||e);
+        failed.push("fh:newsVer — LLM-судья: "+why+" (кэш вердиктов сохранён)");
+      }
+    } else if(skip){ console.log("LLM-судья пропущен ("+skip+"): несуженных кандидатов "+fresh.length+" — страница классифицирует правилами/своим ключом"); }
     if(known.size||CAND.length) R["fh:newsVer"]=[...known.values()];
+    if(ANTHROPIC_API_KEY) R["fh:llmDay"]=llmDay;          /* счётчик предела переживает сборку только в снимке */
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
@@ -492,7 +527,7 @@ async function main(){
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
     ok:Object.keys(R).length, failed, stale_keys,
     meta:{symbols:NEWS_SYMBOLS,
-      llm:OPENROUTER_KEY?{model:OPENROUTER_MODEL,verdicts:(R["fh:newsVer"]||[]).length,judged_now:LLM_JUDGED}:null},
+      llm:ANTHROPIC_API_KEY?{model:JUDGE_MODEL,verdicts:(R["fh:newsVer"]||[]).length,judged_now:LLM_JUDGED}:null},
     responses:R}));
   console.log(`снимок: ${Object.keys(R).length} источников (fred свежих: ${fredFresh}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));

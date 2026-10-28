@@ -10,19 +10,26 @@ jobs:
       # v5.0: самопроверка берёт ТОТ ЖЕ промпт и разбор, что боевые судьи (сборщик и страница), — блок
       # ⟦NEWS-CORE⟧ из docs/index.html. Раньше здесь жила своя копия старого промпта {"confirmed":[…]},
       # и после смены формата самопроверка проверяла уже не то, чем судят на самом деле.
+      # 28.10.2026: и запрос тот же, что у боевого судьи в scripts/fetch-snapshot.mjs, — Claude через SDK
+      # Anthropic: модель JUDGE_MODEL, глубина JUDGE_EFFORT, серверный резерв при отказе по политике.
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
+      - name: SDK Anthropic
+        run: npm i --no-save --no-package-lock --no-audit --no-fund @anthropic-ai/sdk@1.3.0
       - name: Тестовая классификация той же моделью и тем же промптом
         env:
-          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JUDGE_MODEL: ${{ vars.JUDGE_MODEL }}
+          JUDGE_EFFORT: ${{ vars.JUDGE_EFFORT }}
         run: |
-          node - <<'EOF'
-          const {readFileSync}=require("node:fs");
-          const KEY=process.env.OPENROUTER_KEY, MODEL=process.env.OPENROUTER_MODEL;
-          if(!KEY){console.error("нет секрета OPENROUTER_KEY");process.exit(1);}
+          node --input-type=module - <<'EOF'
+          import {readFileSync} from "node:fs";
+          const KEY=process.env.ANTHROPIC_API_KEY;
+          const MODEL=(process.env.JUDGE_MODEL||"").trim()||"claude-sonnet-5-5", EFFORT=(process.env.JUDGE_EFFORT||"").trim()||"xhigh";
+          if(!KEY){console.error("нет секрета ANTHROPIC_API_KEY");process.exit(1);}
+          const {default:Anthropic}=await import("@anthropic-ai/sdk");
           const page=readFileSync("docs/index.html","utf-8").replace(/\r\n/g,"\n");
           const cyc=n=>JSON.parse(page.match(new RegExp(n+":\\s*(\\[[^\\]]*\\])"))[1]);
           const CONFIG={CYCLE:{capexTickers:cyc("capexTickers"),bdcTickers:cyc("bdcTickers")}};
@@ -45,27 +52,38 @@ jobs:
                       ["B3","Golub Capital BDC suspends its quarterly distribution"]];
           const WANT={B0:"reset",C0:"friction",C2:"friction",C3:"retreat",C4:"friction",C5:"friction",C6:"friction",C7:"retreat",C8:"unclear",B2:"retreat",B3:"retreat"};
           const t0=Date.now();
-          fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
-            headers:{"Content-Type":"application/json","Authorization":"Bearer "+KEY,"X-Title":"Razlom-26 selftest"},
-            body:JSON.stringify({model:MODEL,max_tokens:4000,messages:[{role:"system",content:C.JUDGE_SYS},{role:"user",content:C.judgePrompt(rows)}]}),
-            signal:AbortSignal.timeout(170000)})  /* v5.4: 13 строк — рассуждающей модели нужно больше 90 с */
-          .then(async r=>{
-            const txt=await r.text();
-            console.log("HTTP",r.status,"за",Date.now()-t0,"мс · модель:",MODEL);
-            if(!r.ok){console.error("ОШИБКА ПРОВАЙДЕРА:",txt.slice(0,300));process.exit(1);}
-            const j=JSON.parse(txt);
-            const c=(j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||"").trim();
-            console.log("ответ модели:",c.slice(0,300));
-            const got=C.parseJudge(c,rows.map(x=>x[0]));
-            if(got.size<rows.length){console.error("РАЗОБРАНО "+got.size+" из "+rows.length+" — модель не следует формату");process.exit(1);}
-            const v=id=>got.get(id)||{};
-            for(const [id,h] of rows){const x=v(id);console.log(id.padEnd(3),String(x.cls).padEnd(10),String(x.subject).padEnd(5),String(x.driver).padEnd(9),(WANT[id]?(x.driver===WANT[id]?"✓":"✗ ждали "+WANT[id]):"").padEnd(18),h.slice(0,90));}
-            const dOk=Object.keys(WANT).filter(id=>v(id).driver===WANT[id]).length;
-            console.log("причина совпала: "+dOk+" из "+Object.keys(WANT).length);
-            const correct=v("B0").cls==="fact"&&v("B0").subject==="ARCC"&&v("B1").cls!=="fact"
-                        &&v("C0").cls==="fact"&&v("C0").subject==="ORCL"&&v("C1").cls!=="fact"
-                        &&v("C2").driver==="friction"&&v("C3").driver==="retreat";
-            console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факты распознаны с верной компанией, мнение и вопрос отклонены, причина Nscale — трение, Meta — отступление"
-                               :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(Object.fromEntries(got)));
-          }).catch(e=>{console.error("СБОЙ:",String(e));process.exit(1);});
+          /* тот же вызов, что у боевого судьи: адаптивные размышления, серверный резерв, повторы внутри SDK;
+             170 с — v5.4: 13 строк рассуждающей модели в 90 с не укладывались */
+          const client=new Anthropic({apiKey:KEY,maxRetries:2,timeout:170000});
+          let msg;
+          try{
+            msg=await client.beta.messages.create({model:MODEL,max_tokens:16000,betas:["server-side-fallback-2026-07-01"],fallbacks:"default",
+              thinking:{type:"adaptive"},output_config:{effort:EFFORT},system:C.JUDGE_SYS,messages:[{role:"user",content:C.judgePrompt(rows)}]},
+              {signal:AbortSignal.timeout(170000)});
+          }catch(e){
+            const why=e instanceof Anthropic.APIUserAbortError||e instanceof Anthropic.APIConnectionTimeoutError?"срок ответа вышел (170 с)"
+              :e instanceof Anthropic.APIConnectionError?"нет связи с API Anthropic"
+              :e instanceof Anthropic.APIError?e.status+" "+(e.type||"")+" — "+String((e.error&&e.error.error&&e.error.error.message)||e.message).slice(0,300)
+              :String(e&&e.message||e);
+            console.error("ОШИБКА ПРОВАЙДЕРА:",why);process.exit(1);
+          }
+          const u=msg.usage||{};
+          console.log("ответ за",Date.now()-t0,"мс · модель:",msg.model,"(запрошена "+MODEL+", effort "+EFFORT+") · вход",u.input_tokens,"· выход",u.output_tokens,
+            "· из них размышления",u.output_tokens_details&&u.output_tokens_details.thinking_tokens,"· $"+(((u.input_tokens||0)*2+(u.output_tokens||0)*10)/1e6).toFixed(4),"· stop_reason",msg.stop_reason);
+          if(msg.stop_reason==="refusal"){console.error("ОТКАЗ МОДЕЛИ, категория:",(msg.stop_details&&msg.stop_details.category)||"не указана");process.exit(1);}
+          if(msg.stop_reason==="max_tokens"){console.error("НЕ ХВАТИЛО max_tokens — ответ оборван");process.exit(1);}
+          /* только текстовые блоки: размышления (thinking) — черновик, а не ответ */
+          const c=(msg.content||[]).filter(b=>b&&b.type==="text").map(b=>b.text||"").join("").trim();
+          console.log("ответ модели:",c.slice(0,300));
+          const got=C.parseJudge(c,rows.map(x=>x[0]));
+          if(got.size<rows.length){console.error("РАЗОБРАНО "+got.size+" из "+rows.length+" — модель не следует формату");process.exit(1);}
+          const v=id=>got.get(id)||{};
+          for(const [id,h] of rows){const x=v(id);console.log(id.padEnd(3),String(x.cls).padEnd(10),String(x.subject).padEnd(5),String(x.driver).padEnd(9),(WANT[id]?(x.driver===WANT[id]?"✓":"✗ ждали "+WANT[id]):"").padEnd(18),h.slice(0,90));}
+          const dOk=Object.keys(WANT).filter(id=>v(id).driver===WANT[id]).length;
+          console.log("причина совпала: "+dOk+" из "+Object.keys(WANT).length);
+          const correct=v("B0").cls==="fact"&&v("B0").subject==="ARCC"&&v("B1").cls!=="fact"
+                      &&v("C0").cls==="fact"&&v("C0").subject==="ORCL"&&v("C1").cls!=="fact"
+                      &&v("C2").driver==="friction"&&v("C3").driver==="retreat";
+          console.log(correct?"✓ САМОПРОВЕРКА ПРОЙДЕНА: факты распознаны с верной компанией, мнение и вопрос отклонены, причина Nscale — трение, Meta — отступление"
+                             :"⚠ ФОРМАТ ОК, НО КЛАССИФИКАЦИЯ СПОРНА: "+JSON.stringify(Object.fromEntries(got)));
           EOF
