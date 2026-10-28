@@ -517,6 +517,15 @@ const PAGE_EXTRACTOR = `(() => {
   // Время снимка, на котором посчитана страница: им помечаются события риска, чтобы повторный
   // прогон ТОГО ЖЕ снимка не слал их дважды, а настоящий повтор на новом снимке — слал.
   try { out.snapshot_at = state.lastSnapGen || ""; } catch (e) { out.snapshot_at = ""; }
+  // Поставщики данных: ключи снимка, которые сервер не смог обновить (failed: «ключ — причина») или
+  // отдал из старого кэша (stale_keys). От них страница уходит на резервные источники, и ряд карточки
+  // меняется целиком — это смена источника, а не пересмотр (см. providersSwitched).
+  try {
+    const prov = {};
+    for (const f of (SNAP && SNAP.failed) || []) prov[String(f).split(" — ")[0].trim()] = "failed";
+    for (const k of Object.keys((SNAP && SNAP.stale_keys) || {})) prov[k] = prov[k] || "stale";
+    out.providers = prov;
+  } catch (e) { out.providers = null; }
   // Закрытия S&P для дневника вердиктов: берём у страницы, а не качаем заново.
   try {
     const s = (typeof fredCached === "function" && fredCached("SP500")) || ((state.data || {}).spx || {}).series || [];
@@ -1037,21 +1046,48 @@ const ruDay = (t) => { const d = new Date(Number(t)); return `${String(d.getUTCD
 // Переписанная история: сравниваем ТЕ ЖЕ метки времени в старом и новом ряду. Точки от
 // последней запомненной и новее не считаются — последняя точка суток ещё формируется, её
 // изменение это ход рынка, а не ревизия.
+// Порог значимости пересмотра точки, в процентах от её величины (перенесён из 838, где выведен из
+// 38 сообщений за 19.07–10.10.2026: у 22 наибольший сдвиг был меньше 0,1 %, и сообщение печатало два
+// одинаковых числа). У этой панели та же пыль у рядов в миллиардах долларов: резервы, TGA, RRP.
+const REVISION_MIN_PCT = 0.1;
+// Доля переписанных точек, начиная с которой это уже не пересмотр, а другой ряд целиком.
+const WHOLESALE_SHARE = 0.5;
+
+// Край окна тоже не сравнивается: самая старая точка нового ряда. Страница считает ряды по окну
+// источника, и первая точка окна бывает неполной — у SRF окно «последние 6 операций», и при сдвиге
+// окна самый старый день теряет утреннюю операцию (22.10.2026 «0,011 → 0 (−100%)» за 19.10, 23.10 то же
+// за 20.10). У длинных рядов это точка полугодовой давности, и её пересмотр ничего не стоит.
 function seriesRevisions(wasPoints, curPoints) {
-  if (!wasPoints || !curPoints) return [];
+  const out = { changed: [], compared: 0, dust: 0 };
+  if (!wasPoints || !curPoints) return out;
   const frontier = Math.max(...Object.keys(wasPoints).map(Number));
-  const changed = [];
+  const edge = Math.min(...Object.keys(curPoints).map(Number));
   for (const [tRaw, oldV] of Object.entries(wasPoints)) {
     const t = Number(tRaw);
-    if (!finite(t) || t >= frontier) continue;
+    if (!finite(t) || t >= frontier || t <= edge) continue;
     const newV = curPoints[tRaw];
     if (!finite(newV) || !finite(oldV)) continue;
+    out.compared++;
     const scale = Math.max(Math.abs(oldV), Math.abs(newV), 1e-12);
     if (Math.abs(newV - oldV) <= scale * 1e-9) continue;
-    changed.push({ t, before: oldV, after: newV, pct: oldV === 0 ? null : ((newV / oldV - 1) * 100) });
+    const top = Math.max(Math.abs(oldV), Math.abs(newV));
+    if ((Math.abs(newV - oldV) / top) * 100 < REVISION_MIN_PCT) { out.dust++; continue; }
+    // Процент — от МОДУЛЯ прежнего значения: у отрицательных величин «новое/старое − 1» давало
+    // перевёрнутый знак (NFCI −0,49 → −0,48 печатался «−2,0%», SOFR−IORB −3 → −28 — «+833%»).
+    out.changed.push({ t, before: oldV, after: newV, pct: oldV === 0 ? null : ((newV - oldV) / Math.abs(oldV)) * 100 });
   }
-  changed.sort((a, b) => a.t - b.t);
-  return changed;
+  out.changed.sort((a, b) => a.t - b.t);
+  return out;
+}
+
+// Сменился ли поставщик данных между прогонами. Своего поля «источник набора» у снимка этой панели нет,
+// зато есть то, от чего страница уходит на резерв: ключи, которые сервер не смог обновить (failed), и
+// ключи из старого кэша (stale_keys). Отсутствие ключа — «в порядке». 22.10.2026 13:08 fx:JPY упал по
+// таймауту, страница взяла курс иены из FRED H.10 вместо фиксинга ЕЦБ, и весь ряд «переписался».
+function providersSwitched(was, cur) {
+  if (!was || !cur) return false;
+  for (const k of new Set([...Object.keys(was), ...Object.keys(cur)])) if ((was[k] || "ok") !== (cur[k] || "ok")) return true;
+  return false;
 }
 
 // Названия детекторов у панелей внутренние («Слом маржинального спроса»); наружу идёт то же
@@ -1371,8 +1407,11 @@ function diff(prevState, panel) {
   const releaseGroups = [];
   const revisedSeries = [];
   const bounced = [];
+  const switched = [];
+  let dust = 0;
   const seenRevised = prevState.revised_points || {};
   const prevInd = prevState.indicators || {};
+  const providerSwitch = providersSwitched(prevState.providers, panel.providers);
 
   // Изменения внутри панели (вердикт, зоны показателей, детекторы) сами по себе НЕ рассылаются:
   // это внутренняя кухня. Они собираются как объяснение к единственному внешнему событию о самой
@@ -1448,7 +1487,20 @@ function diff(prevState, panel) {
     // Наблюдение из прода: mempool.space пересчитывает оценку хешрейта за один и тот же день
     // туда-обратно между двумя значениями. Возврат к уже показанному значению — не новость,
     // а качок источника, поэтому такие точки отсеиваются (факт остаётся в логе).
-    const rewritten = (HUMAN[i.id]?.quiet || i.unlisted ? [] : seriesRevisions(was.points, i.points)).filter((c) => {
+    if (HUMAN[i.id]?.quiet || i.unlisted) continue;
+    const rev = seriesRevisions(was.points, i.points);
+    dust += rev.dust;
+    if (!rev.changed.length) continue;
+    // Смена источника — не пересмотр. Страница, уйдя на резерв, отдаёт ДРУГОЙ ряд, и сравнение точек
+    // выдавало это за «первоисточник переписал уже опубликованные данные». Признаки: у карточки сменилась
+    // строка источника либо в такт смены поставщика (см. providersSwitched) ряд переписан целиком.
+    const sourceMoved = !!(i.source && was.source && i.source !== was.source);
+    const wholesale = rev.compared >= 6 && rev.changed.length / rev.compared >= WHOLESALE_SHARE;
+    if (sourceMoved || (wholesale && providerSwitch)) {
+      switched.push(`${i.name}: ${sourceMoved ? `${sourceLabel(was.source)} → ${sourceLabel(i.source)}` : "сменился поставщик данных"}, точек с другим значением: ${rev.changed.length}`);
+      continue;
+    }
+    const rewritten = rev.changed.filter((c) => {
       const seen = seenRevised[`${i.id}|${c.t}`]?.v;
       if (Array.isArray(seen) && seen.some((v) => sameNum(v, c.after))) {
         bounced.push(`${i.name} за ${ruDay(c.t)}: значение вернулось к ранее показанному`);
@@ -1596,6 +1648,11 @@ function diff(prevState, panel) {
     console.log(`качки источника (в рассылку не идут): ${bounced.length}`);
     for (const b of bounced) console.log(`  · ${b}`);
   }
+  if (switched.length) {
+    console.log(`смена источника ряда (не пересмотр, в рассылку не идёт): ${switched.length}`);
+    for (const s of switched) console.log(`  · ${s}`);
+  }
+  if (dust) console.log(`пересчёт истории меньше ${String(REVISION_MIN_PCT).replace(".", ",")} % (в рассылку не идёт): точек ${dust}`);
 
   // ---- Доля капитала: что стало, почему и насколько это устойчиво ----
   if (allocMoved) {
@@ -2794,6 +2851,8 @@ function snapshotState(panel) {
     indicators,
     detectors,
     revisions: panel.revisions || [],
+    // поставщики данных этого прогона — база для providersSwitched (смена источника ≠ пересмотр)
+    ...(panel.providers ? { providers: panel.providers } : {}),
   };
 }
 

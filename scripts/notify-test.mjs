@@ -560,8 +560,8 @@ const withPoints = (pts, o = {}) => ind({ series: undefined, points: pts, ...o }
 const day = (iso) => Date.parse(iso + "T00:00:00Z");
 
 test("переписанная точка ряда показывается с датой и «было → стало»", () => {
-  const before = stateOf(panelOf([withPoints({ [day("2026-05-27")]: 100, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]));
-  const after = panelOf([withPoints({ [day("2026-05-27")]: 115, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]);
+  const before = stateOf(panelOf([withPoints({ [day("2026-05-26")]: 90, [day("2026-05-27")]: 100, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]));
+  const after = panelOf([withPoints({ [day("2026-05-26")]: 90, [day("2026-05-27")]: 115, [day("2026-05-28")]: 110, [day("2026-05-29")]: 120 })]);
   const ev = diff(before, after);
   assert.equal(ev.length, 1);
   assert.equal(ev[0].kind, "revision");
@@ -601,7 +601,7 @@ test("дребезг последнего знака не выдаётся за 
 });
 
 test("возврат точки к уже показанному значению — не сообщение, а качок источника", () => {
-  const pts = (v) => ({ [day("2026-05-27")]: v, [day("2026-05-28")]: 200, [day("2026-05-29")]: 300 });
+  const pts = (v) => ({ [day("2026-05-26")]: 50, [day("2026-05-27")]: v, [day("2026-05-28")]: 200, [day("2026-05-29")]: 300 });
   const s0 = stateOf(panelOf([withPoints(pts(100))]));
   const first = diff(s0, panelOf([withPoints(pts(115))]));
   assert.equal(first.length, 1, "первый пересмотр показывается");
@@ -615,6 +615,61 @@ test("возврат точки к уже показанному значени�
   assert.equal(diff(s2, panelOf([withPoints(pts(130))])).length, 1, "новое, ещё не показанное значение — событие");
 });
 
+test("пересчёт отрицательного ряда печатает знак по сути: −0,49 → −0,48 — это рост, −3 → −28 — падение", () => {
+  // NFCI и SOFR−IORB отрицательны; «новое/старое − 1» переворачивало знак: −0,49 → −0,48 выходило «−2,0%».
+  const pts = (a, b) => ({ [day("2026-10-01")]: -0.5, [day("2026-10-08")]: a, [day("2026-10-15")]: b, [day("2026-10-22")]: -0.47 });
+  const ev = diff(stateOf(panelOf([withPoints(pts(-0.49, -0.45))])), panelOf([withPoints(pts(-0.48, -0.45))]));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].moves[0].delta, "+2,0%", "−0,49 → −0,48 — рост на 2 %, а не падение");
+  const ev2 = diff(stateOf(panelOf([withPoints(pts(-3, -1))])), panelOf([withPoints(pts(-28, -1))]));
+  assert.equal(ev2[0].moves[0].delta, "−833,3%");
+});
+
+test("пересмотр меньше 0,1 % — пыль, в рассылку не идёт", () => {
+  // Ряды в миллиардах долларов (резервы, TGA, RRP) пересчитываются в последнем знаке: сообщение печатало
+  // два одинаковых числа «3,177·10^11 → 3,177·10^11».
+  const pts = (v) => ({ [day("2026-10-01")]: 3.1e11, [day("2026-10-08")]: v, [day("2026-10-15")]: 3.2e11 });
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let ev;
+  try { ev = diff(stateOf(panelOf([withPoints(pts(3.1771e11))])), panelOf([withPoints(pts(3.1769e11))])); } finally { console.log = realLog; }
+  assert.equal(ev.length, 0);
+  assert.ok(logs.some((l) => /меньше 0,1 %.*точек 1/.test(l)), `пыль обязана остаться в логе: ${logs}`);
+  assert.equal(diff(stateOf(panelOf([withPoints(pts(3.1771e11))])), panelOf([withPoints(pts(3.19e11))])).length, 1, "0,4 % — уже пересмотр");
+});
+
+test("самая старая точка нового ряда — край окна, не пересмотр (SRF: «последние 6 операций»)", () => {
+  // 22.10.2026: у SRF окно из 6 операций (две в день); при сдвиге окна самый старый день теряет утреннюю
+  // операцию, и выходило «0,011 → 0 (−100%)» за 19.10.
+  const before = stateOf(panelOf([withPoints({ [day("2026-10-19")]: 0.011, [day("2026-10-20")]: 0.067, [day("2026-10-21")]: 0 })]));
+  const after = panelOf([withPoints({ [day("2026-10-19")]: 0, [day("2026-10-20")]: 0.067, [day("2026-10-21")]: 0, [day("2026-10-22")]: 0 })]);
+  assert.equal(diff(before, after).length, 0);
+  // точка внутри окна по-прежнему сравнивается
+  const inner = panelOf([withPoints({ [day("2026-10-19")]: 0.011, [day("2026-10-20")]: 5, [day("2026-10-21")]: 0, [day("2026-10-22")]: 0 })]);
+  assert.equal(diff(before, inner).length, 1);
+});
+
+test("смена поставщика — не пересмотр: ряд целиком другой в такт сбоя ключа снимка", () => {
+  // 22.10.2026 13:08: fx:JPY упал по таймауту, страница взяла курс из FRED H.10, и «переписался» весь ряд иены.
+  const base = {}, other = {};
+  for (let d = 1; d <= 12; d++) { base[day(`2026-10-${String(d).padStart(2, "0")}`)] = 150 + d; other[day(`2026-10-${String(d).padStart(2, "0")}`)] = 150.6 + d; }
+  other[day("2026-10-01")] = base[day("2026-10-01")];
+  const was = stateOf(panelOf([withPoints(base, { id: "jpy" })], { providers: {} }));
+  const logs = [];
+  const realLog = console.log;
+  console.log = (...a) => logs.push(a.join(" "));
+  let ev;
+  try { ev = diff(was, panelOf([withPoints(other, { id: "jpy" })], { providers: { "fx:JPY": "failed" } })); } finally { console.log = realLog; }
+  assert.equal(ev.length, 0, "резервный источник — не «первоисточник переписал данные»");
+  assert.ok(logs.some((l) => /смена источника ряда/.test(l)), "факт смены остаётся в логе");
+  // тот же ряд целиком без смены поставщика — пересмотр (NFCI переоценивает всю историю каждую среду)
+  assert.equal(mute(() => diff(was, panelOf([withPoints(other, { id: "jpy" })], { providers: {} }))).length, 1);
+  // смена поставщика без переписанного целиком ряда пересмотр не глушит
+  const one = { ...base, [day("2026-10-05")]: 170 };
+  assert.equal(mute(() => diff(was, panelOf([withPoints(one, { id: "jpy" })], { providers: { "fx:JPY": "failed" } }))).length, 1);
+});
+
 test("память о показанных значениях протухает и не растёт бесконечно", () => {
   const now = Date.parse("2026-07-24T00:00:00Z");
   const old = { "x|1": { v: [1], at: "2026-01-01T00:00:00Z" }, "x|2": { v: [2], at: "2026-07-20T00:00:00Z" } };
@@ -626,8 +681,8 @@ test("память о показанных значениях протухает
 });
 
 test("крупные и мелкие порядки печатаются читаемо", () => {
-  const before = stateOf(panelOf([withPoints({ [day("2026-05-27")]: 7.31e20, [day("2026-05-28")]: 1 })]));
-  const ev = diff(before, panelOf([withPoints({ [day("2026-05-27")]: 8.36e20, [day("2026-05-28")]: 1 })]));
+  const before = stateOf(panelOf([withPoints({ [day("2026-05-26")]: 7e20, [day("2026-05-27")]: 7.31e20, [day("2026-05-28")]: 1 })]));
+  const ev = diff(before, panelOf([withPoints({ [day("2026-05-26")]: 7e20, [day("2026-05-27")]: 8.36e20, [day("2026-05-28")]: 1 })]));
   assert.match(ev[0].moves[0].before, /10\^20/, "хешрейт обязан читаться, а не тянуться двадцатью нулями");
   assert.equal(ev[0].moves[0].delta, "+14,4%");
 });
@@ -1223,14 +1278,14 @@ test("каноническое решение передаёт закрытия 
 /* ---- v5.2.3: плитки вердикта со знаком «−» — настоящее извлечение со страницы на подставном DOM ---- */
 
 // Исполняется ТОТ ЖЕ текст PAGE_EXTRACTOR, что уходит в Chrome; глобали страницы подставлены параметрами.
-const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {} }) => {
+const extractFrom = ({ tiles, dom = {}, decision, strip = "доля акций сейчас 50% · держите половину нормы", ind = [], data = {}, snap = null }) => {
   const els = {
     ...Object.fromEntries(Object.entries(dom).map(([id, t]) => [id, { textContent: t }])),
     actionStrip: { innerText: strip, querySelector: (s) => (s === ".as-pct" ? { textContent: "50%" } : null) },
   };
   const document = { getElementById: (id) => els[id] || null };
   const state = { data, lastSnapGen: "2026-10-27T17:46:00Z", ...(tiles ? { tiles } : {}), ...(decision ? { decision } : {}) };
-  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], null, undefined);
+  return new Function("document", "IND", "state", "DETECTORS", "SNAP", "fredCached", "return " + PAGE_EXTRACTOR)(document, ind, state, [], snap, undefined);
 };
 const TILES = { score: "+0", lead: "-7", coin: "+35", det: "-19" };
 const EXTRA = "опережающие -7 · подтверждающие +35 · детекторы -19";
@@ -1270,6 +1325,12 @@ test("v5.3: карточка с notify:false уведомителю не вид�
   const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), ind, data });
   assert.deepEqual(out.indicators.map((i) => i.id), ["cot_es", "hy"]);
   assert.deepEqual(out.indicators.map((i) => i.voting), [false, true]);
+});
+
+test("извлечение со страницы отдаёт поставщиков: сбойные и устаревшие ключи снимка", () => {
+  const out = extractFrom({ dom: { vWord: "РИСК УМЕРЕННЫЙ" }, decision: decisionOf({ rung: 1 }), ind: [], data: {},
+    snap: { failed: ["fx:JPY — The operation was aborted due to timeout"], stale_keys: { "fred:NFCI": 3 }, responses: {} } });
+  assert.deepEqual(out.providers, { "fx:JPY": "failed", "fred:NFCI": "stale" });
 });
 
 test("проверка связи называет долю в долях нормы", () => {
