@@ -753,8 +753,15 @@ function allocationFromDecision(dec) {
     since: isDay(dec.memory?.since) ? dec.memory.since : isDay(dec.since) ? dec.since : "",
     dataAsOf: isDay(dec.dataAsOf) ? dec.dataAsOf : "",
     action: typeof dec.action === "string" ? dec.action : "",
+    // v5.5: поправка владельца — только пока включена (выключенная не меняет ни байта состояния и сообщений)
+    ...(dec.owner && (dec.owner.cap === 0 || dec.owner.cap === 50) ? { owner: { cap: dec.owner.cap, since: dec.owner.since || "", until: dec.owner.until || "",
+      reason: String(dec.owner.reason || ""), eff: finite(dec.owner.eff) ? dec.owner.eff : null, limiting: !!dec.owner.limiting } } : {}),
   };
 }
+// v5.5: строка о поправке владельца для сообщений — обе доли и срок
+const ownerText = (a) => a?.owner
+  ? `Поправка владельца: держите не больше ${a.owner.cap}% нормы до ${ruDay(Date.parse(a.owner.until))}${a.owner.reason ? ` (${a.owner.reason})` : ""}; доля модели — ${a.pct}%`
+  : "";
 
 // С чем сравнивать каноническую ступень. Первым — с тем, что уже ОБЪЯВЛЕНО (база состояния
 // уведомлений сдвигается только после удачной рассылки): если Telegram упал, а журнал успел
@@ -841,6 +848,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
         .map((k) => [k, finite(funds?.[k]) && funds[k] > 0 ? round(funds[k], 2) : old?.[k]])
         .filter(([, v]) => finite(v))),
       p: round(dec.tail?.p, 3),
+      ...(dec.owner && (dec.owner.cap === 0 || dec.owner.cap === 50) ? { o: dec.owner.cap } : {}),   // v5.5: поправка владельца в эту сессию
     };
     if (dets && dets.x) {
       row.x = mergeDetX(old?.x, dets.x);
@@ -856,7 +864,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
     const material = !old || old.r !== row.r || old.g !== row.g || !finite(old.c) || Math.abs(old.c - row.c) >= 1
       || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null)
       || Object.keys(DIARY_FUNDS).some((k) => !finite(old[k]) && finite(row[k]))
-      || ["x", "xc", "xb"].some((k) => (old[k] || "") !== (row[k] || ""));
+      || ["x", "xc", "xb"].some((k) => (old[k] || "") !== (row[k] || "")) || old.o !== row.o;
     if (material) {
       diary = diary.filter((x) => x.d !== row.d);
       diary.push(row);
@@ -870,7 +878,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
     snapshot_at: snapshotAt || "",
     dataAsOf: isDay(dec.dataAsOf) ? dec.dataAsOf : "",
     memory: mem,
-    decision: pick(dec, ["regime", "regimeWord", "rung", "pct", "raw", "composite", "lead", "coin", "tail", "override", "frozen"]),
+    decision: pick(dec, ["regime", "regimeWord", "rung", "pct", "raw", "composite", "lead", "coin", "tail", "override", "frozen", "owner"]),
     transitions: transitions.slice(-LEDGER_TRANSITIONS_MAX),
     diary: diary.slice(-LEDGER_DIARY_MAX),
   };
@@ -1596,6 +1604,7 @@ function diff(prevState, panel) {
             regimeTo ? `Режим: ${regimeFrom && regimeFrom !== regimeTo ? `${regimeFrom} → ` : ""}${regimeTo}` : "",
             curAlloc.action,
             `доля стратегической нормы акций${curAlloc.dataAsOf ? ` · по данным торговой сессии ${ruDay(Date.parse(curAlloc.dataAsOf))}` : ""}`,
+            ownerText(curAlloc),
           ].filter(Boolean).join("\n")
         : "",
       causes,
@@ -1626,6 +1635,24 @@ function diff(prevState, panel) {
         note: d.note || "",
       });
     }
+  }
+  // v5.5: поправка владельца включена, изменена, снята или истекла — меняется доля, которую держит владелец.
+  // Пока поправки нет ни в прошлом, ни в нынешнем состоянии, событий нет (вывод прежний).
+  const po = prevState.allocation?.owner || null, co = curAlloc?.owner || null;
+  if (curAlloc && (po || co) && (!po !== !co || po.cap !== co.cap || po.until !== co.until || po.since !== co.since)) {
+    const day = new Date(Date.parse(stamp) || Date.now()).toISOString().slice(0, 10);
+    const effOf = (o) => (o && finite(o.eff) ? o.eff : curAlloc.pct);
+    events.push({
+      kind: "allocation",
+      key: co ? `owner:${co.cap}@${co.since}..${co.until}` : `owner:off@${po.since}..${po.until}`,
+      title: co ? "Поправка владельца включена" : po && day > po.until ? "Поправка владельца истекла" : "Поправка владельца снята",
+      before: `${effOf(po)}% нормы`,
+      after: `${co ? effOf(co) : curAlloc.pct}% нормы`,
+      detail: co ? ownerText(curAlloc) : `Действует доля модели — ${curAlloc.pct}% нормы`,
+      causes: [],
+      stability: [],
+      note: "",
+    });
   }
   events.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
   return events;
@@ -2156,6 +2183,7 @@ function pingMessage(panel) {
     panel.allocation && finite(panel.allocation.pct)
       ? `Доля ${panel.assetWord || "рискового актива"} сейчас: <b>${panel.allocation.pct}%</b>${panel.allocation.canonical ? " стратегической нормы" : ""}`
       : "",
+    ownerText(panel.allocation),
     `Показателей под наблюдением: ${(panel.indicators || []).length}`,
     det.length ? `Детекторы не в покое: ${esc(det.map((d) => `${d.name} (${DET_LABEL[d.state] || d.state})`).join(", "))}` : "Все детекторы спокойны",
   ]

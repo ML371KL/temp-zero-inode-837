@@ -22,6 +22,7 @@ on:
       - "scripts/breakdown-test.mjs"
       - "scripts/households-test.mjs"
       - "scripts/episodes-test.mjs"
+      - "scripts/owner-test.mjs"
       - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
@@ -93,6 +94,11 @@ jobs:
         # Ядро ⟦EPISODES-CORE⟧ исполняется из страницы: эпизоды по полю x дневника (максимум за сессию), пик,
         # компании, S&P через 21 и 63 сессии по закрытиям дневника, восстановленный эпизод капекса октября. Без сети.
         run: node scripts/episodes-test.mjs
+
+      - name: Проверить поправку владельца
+        # Ядро ⟦OWNER-CORE⟧ из страницы: форма docs/owner.json (cap 0|50, срок), min(модель, cap), ±X п.п. к модели по
+        # закрытиям дневника; файл в репозитории — выключенная поправка {"cap":null}. Без сети.
+        run: node scripts/owner-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,

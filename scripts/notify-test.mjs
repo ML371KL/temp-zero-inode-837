@@ -737,6 +737,47 @@ test("v5.4.1: извлечение со страницы несёт компан
   assert.deepEqual(out.detectors.map((d) => [d.id, d.state, d.co]), [["d_capex", "fired", ["MSFT/cut", "META/dc"]], ["d_oil", "watch", null]]);
 });
 
+test("v5.5: поправка владельца выключена — доля, журнал и сообщения прежние", () => {
+  const dec = decisionOf({ rung: 2, since: "2026-11-03", dataAsOf: "2026-11-03" });
+  assert.ok(!("owner" in allocationFromDecision(dec)), "в доле нет поля owner");
+  const l = buildLedger(ledgerAt(2), dec, { spx: 7700, now: 0 });
+  assert.ok(!("o" in l.diary.find((x) => x.d === "2026-11-03")), "в дневнике нет поля o");
+  assert.ok(!("owner" in l.decision), "в сводке журнала нет owner");
+  const base = stateOf(canonPanel(decisionOf({ rung: 2 })).panel);
+  const { panel: p } = canonPanel(decisionOf({ rung: 2, since: "2026-10-01" }), ledgerAt(2, "2026-10-01"));
+  assert.equal(diff({ ...base, ledger: ledgerAt(2, "2026-10-01") }, p).filter((e) => /Поправка владельца/.test(e.title)).length, 0);
+  assert.ok(!/Поправка владельца/.test(pingMessage(p)));
+});
+
+test("v5.5: поправка владельца включена — обе доли, срок, поле o, событие включения и истечения", () => {
+  const own = { cap: 50, since: "2026-11-02", until: "2026-11-20", reason: "отчёты гиперскейлеров", eff: 50, limiting: true, delta: -0.8 };
+  const dec = decisionOf({ rung: 2, since: "2026-10-29", dataAsOf: "2026-11-03", owner: own });
+  const a = allocationFromDecision(dec);
+  assert.deepEqual(a.owner, { cap: 50, since: "2026-11-02", until: "2026-11-20", reason: "отчёты гиперскейлеров", eff: 50, limiting: true });
+  assert.equal(a.pct, 100, "доля модели не меняется");
+  const l = buildLedger(ledgerAt(2), dec, { spx: 7700, now: 0 });
+  assert.equal(l.diary.find((x) => x.d === "2026-11-03").o, 50);
+  assert.equal(l.decision.owner.cap, 50);
+  // включение: прошлое состояние без поправки
+  const prevNo = stateOf(canonPanel(decisionOf({ rung: 2, since: "2026-10-29", dataAsOf: "2026-11-02" }), ledgerAt(2, "2026-10-29")).panel);
+  const { panel: pOn } = canonPanel(dec, ledgerAt(2, "2026-10-29"));
+  const on = diff({ ...prevNo, ledger: ledgerAt(2, "2026-10-29") }, pOn).filter((e) => /Поправка владельца/.test(e.title));
+  assert.equal(on.length, 1);
+  assert.deepEqual([on[0].title, on[0].before, on[0].after], ["Поправка владельца включена", "100% нормы", "50% нормы"]);
+  assert.match(on[0].detail, /не больше 50% нормы до 20\.11\.2026 \(отчёты гиперскейлеров\); доля модели — 100%/);
+  assert.match(renderMessage(on[0], "к"), /Поправка владельца включена/);
+  assert.match(pingMessage(pOn), /доля модели — 100%/);
+  // повтор того же состояния — тишина; истечение — событие «истекла», действует доля модели
+  assert.equal(diff({ ...stateOf(pOn), ledger: ledgerAt(2, "2026-10-29") }, pOn).filter((e) => /Поправка/.test(e.title)).length, 0);
+  const { panel: pOff } = canonPanel(decisionOf({ rung: 2, since: "2026-10-29", dataAsOf: "2026-11-23" }), ledgerAt(2, "2026-10-29"));
+  const off = diff({ ...stateOf(pOn), ledger: ledgerAt(2, "2026-10-29") }, pOff).filter((e) => /Поправка владельца/.test(e.title));
+  assert.deepEqual([off[0].title, off[0].before, off[0].after], ["Поправка владельца истекла", "50% нормы", "100% нормы"]);
+  // смена доли модели при включённой поправке — в сообщении обе доли
+  const { panel: pMove } = canonPanel(decisionOf({ rung: 1, since: "2026-11-04", dataAsOf: "2026-11-04", owner: { ...own, eff: 50, limiting: false } }), ledgerAt(2, "2026-10-29"));
+  const mv = allocEvents(diff({ ...stateOf(pOn), ledger: ledgerAt(2, "2026-10-29") }, pMove)).find((e) => /Доля акций/.test(e.title));
+  assert.match(mv.detail, /Поправка владельца: держите не больше 50% нормы до 20\.11\.2026/);
+});
+
 test("первый канонический прогон без журнала — база, а не сообщение", () => {
   const legacy = stateOf(panelOf([ind({})], { allocation: { pct: 85 } }));
   const { panel: p } = canonPanel(decisionOf({ rung: 2 }));

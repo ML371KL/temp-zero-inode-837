@@ -70,6 +70,9 @@ const slimFred=(s,j)=>{ if(SLIM_FRED.has(s)&&j&&Array.isArray(j.observations))
    на сервере; страница читает их из снимка по ключам cftc:es и cboe:cor1m (см. snapKey в index.html). */
 const CFTC_ES_URL="https://publicreporting.cftc.gov/resource/6dca-aqww.json?market_and_exchange_names=E-MINI%20S%26P%20500%20-%20CHICAGO%20MERCANTILE%20EXCHANGE&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170&$select=report_date_as_yyyy_mm_dd,open_interest_all,noncomm_positions_long_all,noncomm_positions_short_all";
 const CBOE_COR1M_URL="https://cdn.cboe.com/api/global/us_indices/daily_prices/COR1M_History.csv";
+/* v5.5: избыточная премия облигаций ФРС (EBP, Gilchrist–Zakrajšek) — месячный CSV с 1973 года, лаг ~месяц.
+   В снимок — только [дата, ebp] (~15 КБ); справка к карточке расслоения кредита, в балл не идёт */
+const FRB_EBP_URL="https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv";
 /* ленивые резервы — добираются, если упал первичный путь */
 /* v5.0: резерв SRF — RPONTTLD (все виды обеспечения), а не RPONTSYD (только казначейские): в стрессовые
    дни заметная часть обращений идёт под MBS — 31.10.2025 это 50,35 против 29,4 млрд */
@@ -177,6 +180,7 @@ function valid(key,j){
   if(key.startsWith("ypx:"))    return Array.isArray(j)&&j.length>=150&&j.every(r=>Array.isArray(r)&&r.length===3&&r[1]>0); /* v5.0: год дневных закрытий */
   if(key.startsWith("yix:"))    return Array.isArray(j)&&j.length>=260&&j.every(r=>Array.isArray(r)&&r.length===3&&r[0]>0&&r[1]>0&&r[2]>0); /* v5.1: ≥260 сессий — 52-нед. максимум и 200-дневная */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
+  if(key==="frb:ebp")           return Array.isArray(j)&&j.length>=400&&j.every(r=>Array.isArray(r)&&r.length===2&&/^\d{4}-\d{2}-\d{2}$/.test(r[0])&&Number.isFinite(r[1])); /* v5.5: ≥400 месяцев */
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
   return true;
 }
@@ -216,6 +220,14 @@ async function main(){
     const t=String(await getTEXT(CBOE_COR1M_URL)).trim();
     const lines=t.split(/\r?\n/);                       /* полная история с 2006 — ~5 200 строк; в снимке держим ~1,5 года */
     return [lines[0],...lines.slice(-400)].join("\n");
+  });
+
+  await put("frb:ebp",async()=>{
+    const lines=String(await getTEXT(FRB_EBP_URL)).trim().split(/\r?\n/);
+    const h=lines[0].split(",").map(x=>x.trim().toLowerCase()), di=h.indexOf("date"), ei=h.indexOf("ebp");
+    if(di<0||ei<0) throw new Error("нет колонок date/ebp");
+    return lines.slice(1).map(l=>{const c=l.split(",");return [String(c[di]||"").trim(),+(+c[ei]).toFixed(4)];})
+      .filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r[0])&&Number.isFinite(r[1]));
   });
 
   /* ── Крипто/золото: CoinGecko, резерв Binance ── */

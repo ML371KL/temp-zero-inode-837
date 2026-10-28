@@ -169,6 +169,38 @@ try {
     assert.match(r.inputs, /^отступление: фактов \d+/, "строка детектора начинается с отступлений");
     console.log("      капекс:", r.st, r.pts, "·", r.inputs.replace(/\s+/g, " ").slice(0, 160));
   });
+  await test("v5.5: поправка владельца — выключенная не меняет вывода, включённая: min(модель, cap), модель прежняя", async () => {
+    const r = await page.evaluate(() => {
+      const strip = () => document.getElementById("actionStrip").innerHTML;
+      const snapDec = () => JSON.stringify(buildSnapshot().decision);
+      const cfg0 = state.ownerCfg;
+      const fileOff = { dec: JSON.stringify(state.decision), strip: strip(), ai: snapDec(), cfg: JSON.stringify(cfg0) };
+      state.ownerCfg = null; compute();
+      const noFile = { dec: JSON.stringify(state.decision), strip: strip(), ai: snapDec() };
+      const day = etToday(), sh = n => new Date(Date.parse(day + "T12:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+      state.ownerCfg = { cap: 50, since: sh(-10), until: sh(10), reason: "тест поправки" }; compute();
+      const on = { owner: state.decision.owner, pct: state.decision.pct, rung: state.decision.rung, memory: JSON.stringify(state.decision.memory),
+        composite: state.decision.composite, strip: document.getElementById("actionStrip").innerText, ai: buildSnapshot().decision.owner_override || "" };
+      state.ownerCfg = { cap: 50, since: sh(-20), until: sh(-1), reason: "истекла" }; compute();
+      const expired = !("owner" in state.decision);
+      state.ownerCfg = cfg0; compute();
+      return { fileOff, noFile, on, expired, back: JSON.stringify(state.decision) === fileOff.dec };
+    });
+    assert.equal(r.fileOff.cfg, JSON.stringify({ cap: null }), "docs/owner.json — выключенная поправка");
+    assert.ok(!JSON.parse(r.fileOff.dec).owner && !/Вы держите/.test(r.fileOff.strip) && !/owner_override/.test(r.fileOff.ai), "выключенная поправка — полей нет");
+    assert.equal(r.noFile.dec, r.fileOff.dec, "решение побайтно то же, что без файла");
+    assert.equal(r.noFile.strip, r.fileOff.strip, "полоса доли побайтно та же");
+    assert.equal(r.noFile.ai, r.fileOff.ai, "ИИ-снимок решения побайтно тот же");
+    assert.equal(r.on.owner.eff, Math.min(r.on.pct, 50), "действующая доля = min(модель, cap)");
+    assert.equal(r.on.owner.limiting, r.on.pct > 50);
+    assert.equal(r.on.pct, JSON.parse(r.fileOff.dec).pct, "доля модели не меняется");
+    assert.equal(r.on.memory, JSON.stringify(JSON.parse(r.fileOff.dec).memory), "память ступени не меняется");
+    assert.equal(r.on.composite, JSON.parse(r.fileOff.dec).composite, "балл не меняется");
+    if (r.on.owner.limiting) assert.match(r.on.strip, /Вы держите 50% — поправка до \d\d\.\d\d: тест поправки\. С \d\d\.\d\d: [+−]?\d+,\d п\.п\. к модели \(модель — 100%\)/);
+    assert.match(r.on.ai, /поправка владельца: держать не больше 50%/);
+    assert.ok(r.expired, "истёкшая поправка выключена");
+    assert.ok(r.back, "после возврата файла решение прежнее");
+  });
   await test("полосы блоков: Σ пунктов + детекторы = общий балл, баллы блоков = плашкам разделов", async () => {
     const r = await page.evaluate(() => {
       const bd = state.breakdown, el = document.getElementById("blockBars");
