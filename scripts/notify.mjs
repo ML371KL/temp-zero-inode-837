@@ -1010,12 +1010,20 @@ function canonicalize(panel, prevLedger, { snapshotAt = "", spx = null, funds = 
 const KIND = {
   allocation: { emoji: "🎯", label: "изменение доли капитала" },
   risk: { emoji: "⚠️", label: "сигнал риска" },
+  service: { emoji: "🛠", label: "служебное сообщение" },
   release: { emoji: "📊", label: "вышли новые данные" },
   revision: { emoji: "♻️", label: "пересмотр опубликованных данных" },
 };
 
 // Порядок важен: сначала то, что меняет вывод, потом то, что его питает.
-const KIND_ORDER = ["allocation", "risk", "release", "revision"];
+const KIND_ORDER = ["allocation", "risk", "service", "release", "revision"];
+// Служебное сообщение короткое и самодостаточное: разбор модели ему не нужен.
+const NO_COMMENT = new Set(["service"]);
+// Что идёт в осторожном режиме, когда тесты уведомлений не прошли (см. main): смена доли и сигналы
+// риска — их мало, и ключ каждого привязан к моменту события. Публикации и пересмотры, где ошибка
+// кода способна дать лавину, придерживаются.
+const SAFE_KINDS = new Set(["allocation", "risk"]);
+const SELFTEST_ALERT_EVERY_MS = 24 * 3600 * 1000;
 
 const DET_LABEL = { calm: "спокоен", watch: "наблюдение", fired: "СРАБОТАЛ", good: "подтверждён" };
 
@@ -1820,6 +1828,7 @@ function templateComment(ev) {
   if (ev.kind === "revision") {
     return "Первоисточник переписал уже опубликованные данные задним числом: картина прошлого изменилась, хотя новых событий не происходило.";
   }
+  if (NO_COMMENT.has(ev.kind)) return "";
   // Разбора от модели нет — значит и осмысления не будет. Честнее дать короткую справку о
   // смысле показателя и прямо сказать, что разбор недоступен, чем выдавать словарное определение
   // за анализ. Формулировка «Что это за показатель» из первой версии была именно этой ошибкой:
@@ -1856,8 +1865,11 @@ function renderMessage(ev, comment) {
     stability ? `\n<b>Насколько это устойчиво</b>\n${stability}` : "",
   ].filter(Boolean);
   if (ev.indicator?.observed_at) lines.push(`<i>данные на ${esc(ev.indicator.observed_at)}${ev.indicator.source ? " · " + esc(ev.indicator.source) : ""}</i>`);
-  lines.push("");
-  lines.push("💬 " + esc(comment));
+  // служебному сообщению разбор не положен — без пустого «💬»
+  if (comment) {
+    lines.push("");
+    lines.push("💬 " + esc(comment));
+  }
   return clipTelegram(lines.join("\n"));
 }
 
@@ -3047,6 +3059,32 @@ async function main(io = {}) {
   if (all.length !== events.length) console.log(`уже доставлено ранее и пропущено: ${all.length - events.length}`);
   console.log(`событий: ${events.length}`);
 
+  // Осторожный режим: тесты уведомлений в этом прогоне не прошли (исход шага передаёт notify.yml).
+  // Раньше красный тест останавливал весь прогон — и все сообщения, включая смену доли, и запись журнала
+  // решений, единственным писателем которого этот скрипт и является. Теперь журнал пишется как обычно
+  // (выше, до рассылки), смена доли и сигналы риска идут — их мало, и ключ каждого привязан к моменту
+  // события; публикации и пересмотры, где ошибка кода способна дать лавину, не рассылаются, а о самом сбое
+  // раз в сутки приходит служебное сообщение. Без состояния оно не шлётся: помнить «уже сказано» нечем.
+  let queue = events;
+  let selftestAlertAt = prev.selftest_alert_at || "";
+  if ((io.selftest ?? process.env.NOTIFY_SELFTEST) === "failure") {
+    queue = events.filter((ev) => SAFE_KINDS.has(ev.kind));
+    console.log(`тесты уведомлений не прошли — осторожный режим: публикаций и пересмотров не разослано ${events.length - queue.length}`);
+    const lastAt = Date.parse(selftestAlertAt);
+    if (!first && !(finite(lastAt) && now - lastAt < SELFTEST_ALERT_EVERY_MS)) {
+      selftestAlertAt = new Date(now).toISOString();
+      queue = [{
+        kind: "service",
+        key: `selftest@${selftestAlertAt}`,
+        title: "Тесты уведомлений не проходят",
+        before: "",
+        after: "",
+        detail: "Идут только сообщения о смене доли и сигналы риска. Публикации и пересмотры данных не рассылаются, пока тесты не починены. Журнал решений пишется как обычно. Причина — в журнале прогона «Уведомления в Telegram».",
+        note: "",
+      }, ...queue];
+    }
+  }
+
   const trend = appendTrend(prev.alloc_trend, panel);
   const allocChanges = appendChanges(prev.alloc_changes, panel, prev.allocation);
   let baseline = null; // сдвигается один раз в самом конце — до тех пор пишем старую базу
@@ -3060,16 +3098,21 @@ async function main(io = {}) {
   const llmWeek = prev.llm_week && typeof prev.llm_week === "object" && !Array.isArray(prev.llm_week) ? prev.llm_week : {};
   const persist = async () => {
     const state = { ...(baseline || prev), sent: sentIndex, revised_points: revisedSeen, alloc_trend: trend, alloc_changes: allocChanges, rule_notes: ruleNotesSeen, llm_spend: llmSpend, llm_week: llmWeek };
+    if (selftestAlertAt) state.selftest_alert_at = selftestAlertAt;
     if (io.saveState) return io.saveState(state);
     await mkdir(dirname(STATE_PATH), { recursive: true });
     await writeFile(STATE_PATH, JSON.stringify(state, null, 1));
   };
 
   let sent = 0;
-  if (events.length) {
-    const capped = events.slice(0, MAX_EVENTS);
-    if (events.length > MAX_EVENTS) console.log(`ПРЕДОХРАНИТЕЛЬ: событий ${events.length} > ${MAX_EVENTS}, отправляются первые ${MAX_EVENTS} по важности`);
-    const llm = await llmComments(capped, panel, { spend: llmSpend, week: llmWeek });
+  if (queue.length) {
+    const capped = queue.slice(0, MAX_EVENTS);
+    if (queue.length > MAX_EVENTS) console.log(`ПРЕДОХРАНИТЕЛЬ: событий ${queue.length} > ${MAX_EVENTS}, отправляются первые ${MAX_EVENTS} по важности`);
+    // Разбор нужен не всем событиям: служебному сообщению модель не нужна.
+    const ask = capped.map((ev, idx) => ({ ev, idx })).filter((x) => !NO_COMMENT.has(x.ev.kind));
+    const got = ask.length ? await llmComments(ask.map((x) => x.ev), panel, { spend: llmSpend, week: llmWeek }) : null;
+    const llm = got ? new Array(capped.length).fill(null) : null;
+    if (got) ask.forEach((x, k) => { llm[x.idx] = got[k] || null; });
     // Оплаченный запрос — на диск сразу, до рассылки: упавший на Telegram прогон не должен
     // стереть его из суточного расхода. База сравнения при этом не двигается (baseline ещё null).
     await persist();
@@ -3100,7 +3143,7 @@ async function main(io = {}) {
     }
   }
 
-  if (dry) revisedSeen = rememberRevised(revisedSeen, events.filter((e) => e.revisedPoints), now);
+  if (dry) revisedSeen = rememberRevised(revisedSeen, queue.filter((e) => e.revisedPoints), now);
   baseline = snapshotState(panel, prev);
   await persist();
   console.log(dry ? "dry-run: ничего не отправлено, база сравнения обновлена" : `отправлено сообщений: ${sent}`);

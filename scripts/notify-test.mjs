@@ -1758,6 +1758,48 @@ testAsync("внутренняя шкала панели не уходит мод
   ]);
 });
 
+/* ---- осторожный режим: красные тесты не глушат ни смену доли, ни журнал решений (боевая ветка main через io) ---- */
+const mainRun = async ({ state, selftest, panelExtra = {}, value = "2", ledger = ledgerAt(2), dec = decisionOf({ rung: 1, since: "2026-10-01" }) }) => {
+  const out = { sent: [], texts: [], ledger: null, state: null };
+  const panel = panelOf([ind({ value, value_num: Number(value), observed_at: "2026-07-21" })], { source: "page", decision: dec, snapshot_at: "2026-10-01T20:06:00.000Z", ...panelExtra });
+  await quiet(() => withEnv({ ANTHROPIC_API_KEY: undefined, NOTIFY_SELFTEST: undefined }, () => main({
+    panel, ledger, snapshot: null, state, selftest,
+    saveLedger: (l) => { out.ledger = l; },
+    saveState: (s) => { out.state = JSON.parse(JSON.stringify(s)); },
+    deliver: (text, ev) => { out.sent.push(ev.kind); out.texts.push(text); },
+  })));
+  return out;
+};
+const prevForMain = () => stateOf(panelOf([ind({ value: "1", value_num: 1, observed_at: "2026-07-20" })]));
+
+testAsync("красные тесты: смена доли и журнал решений идут, публикации — нет, служебное сообщение — одно в сутки", async () => {
+  const r = await mainRun({ state: prevForMain(), selftest: "failure" });
+  assert.deepEqual(r.sent, ["service", "allocation"], "служебное сообщение, затем смена доли; публикация придержана");
+  assert.ok(r.ledger && r.ledger.memory.rung === 1, "журнал решений пишется и при красных тестах — сайт держит каноническую ступень по нему");
+  assert.match(r.texts[0], /Тесты уведомлений не проходят/);
+  assert.doesNotMatch(r.texts[0], /💬/, "служебному сообщению разбор не положен");
+  assert.ok(r.state.selftest_alert_at, "время служебного сообщения запоминается");
+  // через час — снова красные тесты и новая публикация: служебного сообщения нет, публикации нет
+  const again = await mainRun({ state: { ...r.state, selftest_alert_at: new Date(Date.now() - 3600e3).toISOString() }, selftest: "failure", value: "3" });
+  assert.deepEqual(again.sent, [], "служебное сообщение — не чаще раза в сутки");
+  // через сутки — снова
+  const day = await mainRun({ state: { ...r.state, selftest_alert_at: new Date(Date.now() - 25 * 3600e3).toISOString() }, selftest: "failure", value: "3" });
+  assert.deepEqual(day.sent, ["service"]);
+});
+
+testAsync("зелёные тесты: рассылка полная, служебного сообщения нет", async () => {
+  const r = await mainRun({ state: prevForMain(), selftest: "success" });
+  assert.deepEqual(r.sent, ["allocation", "release"]);
+  assert.ok(r.ledger);
+  assert.equal(r.state.selftest_alert_at, undefined);
+});
+
+testAsync("красные тесты без состояния: база фиксируется молча, служебного сообщения нет", async () => {
+  const r = await mainRun({ state: null, selftest: "failure" });
+  assert.deepEqual(r.sent, []);
+  assert.ok(r.state.indicators, "база зафиксирована");
+});
+
 testAsync("без ключа модель не дёргается вовсе", async () => {
   const real = process.env.ANTHROPIC_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
