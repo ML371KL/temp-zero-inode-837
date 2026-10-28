@@ -1959,9 +1959,12 @@ function llmContext(panel) {
   const named = (panel.indicators || [])
     .filter((i) => HUMAN[i.id] && i.value)
     .slice(0, 20)
-    .map((i) => `${humanTitle(i.id, i.name)}: ${fmtValue(i)}`);
+    .map((i) => `${humanTitle(i.id, i.name)}: ${closeText(i) || fmtValue(i)}`);
   return { market_now: named };
 }
+// У карточек с официальным закрытием значение карточки — производная (у VIX — изменение за 30 дней), а имя в
+// словаре — сам индекс; модели уходит то же закрытие, что и читателю в строке «вышли новые данные».
+const closeText = (i) => (i.close ? `${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")} (закрытие ${ruDay(Date.parse(i.close.d))})` : "");
 
 // Какая модель реально ответила — нужно для честной подписи в проверке связи.
 let LAST_MODEL = "";

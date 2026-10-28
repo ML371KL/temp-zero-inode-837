@@ -464,6 +464,17 @@ test("VIX выходит по закрытию FRED, а не по первой �
   assert.equal(step(["+3,6", "2026-10-22", true], ["0,95", "2026-10-22", true], C21).length, 0);
 });
 
+testAsync("контекст модели называет VIX уровнем закрытия, а не изменением карточки за 30 дней", async () => {
+  const panel = mute(() => fromPageRaw({ generated_at: "2026-10-27T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [{ id: "vix", name: "VIX: изменение за 30 дн.", value: "+3,5", value_num: 3.5, unit: "", delta: "VIX 18,9 · интрадей (~15 мин)", zone: "норма", score: 0,
+      observed_at: "2026-10-27", source: "fred.stlouisfed.org", note: "", degraded: false, voting: true, lead: false, series: [] }],
+    closes: { VIXCLS: [{ d: "2026-10-26", v: 18.4 }], VXVCLS: [] } }));
+  const { seen, impl } = capture(reply("===0===\nтекст"));
+  await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
+  const ctx = JSON.parse(seen[0].body.messages[0].content).panel_context.market_now;
+  assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10.2026)`]);
+});
+
 test("закрытие не прочиталось — публикации нет, база держит прошлое закрытие", () => {
   const card = (id) => ({ id, name: id, value: "1", value_num: 1, unit: "", delta: "", zone: "норма", score: 0, observed_at: "2026-10-21", source: "", note: "", degraded: false, voting: true, lead: false, series: [] });
   const run = (c) => mute(() => fromPageRaw({ generated_at: "2026-10-22T14:00:00.000Z", detectors: [], revisions: [], verdict: { word: "" }, indicators: [card("vix")], closes: c }));
