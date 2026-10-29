@@ -1,12 +1,13 @@
 {
  "v": 1,
- "updated_at": "2026-10-28T12:06:53.403Z",
- "snapshot_at": "2026-10-28T12:06:36.950Z",
- "dataAsOf": "2026-10-27",
- "memory": {"v":2,"rung":1,"since":"2026-10-16","pend":2,"pendSession":"2026-10-27","lastMove":{"d":"2026-10-16","from":2,"to":1}},
- "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":1,"pct":50,"raw":2,"composite":10.64,"lead":-6.67,"coin":32.5,"tail":{"p":0.117,"base":0.17},"override":false,"frozen":false},
+ "updated_at": "2026-10-29T00:06:51.754Z",
+ "snapshot_at": "2026-10-29T00:06:33.056Z",
+ "dataAsOf": "2026-10-28",
+ "memory": {"v":2,"rung":2,"since":"2026-10-28","pend":null,"pendSession":null,"lastMove":{"d":"2026-10-28","from":1,"to":2}},
+ "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":10.64,"lead":-6.67,"coin":32.5,"tail":{"p":0.117,"base":0.17},"override":false,"frozen":false},
  "transitions": [
-  {"d":"2026-10-16","from":2,"to":1,"composite":-14}
+  {"d":"2026-10-16","from":2,"to":1,"composite":-14},
+  {"d":"2026-10-28","from":1,"to":2,"composite":10.6}
  ],
  "diary": [
   {"d":"2026-10-01","c":10.2,"l":-3.3,"r":2,"g":"moderate","spx":7666.45,"p":0.119},
@@ -27,6 +28,7 @@
   {"d":"2026-10-22","c":0,"l":-6.7,"r":1,"g":"moderate","spx":7757.17,"p":0.167},
   {"d":"2026-10-23","c":0,"l":-6.7,"r":1,"g":"moderate","spx":7757.17,"p":0.167},
   {"d":"2026-10-26","c":0,"l":-6.7,"r":1,"g":"moderate","spx":7676.77,"qqq":712.2,"iwm":276.99,"rsp":217.29,"dia":522.97,"p":0.167},
-  {"d":"2026-10-27","c":10.6,"l":-6.7,"r":1,"g":"moderate","spx":7722.6,"qqq":721.25,"iwm":280.18,"rsp":217.52,"dia":523.28,"p":0.117,"x":"w..w..."}
+  {"d":"2026-10-27","c":10.6,"l":-6.7,"r":1,"g":"moderate","spx":7722.6,"qqq":721.25,"iwm":280.18,"rsp":217.52,"dia":523.28,"p":0.117,"x":"w..w..."},
+  {"d":"2026-10-28","c":10.6,"l":-6.7,"r":2,"g":"moderate","spx":7743.98,"qqq":721.25,"iwm":280.18,"rsp":217.52,"dia":523.28,"p":0.117,"x":"w..w..."}
  ]
 }
