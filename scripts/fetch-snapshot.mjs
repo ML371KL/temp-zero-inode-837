@@ -167,6 +167,19 @@ async function yahooDailyCSV(ySym,days){                  /* дневная ис
   return [rows[0],...rows.slice(1).slice(-days)].join("\n");
 }
 
+/* v5.6: сигнал «всплеск покупок инсайдеров» из панели 840 (SEC Form 4). Файл data/stats.json публикуется раз в сутки
+   (~33 КБ, из них нужно поле breadth); в снимок кладётся только оно и в сжатом виде: asOf (последний ПОЛНЫЙ месяц),
+   z, surge, thr и история [{m,z,p?}] за ~60 месяцев — p:1 помечает неполный текущий месяц. Страница читает ключ
+   insider:breadth (snapKey) и на балл, покрытие и лестницу он не влияет; правило под выключателем docs/insider-surge.json
+   читает ту же историю. Условный запрос: ETag прошлого удачного ответа лежит в meta.insider_etag, 304 — прежнее значение. */
+const INSIDER_URL=process.env.INSIDER_URL||"https://ml371kl.github.io/temp-zero-inode-840/data/stats.json";
+function slimBreadth(j){
+  const b=j&&typeof j==="object"&&j.breadth&&typeof j.breadth==="object"?j.breadth:null;
+  if(!b||!Array.isArray(b.history)) return null;
+  const MON=/^\d{4}-(0[1-9]|1[0-2])$/, num=v=>v==null||v===""?null:Number(v);   /* мусор → NaN → valid() откажет, прежнее значение останется */
+  return {asOf:String(b.asOf||""), z:num(b.z), surge:b.surge===true, thr:Number(b.thr),
+    history:b.history.filter(x=>x&&MON.test(x.m||"")).map(x=>({m:x.m,z:num(x.z),...(x.p?{p:1}:{})}))};
+}
 const R={};                     /* responses под логическими ключами */
 const failed=[];
 /* валидатор формы: пустой/битый ответ = сбой источника, а не «успех» */
@@ -189,8 +202,31 @@ function valid(key,j){
   if(key.startsWith("yix:"))    return Array.isArray(j)&&j.length>=260&&j.every(r=>Array.isArray(r)&&r.length===3&&r[0]>0&&r[1]>0&&r[2]>0); /* v5.1: ≥260 сессий — 52-нед. максимум и 200-дневная */
   if(key.startsWith("fh:quote"))return typeof j.c==="number"&&j.c>0;
   if(key==="frb:ebp")           return Array.isArray(j)&&j.length>=400&&j.every(r=>Array.isArray(r)&&r.length===2&&/^\d{4}-\d{2}-\d{2}$/.test(r[0])&&Number.isFinite(r[1])); /* v5.5: ≥400 месяцев */
+  if(key==="insider:breadth")   return /^\d{4}-(0[1-9]|1[0-2])$/.test(j.asOf||"")&&(j.z===null||Number.isFinite(j.z))&&typeof j.surge==="boolean"&&Number.isFinite(j.thr)&&j.thr>0
+    &&Array.isArray(j.history)&&j.history.length>=24&&j.history.every((r,i,a)=>r&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.m||"")&&(r.z===null||Number.isFinite(r.z))&&(i===0||a[i-1].m<r.m))
+    &&j.history.some(r=>r.m===j.asOf&&!r.p); /* v5.6: ≥2 лет, месяцы по возрастанию без повторов, asOf — полный месяц истории */
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
   return true;
+}
+/* условный запрос к stats.json панели 840: prev — прошлая копия из снимка, etag — ETag её ответа. Условие шлётся только при годной
+   прошлой копии; 304 → копия как есть. Повторы — на сетевой сбой и HTTP-ошибку; «поля ещё нет» повтором не лечится. */
+async function getInsider(prev,etag){
+  const cond=etag&&prev&&valid("insider:breadth",prev);
+  let r,last;
+  for(let i=0;i<(late()?1:3)&&!r;i++){
+    try{
+      const x=await fetch(INSIDER_URL,{signal:AbortSignal.timeout(late()?8000:15000),
+        headers:{"User-Agent":"razlom26-snapshot/1.0",...(cond?{"If-None-Match":etag}:{})}});
+      if(x.status!==304&&!x.ok) throw new Error("HTTP "+x.status);
+      if(x.status===304&&!cond) throw new Error("304 без условного запроса");
+      r=x;
+    }catch(e){last=e; if(i<2) await sleep(1200*(i+1));}
+  }
+  if(!r) throw last;
+  if(r.status===304) return {j:prev,etag};
+  const slim=slimBreadth(await r.json());
+  if(!slim) throw new Error("в stats.json нет поля breadth");
+  return {j:slim,etag:r.headers.get("etag")||""};
 }
 async function put(key,fn){
   /* v4.13.5: за дедлайном источник не добирается вовсе — попадает в failed, где его значение
@@ -209,6 +245,8 @@ const fredURL=(s,lim)=>`https://api.stlouisfed.org/fred/series/observations?seri
 
 async function main(){
   if(!FRED_KEY) throw new Error("нет секрета FRED_KEY");
+  let prevSnap=null;                                   /* v5.6: читается первым — нужен блоку инсайдеров ниже и новостному слою */
+  try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
 
   /* ── FRED: параллельно пачками по 4 ── */
   const fredList=Object.entries(SERIES);
@@ -237,6 +275,14 @@ async function main(){
     return lines.slice(1).map(l=>{const c=l.split(",");return [String(c[di]||"").trim(),+(+c[ei]).toFixed(4)];})
       .filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r[0])&&Number.isFinite(r[1]));
   });
+
+  /* v5.6: всплеск покупок инсайдеров — одно обращение за прогон, условное по ETag */
+  let insiderEtag=(prevSnap&&prevSnap.meta&&typeof prevSnap.meta.insider_etag==="string"&&prevSnap.meta.insider_etag)||"", insiderNew=null;
+  await put("insider:breadth",async()=>{
+    const o=await getInsider(prevSnap&&prevSnap.responses&&prevSnap.responses["insider:breadth"],insiderEtag);
+    insiderNew=o.etag; return o.j;
+  });
+  if(R["insider:breadth"]!==undefined&&insiderNew!==null) insiderEtag=insiderNew;   /* сбой — ETag прежний, как и значение */
 
   /* ── Крипто/золото: CoinGecko, резерв Binance ── */
   await put("cg:bitcoin", ()=>getJSON("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily"));
@@ -287,8 +333,6 @@ async function main(){
      накоплением между запусками (дедуп по url+datetime).
      v4.10: slim сохраняет source (клиент различает мнение-источники);
      жёсткие кандидаты собираются для серверного LLM-судьи. */
-  let prevSnap=null;
-  try{ if(existsSync(OUT)) prevSnap=JSON.parse(readFileSync(OUT,"utf-8")); }catch(e){}
   /* v5.0: ядро сканера исполняется ЦЕЛИКОМ со страницы — блок ⟦NEWS-CORE⟧…⟦/NEWS-CORE⟧ из
      docs/index.html (кандидаты по клаузам, атрибуция компании по алиасам, якоря, промпт и разбор
      ответа судьи). v4.13.5 выдирал отдельные регэкспы по шаблонам строк — схема ломалась от
@@ -500,7 +544,7 @@ async function main(){
         if((FALLBACK[k]||[]).some(f=>R[f]!==undefined)) continue;
         const origin=new Date((prev.stale_keys&&prev.stale_keys[k])||prev.generated_at).getTime();
         const age=Date.now()-origin;
-        const cap=k.startsWith("ydiv:")?45*86400e3:
+        const cap=(k.startsWith("ydiv:")||k.startsWith("insider:"))?45*86400e3:     /* v5.6: insider — месячный сигнал, как история выплат */
                   (k.startsWith("ypx:")||k.startsWith("yix:"))?3*86400e3:             /* v5.0: цены корзин и (v5.1) индексных фондов — как интрадей, 3 сут. */                                  /* ydiv: история выплат меняется раз в квартал — держим до окна свежести (45 дн.) */
                   (k.startsWith("fh:")||k.startsWith("stq:"))?3*86400e3:7*86400e3;  /* stq: (интрадей) — 3 сут.; stqd: (дневная история, резерв крипто) — 7 сут. */
         if(age>cap) continue;                       /* слишком старое не подкладываем: пусть карточка честно скажет о сбое */
@@ -527,7 +571,8 @@ async function main(){
   writeFileSync(OUT,JSON.stringify({generated_at:new Date().toISOString(),
     ok:Object.keys(R).length, failed, stale_keys,
     meta:{symbols:NEWS_SYMBOLS,
-      llm:ANTHROPIC_API_KEY?{model:JUDGE_MODEL,verdicts:(R["fh:newsVer"]||[]).length,judged_now:LLM_JUDGED}:null},
+      llm:ANTHROPIC_API_KEY?{model:JUDGE_MODEL,verdicts:(R["fh:newsVer"]||[]).length,judged_now:LLM_JUDGED}:null,
+      ...(insiderEtag?{insider_etag:insiderEtag}:{})},
     responses:R}));
   console.log(`снимок: ${Object.keys(R).length} источников (fred свежих: ${fredFresh}), сбоев: ${failed.length}`);
   failed.forEach(f=>console.log("  ! "+f));

@@ -201,6 +201,118 @@ try {
     assert.ok(r.expired, "истёкшая поправка выключена");
     assert.ok(r.back, "после возврата файла решение прежнее");
   });
+  await test("v5.6: «Всплеск покупок инсайдеров» — справка: балл, доля, режим и покрытие без карточки те же; уведомитель её не видит", async () => {
+    const FIX = JSON.parse(readFileSync("scripts/fixtures/insider-breadth-2026-11-04.json", "utf-8"));
+    const r = await page.evaluate(async (EX, fix) => {
+      const ind = IND.find(i => i.id === "insider_surge");
+      if (!ind) return { missing: true };
+      /* карточка читает ТОЛЬКО снимок: если ключа ещё нет (сборщик не выкатан), подставляем фикстуру формы 840 на время проверки */
+      const injected = !(SNAP && SNAP.responses && SNAP.responses["insider:breadth"] !== undefined);
+      if (injected) { SNAP = SNAP || { responses: {} }; SNAP.responses["insider:breadth"] = fix.breadth; }
+      const pick = () => { const d = state.decision;
+        return JSON.stringify({ comp: d.composite, lead: d.lead, pct: d.pct, rung: d.rung, raw: d.raw, regime: d.regime, cover: d.coverage, mem: d.memory,
+          agg: aggregate({}).composite, bd: state.breakdown && state.breakdown.total, tiles: state.tiles, badges: state.blockBadges, strip: document.getElementById("actionStrip").innerHTML }); };
+      const k = IND.indexOf(ind), saved = state.data.insider_surge;
+      await loadOne(ind); compute();
+      const withCard = pick(), loaded = state.data.insider_surge;
+      IND.splice(k, 1); delete state.data.insider_surge; compute();
+      const without = pick();
+      IND.splice(k, 0, ind); state.data.insider_surge = loaded; compute();
+      const again = pick();
+      const snap = buildSnapshot(), ext = new Function("return " + EX)();
+      const card = document.getElementById("card_insider_surge");
+      const out = { info: ind.info, notify: ind.notify, block: ind.block, withCard, without, again, loaded: !!loaded && loaded.zi != null,
+        ai: snap.indicators.find(i => i.name === ind.name) || null, ext: ext.indicators.map(i => i.id),
+        val: card.querySelector(".c-val").innerText, delta: card.querySelector(".c-delta").innerText, note: card.querySelector(".c-note").innerText,
+        badge: card.querySelector(".c-score").innerText, spark: !!card.querySelector(".c-spark canvas"), text: card.innerText };
+      if (injected) delete SNAP.responses["insider:breadth"];
+      state.data.insider_surge = saved; compute();
+      return out;
+    }, PAGE_EXTRACTOR, FIX);
+    assert.ok(!r.missing, "карточки insider_surge нет в IND");
+    assert.deepEqual([r.info, r.notify, r.block], [true, false, "context"], "info:true, notify:false — иначе уведомитель разошлёт релизы");
+    assert.equal(r.without, r.withCard, "без карточки балл/доля/режим/покрытие/полоса другие");
+    assert.equal(r.again, r.withCard, "повторный расчёт с карточкой разошёлся");
+    assert.ok(r.loaded, "карточка не загрузилась из снимка");
+    assert.ok(r.ai && r.ai.type === "info" && /справочно/.test(r.ai.score) && /^Контекст/.test(r.ai.block), "в ИИ-снимке — как прочие карточки «Контекста»");
+    assert.ok(!r.ext.includes("insider_surge"), "уведомитель не должен видеть карточку");
+    assert.equal(r.badge, "справочно");
+    assert.match(r.val, /^-?\d+,\d\d\s*z$/);
+    assert.match(r.delta, /^порог 2 · (всплеск: [а-я]{3} \d{4}|всплесков за \d+ мес\. не было) · правило выкл\.$/);
+    assert.ok(r.spark, "линия z нарисована");
+    assert.ok(!/(^|[\s(])-\d/.test(r.text), "дефис перед числом на карточке");
+  });
+  /* сценарий правила инсайдеров на странице pg: данные подставляются в state.data, выключатель и поправка владельца — в state */
+  const insiderRun = (pg) => pg.evaluate(() => {
+      const strip = () => document.getElementById("actionStrip").innerHTML;
+      const snapDec = () => JSON.stringify(buildSnapshot().decision);
+      const day = etToday(), cfg0 = state.insiderCfg, own0 = state.ownerCfg, data0 = state.data.insider_surge;
+      const mAdd = (m, n) => { const i = +m.slice(0, 4) * 12 + (+m.slice(5, 7) - 1) + n; return Math.floor(i / 12) + "-" + String(i % 12 + 1).padStart(2, "0"); };
+      const cur = day.slice(0, 7);
+      /* история: 30 полных месяцев до прошлого; всплеск surgeM; неполный текущий месяц */
+      const mk = (surgeM, partialZ) => { const h = []; for (let k = 30; k >= 1; k--) { const m = mAdd(cur, -k); h.push({ m, z: m === surgeM ? 2.6 : 0.3, p: 0 }); }
+        h.push({ m: cur, z: partialZ ?? 0.3, p: 1 }); return h; };
+      const put = h => { state.data.insider_surge = { zi: 1, value: "0,30", date: new Date(), hist: h, series: [] }; };
+      const rec = () => ({ dec: JSON.stringify(state.decision), strip: strip(), ai: snapDec(), decObj: state.decision, stripText: document.getElementById("actionStrip").innerText, aiObj: buildSnapshot().decision });
+      const fileOff = rec(), cfgFile = JSON.stringify(cfg0);
+      state.insiderCfg = null; compute(); const noFile = rec();
+      put(mk(mAdd(cur, -3))); compute(); const offWithData = rec();                       /* данные есть, выключатель — файл репозитория */
+      state.insiderCfg = { on: false }; compute(); const explicitOff = rec();
+      state.insiderCfg = { on: true }; compute(); const on = rec();
+      state.ownerCfg = { cap: 50, since: mAdd(cur, -1) + "-01", until: mAdd(cur, 1) + "-28", reason: "тест" }; compute(); const both = rec();
+      state.ownerCfg = { cap: 0, since: mAdd(cur, -1) + "-01", until: mAdd(cur, 1) + "-28", reason: "тест" }; compute(); const bothZero = rec();
+      state.ownerCfg = own0;
+      put(mk(mAdd(cur, -20))); compute(); const oldSurge = rec();                          /* всплеск 20 месяцев назад — окно кончилось */
+      put(mk(null, 3.5)); compute(); const partial = rec();                                /* z ≥ 2 только в неполном текущем месяце */
+      state.data.insider_surge = null; compute(); const noData = rec();
+      state.data.insider_surge = data0; state.insiderCfg = cfg0; state.ownerCfg = own0; compute();
+      return { fileOff, noFile, offWithData, explicitOff, on, both, bothZero, oldSurge, partial, noData, cfgFile, back: JSON.stringify(state.decision) === fileOff.dec };
+  });
+  const insiderCheck = (r, wantPct) => {
+    const base = JSON.parse(r.fileOff.dec);
+    if (wantPct != null) assert.equal(base.pct, wantPct, "ступень модели в сценарии");
+    assert.equal(r.cfgFile, JSON.stringify({ on: false }), "docs/insider-surge.json — выключенное правило");
+    assert.ok(!base.insider && !/Правило инсайдеров/.test(r.fileOff.strip) && !/insider_rule/.test(r.fileOff.ai), "выключенное правило — полей нет");
+    for (const k of ["noFile", "offWithData", "explicitOff", "oldSurge", "partial", "noData"]) {
+      assert.equal(r[k].dec, r.fileOff.dec, k + ": решение побайтно то же");
+      assert.equal(r[k].strip, r.fileOff.strip, k + ": полоса доли побайтно та же");
+      assert.equal(r[k].ai, r.fileOff.ai, k + ": ИИ-снимок решения побайтно тот же");
+    }
+    /* включено */
+    const o = r.on.decObj, ins = o.insider;
+    assert.ok(ins, "правило включено, окно действует — поле decision.insider");
+    assert.equal(ins.share, 100); assert.equal(ins.eff, 100); assert.equal(ins.final, 100);
+    assert.equal(ins.lifting, base.pct < 100, "поднимает долю, только если модель ниже 100%");
+    for (const k of ["pct", "rung", "composite", "lead", "raw", "regime", "since", "pend", "frozen", "action"]) assert.deepEqual(o[k], base[k], "модель не меняется: " + k);
+    assert.deepEqual(o.memory, base.memory, "память ступени не меняется");
+    assert.match(ins.since, /^\d{4}-\d{2}-01$/); assert.match(ins.until, /^\d{4}-\d{2}-\d{2}$/);
+    if (ins.lifting) {
+      assert.match(r.on.stripText, /Правило инсайдеров: 100% нормы до [а-я]{3} \d{4} \(всплеск покупок: [а-я]{3} \d{4}, z 2,6\)\. С [а-я]{3} \d{4}: [+−]?\d+,\d п\.п\. к модели \(модель — \d+%\)\./);
+      assert.match(r.on.stripText, /^доля акций сейчас\s*100%/mi);
+      assert.match(r.on.stripText, /По модели: /);
+    } else assert.ok(!/Правило инсайдеров/.test(r.on.stripText), "модель уже 100% — строки нет");
+    assert.match(r.on.aiObj.insider_rule, /правило всплеска покупок инсайдеров \(включено владельцем\): 100% нормы с /);
+    /* поправка владельца старше */
+    for (const [name, x, cap] of [["both", r.both, 50], ["bothZero", r.bothZero, 0]]) {
+      assert.equal(x.decObj.owner.eff, cap, name + ": поправка — потолок над результатом правила");
+      assert.equal(x.decObj.owner.limiting, true, name);
+      assert.equal(x.decObj.insider.eff, 100, name + ": доля после правила");
+      assert.equal(x.decObj.insider.final, cap, name + ": итоговая доля");
+      assert.equal(x.decObj.pct, base.pct, name + ": доля модели прежняя");
+      assert.match(x.stripText, new RegExp("^доля акций сейчас\\s*" + cap + "%", "mi"));
+      assert.match(x.stripText, /Вы держите/, name);
+      if (x.decObj.insider.lifting) assert.match(x.stripText, /Поправка владельца старше правила\./, name);
+    }
+    assert.ok(r.back, "после возврата данных и выключателя решение прежнее");
+    if (wantPct != null && wantPct < 100) assert.equal(ins.lifting, true, "модель ниже 100% — правило поднимает долю");
+  };
+  await test("v5.6: правило инсайдеров — выключенное не меняет вывода побайтно; включённое: 100% при любой ступени модели, модель прежняя, поправка владельца старше", async () => {
+    insiderCheck(await insiderRun(page));
+  });
+  for (const rung of [0, 1]) await test(`v5.6: правило инсайдеров при модели ${rung ? 50 : 0}% — поднимает до 100%, строка на полосе доли, поправка владельца старше`, async () => {
+    const w = await open({ v: 2, rung, since: "2026-01-02", pend: null, pendSession: null });
+    try { insiderCheck(await insiderRun(w.page), rung ? 50 : 0); } finally { await w.page.close(); }
+  });
   await test("полосы блоков: Σ пунктов + детекторы = общий балл, баллы блоков = плашкам разделов", async () => {
     const r = await page.evaluate(() => {
       const bd = state.breakdown, el = document.getElementById("blockBars");

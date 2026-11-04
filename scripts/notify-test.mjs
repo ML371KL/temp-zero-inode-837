@@ -1069,6 +1069,61 @@ test("v5.5: поправка владельца включена — обе до
   assert.match(mv.detail, /Поправка владельца: держите не больше 50% нормы до 20\.11(?![.\d])/);
 });
 
+test("v5.6: правило инсайдеров выключено — доля, журнал и сообщения прежние", () => {
+  const dec = decisionOf({ rung: 2, since: "2026-11-03", dataAsOf: "2026-11-03" });
+  assert.ok(!("insider" in allocationFromDecision(dec)), "в доле нет поля insider");
+  const l = buildLedger(ledgerAt(2), dec, { spx: 7700, now: 0 });
+  assert.ok(!("i" in l.diary.find((x) => x.d === "2026-11-03")), "в дневнике нет поля i");
+  assert.ok(!("insider" in l.decision), "в сводке журнала нет insider");
+  const base = stateOf(canonPanel(decisionOf({ rung: 2 })).panel);
+  const { panel: p } = canonPanel(decisionOf({ rung: 2, since: "2026-10-01" }), ledgerAt(2, "2026-10-01"));
+  assert.equal(diff({ ...base, ledger: ledgerAt(2, "2026-10-01") }, p).filter((e) => /инсайдеров/.test(e.title)).length, 0);
+  assert.ok(!/инсайдеров/.test(pingMessage(p)));
+});
+
+test("v5.6: правило инсайдеров включено — обе доли, срок, поле i, события вступления и окончания, поправка владельца старше", () => {
+  const ins = { share: 100, month: "2026-10", z: 2.4, since: "2026-11-01", until: "2027-10-31", eff: 100, final: 100, lifting: true, delta: 0.4 };
+  const dec = decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2026-11-03", insider: ins });
+  const a = allocationFromDecision(dec);
+  assert.deepEqual(a.insider, { share: 100, month: "2026-10", since: "2026-11-01", until: "2027-10-31", eff: 100, final: 100, lifting: true });
+  assert.equal(a.pct, 50, "доля модели не меняется");
+  const l = buildLedger(ledgerAt(1), dec, { spx: 7700, now: 0 });
+  assert.equal(l.diary.find((x) => x.d === "2026-11-03").i, 100);
+  assert.equal(l.decision.insider.share, 100);
+  // вступление: прошлое состояние без правила — одно событие, до/после — доля, которую держит владелец
+  const prevNo = stateOf(canonPanel(decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2026-10-31" }), ledgerAt(1, "2026-10-29")).panel);
+  const { panel: pOn } = canonPanel(dec, ledgerAt(1, "2026-10-29"));
+  const on = diff({ ...prevNo, ledger: ledgerAt(1, "2026-10-29") }, pOn).filter((e) => /инсайдеров/.test(e.title));
+  assert.equal(on.length, 1);
+  assert.deepEqual([on[0].title, on[0].before, on[0].after], ["Правило инсайдеров вступило в силу", "50% нормы", "100% нормы"]);
+  assert.match(on[0].detail, /держите 100% нормы до 31\.10\.2027 \(всплеск в октябре 2026\); доля модели — 50%/);
+  assert.match(renderMessage(on[0], "к"), /Правило инсайдеров вступило в силу/);
+  assert.match(pingMessage(pOn), /Правило всплеска покупок инсайдеров: держите 100% нормы/);
+  // повтор того же состояния — тишина
+  assert.equal(diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pOn).filter((e) => /инсайдеров/.test(e.title)).length, 0);
+  // окончание: действует доля модели
+  const { panel: pEnd } = canonPanel(decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2027-11-02" }), ledgerAt(1, "2026-10-29"));
+  const off = diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pEnd).filter((e) => /инсайдеров/.test(e.title));
+  assert.deepEqual([off[0].title, off[0].before, off[0].after], ["Правило инсайдеров закончилось", "100% нормы", "50% нормы"]);
+  // выключатель снят посреди окна — «снято», а не «закончилось»
+  const { panel: pCut } = canonPanel(decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2026-11-10" }), ledgerAt(1, "2026-10-29"));
+  const cut = diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pCut).filter((e) => /инсайдеров/.test(e.title));
+  assert.deepEqual([cut[0].title, cut[0].before, cut[0].after], ["Правило инсайдеров снято", "100% нормы", "50% нормы"]);
+  // смена доли модели при действующем правиле — в сообщении обе доли
+  const { panel: pMove } = canonPanel(decisionOf({ rung: 0, since: "2026-11-04", dataAsOf: "2026-11-04", insider: ins }), ledgerAt(1, "2026-10-29"));
+  const mv = allocEvents(diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pMove)).find((e) => /Доля акций/.test(e.title));
+  assert.match(mv.detail, /Правило всплеска покупок инсайдеров: держите 100% нормы до 31\.10\.2027 \(всплеск в октябре 2026\); доля модели — 0%/);
+  // поправка владельца старше: обе строки, итоговая доля — потолок
+  const own = { cap: 50, since: "2026-11-02", until: "2026-11-20", reason: "отчёты", eff: 50, limiting: true, delta: -0.8 };
+  const { panel: pBothMove } = canonPanel(decisionOf({ rung: 0, since: "2026-11-04", dataAsOf: "2026-11-04", owner: own, insider: { ...ins, final: 50 } }), ledgerAt(1, "2026-10-29"));
+  const mv2 = allocEvents(diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pBothMove)).find((e) => /Доля акций/.test(e.title));
+  assert.match(mv2.detail, /Поправка владельца: держите не больше 50% нормы до 20\.11/);
+  assert.match(mv2.detail, /Правило всплеска покупок инсайдеров: держите 100% нормы до 31\.10\.2027 \(всплеск в октябре 2026\); доля модели — 0%; поправка владельца старше — итого 50%/);
+  const { panel: pBoth } = canonPanel(decisionOf({ rung: 1, since: "2026-10-29", dataAsOf: "2026-11-03", owner: own, insider: { ...ins, final: 50 } }), ledgerAt(1, "2026-10-29"));
+  const bt = diff({ ...stateOf(pOn), ledger: ledgerAt(1, "2026-10-29") }, pBoth).filter((e) => /Поправка владельца включена/.test(e.title));
+  assert.deepEqual([bt[0].before, bt[0].after], ["100% нормы", "50% нормы"], "владелец ограничил долю, которую давало правило");
+});
+
 test("первый канонический прогон без журнала — база, а не сообщение", () => {
   const legacy = stateOf(panelOf([ind({})], { allocation: { pct: 85 } }));
   const { panel: p } = canonPanel(decisionOf({ rung: 2 }));

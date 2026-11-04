@@ -23,6 +23,7 @@ on:
       - "scripts/households-test.mjs"
       - "scripts/episodes-test.mjs"
       - "scripts/owner-test.mjs"
+      - "scripts/insider-surge-test.mjs"
       - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
@@ -99,6 +100,12 @@ jobs:
         # Ядро ⟦OWNER-CORE⟧ из страницы: форма docs/owner.json (cap 0|50, срок), min(модель, cap), ±X п.п. к модели по
         # закрытиям дневника; файл в репозитории — выключенная поправка {"cap":null}. Без сети.
         run: node scripts/owner-test.mjs
+
+      - name: Проверить правило «всплеск покупок инсайдеров»
+        # Ядро ⟦INSIDER-CORE⟧ из страницы: выключенное правило не действует; окна вокруг эпизодов 2008-12 и 2020-03…05; неполный
+        # месяц правило не включает; поправка владельца и рубильник старше правила. Сжатие breadth, valid() и условный запрос по
+        # ETag — настоящими функциями сборщика; файл в репозитории — {"on": false}. Без сети.
+        run: node scripts/insider-surge-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,
