@@ -866,12 +866,24 @@ function allocationFromDecision(dec) {
     // v5.5: поправка владельца — только пока включена (выключенная не меняет ни байта состояния и сообщений)
     ...(dec.owner && (dec.owner.cap === 0 || dec.owner.cap === 50) ? { owner: { cap: dec.owner.cap, since: dec.owner.since || "", until: dec.owner.until || "",
       reason: String(dec.owner.reason || ""), eff: finite(dec.owner.eff) ? dec.owner.eff : null, limiting: !!dec.owner.limiting } } : {}),
+    // v5.6: правило «всплеск покупок инсайдеров» — только пока включено и окно действует (выключенное не меняет ни байта состояния и сообщений)
+    ...(dec.insider && dec.insider.share === 100 ? { insider: { share: 100, month: String(dec.insider.month || ""), since: dec.insider.since || "", until: dec.insider.until || "",
+      eff: finite(dec.insider.eff) ? dec.insider.eff : null, final: finite(dec.insider.final) ? dec.insider.final : null, lifting: !!dec.insider.lifting } } : {}),
   };
 }
 // v5.5: строка о поправке владельца для сообщений — обе доли и срок
 const ownerText = (a) => a?.owner
   ? `Поправка владельца: держите не больше ${a.owner.cap}% нормы до ${ruDay(Date.parse(a.owner.until))}${a.owner.reason ? ` (${a.owner.reason})` : ""}; доля модели — ${a.pct}%`
   : "";
+
+// v5.6: строка о правиле «всплеск покупок инсайдеров» — обе доли и срок; поправка владельца старше правила
+const MONTH_IN = ["январе", "феврале", "марте", "апреле", "мае", "июне", "июле", "августе", "сентябре", "октябре", "ноябре", "декабре"];
+const insiderText = (a) => a?.insider
+  ? `Правило всплеска покупок инсайдеров: держите ${a.insider.share}% нормы до ${ruDay(Date.parse(a.insider.until))} (всплеск в ${MONTH_IN[Number(a.insider.month.slice(5, 7)) - 1] || a.insider.month} ${a.insider.month.slice(0, 4)}); доля модели — ${a.pct}%`
+    + (a.owner && finite(a.insider.final) && a.insider.final !== a.insider.eff ? `; поправка владельца старше — итого ${a.insider.final}%` : "")
+  : "";
+// Доля, которую держит владелец: после правила и поправки (без них — доля модели)
+const heldPct = (a) => (a?.insider && finite(a.insider.final) ? a.insider.final : a?.owner && finite(a.owner.eff) ? a.owner.eff : a?.pct);
 
 // С чем сравнивать каноническую ступень. Первым — с тем, что уже ОБЪЯВЛЕНО (база состояния
 // уведомлений сдвигается только после удачной рассылки): если Telegram упал, а журнал успел
@@ -959,6 +971,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
         .filter(([, v]) => finite(v))),
       p: round(dec.tail?.p, 3),
       ...(dec.owner && (dec.owner.cap === 0 || dec.owner.cap === 50) ? { o: dec.owner.cap } : {}),   // v5.5: поправка владельца в эту сессию
+      ...(dec.insider && dec.insider.share === 100 ? { i: 100 } : {}),                               // v5.6: правило инсайдеров действовало в эту сессию
     };
     if (dets && dets.x) {
       row.x = mergeDetX(old?.x, dets.x);
@@ -974,7 +987,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
     const material = !old || old.r !== row.r || old.g !== row.g || !finite(old.c) || Math.abs(old.c - row.c) >= 1
       || !finite(old.p) || !finite(row.p) || Math.abs(old.p - row.p) >= 0.01 || (old.spx == null && row.spx != null)
       || Object.keys(DIARY_FUNDS).some((k) => !finite(old[k]) && finite(row[k]))
-      || ["x", "xc", "xb"].some((k) => (old[k] || "") !== (row[k] || "")) || old.o !== row.o;
+      || ["x", "xc", "xb"].some((k) => (old[k] || "") !== (row[k] || "")) || old.o !== row.o || old.i !== row.i;
     if (material) {
       diary = diary.filter((x) => x.d !== row.d);
       diary.push(row);
@@ -988,7 +1001,7 @@ function buildLedger(prev, dec, { snapshotAt = "", spx = null, funds = null, det
     snapshot_at: snapshotAt || "",
     dataAsOf: isDay(dec.dataAsOf) ? dec.dataAsOf : "",
     memory: mem,
-    decision: pick(dec, ["regime", "regimeWord", "rung", "pct", "raw", "composite", "lead", "coin", "tail", "override", "frozen", "owner"]),
+    decision: pick(dec, ["regime", "regimeWord", "rung", "pct", "raw", "composite", "lead", "coin", "tail", "override", "frozen", "owner", "insider"]),
     transitions: transitions.slice(-LEDGER_TRANSITIONS_MAX),
     diary: diary.slice(-LEDGER_DIARY_MAX),
   };
@@ -1822,6 +1835,7 @@ function diff(prevState, panel) {
             curAlloc.action,
             `доля стратегической нормы акций${curAlloc.dataAsOf ? ` · по данным торговой сессии ${ruDay(Date.parse(curAlloc.dataAsOf))}` : ""}`,
             ownerText(curAlloc),
+            insiderText(curAlloc),
           ].filter(Boolean).join("\n")
         : "",
       causes,
@@ -1863,9 +1877,26 @@ function diff(prevState, panel) {
       kind: "allocation",
       key: co ? `owner:${co.cap}@${co.since}..${co.until}` : `owner:off@${po.since}..${po.until}`,
       title: co ? "Поправка владельца включена" : po && day > po.until ? "Поправка владельца истекла" : "Поправка владельца снята",
-      before: `${effOf(po)}% нормы`,
-      after: `${co ? effOf(co) : curAlloc.pct}% нормы`,
-      detail: co ? ownerText(curAlloc) : `Действует доля модели — ${curAlloc.pct}% нормы`,
+      before: `${po ? effOf(po) : prevState.allocation?.insider ? heldPct(prevState.allocation) : curAlloc.pct}% нормы`,   // v5.6: при действующем правиле инсайдеров держали его долю
+      after: `${co ? effOf(co) : heldPct(curAlloc)}% нормы`,
+      detail: co ? ownerText(curAlloc) : curAlloc.insider ? `Действует доля после правила инсайдеров — ${heldPct(curAlloc)}% нормы` : `Действует доля модели — ${curAlloc.pct}% нормы`,
+      causes: [],
+      stability: [],
+      note: "",
+    });
+  }
+  // v5.6: правило «всплеск покупок инсайдеров» вступило в силу, изменилось, снято или закончилось — меняется доля,
+  // которую держит владелец. Пока правила нет ни в прошлом, ни в нынешнем состоянии, событий нет (вывод прежний).
+  const pi = prevState.allocation?.insider || null, ci = curAlloc?.insider || null;
+  if (curAlloc && (pi || ci) && (!pi !== !ci || pi.month !== ci.month || pi.until !== ci.until || pi.since !== ci.since)) {
+    const day = new Date(Date.parse(stamp) || Date.now()).toISOString().slice(0, 10);
+    events.push({
+      kind: "allocation",
+      key: ci ? `insider:${ci.month}@${ci.since}..${ci.until}` : `insider:off@${pi.since}..${pi.until}`,
+      title: ci ? "Правило инсайдеров вступило в силу" : pi && day > pi.until ? "Правило инсайдеров закончилось" : "Правило инсайдеров снято",
+      before: `${heldPct(prevState.allocation)}% нормы`,
+      after: `${heldPct(curAlloc)}% нормы`,
+      detail: ci ? insiderText(curAlloc) : `Правило не действует — доля модели ${curAlloc.pct}% нормы`,
       causes: [],
       stability: [],
       note: "",
@@ -1934,6 +1965,11 @@ function valueLine(was, cur) {
 // Шаблонный комментарий — работает всегда, даже когда LLM недоступна. Держится за то, что
 // панель уже сказала о показателе: направление балла + первая фраза её собственной заметки.
 function templateComment(ev) {
+  // v5.6: событие правила инсайдеров — не смена доли моделью, шаблон «модель считает обстановку…» к нему не подходит
+  if (ev.kind === "allocation" && String(ev.key || "").startsWith("insider:"))
+    return String(ev.key).startsWith("insider:off")
+      ? "Правило больше не действует: доля снова определяется моделью и поправкой владельца, если она включена."
+      : "Правило включено владельцем: пока идёт окно, доля не опускается ниже 100% нормы; модель считает по-прежнему, поправка владельца старше.";
   if (ev.kind === "allocation") {
     const from = parseFloat(ev.before) || 0, to = parseFloat(ev.after) || 0;
     return to > from
@@ -3100,6 +3136,7 @@ function pingMessage(panel) {
       ? `Доля ${panel.assetWord || "рискового актива"} сейчас: <b>${panel.allocation.pct}%</b>${panel.allocation.canonical ? " стратегической нормы" : ""}`
       : "",
     ownerText(panel.allocation),
+    insiderText(panel.allocation),
     `Показателей под наблюдением: ${(panel.indicators || []).length}`,
     det.length ? `Сигналы риска не в покое: ${esc(det.map((d) => `${detectorHuman(d.name)} (${DET_LABEL[d.state] || d.state})`).join(", "))}` : "Сигналы риска спокойны",
   ]
