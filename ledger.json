@@ -1,10 +1,10 @@
 {
  "v": 1,
- "updated_at": "2026-11-19T13:36:57.149Z",
- "snapshot_at": "2026-11-19T13:36:37.756Z",
+ "updated_at": "2026-11-19T14:47:18.667Z",
+ "snapshot_at": "2026-11-19T14:46:43.869Z",
  "dataAsOf": "2026-11-18",
  "memory": {"v":2,"rung":2,"since":"2026-10-28","pend":null,"pendSession":null,"lastMove":{"d":"2026-10-28","from":1,"to":2}},
- "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":11.79,"lead":-6.67,"coin":27.5,"tail":{"p":0.1125,"base":0.17},"override":false,"frozen":false},
+ "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":8.45,"lead":-6.67,"coin":22.5,"tail":{"p":0.1261,"base":0.17},"override":false,"frozen":false},
  "transitions": [
   {"d":"2026-10-16","from":2,"to":1,"composite":-14},
   {"d":"2026-10-28","from":1,"to":2,"composite":10.6}
@@ -44,6 +44,6 @@
   {"d":"2026-11-13","c":17.3,"l":0,"r":2,"g":"moderate","spx":7561.67,"qqq":679.89,"iwm":277.54,"rsp":221.16,"dia":523.15,"p":0.093,"x":"......."},
   {"d":"2026-11-16","c":11.4,"l":-10,"r":2,"g":"moderate","spx":7416.59,"qqq":661.75,"iwm":272.94,"rsp":218.93,"dia":515.68,"p":0.114,"x":"......."},
   {"d":"2026-11-17","c":9.7,"l":-3.3,"r":2,"g":"moderate","spx":7340.53,"qqq":656.95,"iwm":269.05,"rsp":215.76,"dia":507.31,"p":0.121,"x":"......."},
-  {"d":"2026-11-18","c":11.8,"l":-6.7,"r":2,"g":"moderate","spx":7323.63,"qqq":659.51,"iwm":270.12,"rsp":215.43,"dia":501.73,"p":0.113,"x":"......."}
+  {"d":"2026-11-18","c":8.5,"l":-6.7,"r":2,"g":"moderate","spx":7323.63,"qqq":659.51,"iwm":270.12,"rsp":215.43,"dia":501.73,"p":0.126,"x":"......."}
  ]
 }
