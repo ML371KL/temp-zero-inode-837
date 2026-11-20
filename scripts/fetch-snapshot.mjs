@@ -497,21 +497,25 @@ async function main(){
   }
 
   /* ── Интрадей Stooq (без ключей): WTI-фьючерс, VIX, USD/JPY ── */
-  async function cboeVixCSV(){                    /* официальный delayed-CDN CBOE; поля парсим защитно */
-    const j=await getJSON("https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json",2,YUA);
+  async function cboeVixCSV(idx="_VIX",legacy="^VIX"){   /* официальный delayed-CDN CBOE; поля парсим защитно */
+    const j=await getJSON("https://cdn.cboe.com/api/global/delayed_quotes/quotes/"+idx+".json",2,YUA);
     const d=(j&&j.data)||{};
     const px=[d.current_price,d.last,d.close,d.price,d.last_price].find(v=>typeof v==="number"&&v>0);
     if(!(px>5&&px<150)) throw new Error("CBOE: вне диапазона/форма");
     const raw=String(d.last_trade_time||d.timestamp||"");
     const day=/^\d{4}-\d{2}-\d{2}/.test(raw)? raw.slice(0,10) : new Date().toISOString().slice(0,10);
-    return "Symbol,Date,Time,Open,High,Low,Close,Volume\n^VIX,"+day+",00:00:00,"+px+","+px+","+px+","+px+",0";
+    return "Symbol,Date,Time,Open,High,Low,Close,Volume\n"+legacy+","+day+",00:00:00,"+px+","+px+","+px+","+px+",0";
   }
-  const IQ={ "cl.f":{y:"CL=F",lo:15,hi:300}, "^vix":{y:"^VIX",lo:5,hi:150}, "usdjpy":{y:"JPY=X",lo:80,hi:250} };
+  /* v5.6.1: ^vix3m — знаменатель термструктуры той же даты, что и VIX (страница: termLive в ⟦VIXTERM-CORE⟧). Раньше
+     вечером шокового дня сегодняшний VIX делился на вчерашнее закрытие VIX3M из FRED. Ключ идёт сразу за ^vix: обе
+     котировки снимаются с разницей в секунды. */
+  const IQ={ "cl.f":{y:"CL=F",lo:15,hi:300}, "^vix":{y:"^VIX",lo:5,hi:150,cboe:"_VIX"}, "^vix3m":{y:"^VIX3M",lo:5,hi:150,cboe:"_VIX3M"},
+             "usdjpy":{y:"JPY=X",lo:80,hi:250} };
   for(const sym of Object.keys(IQ)){
     await sleep(700+Math.random()*1300);            /* залп с одного IP — худший паттерн для троттлинга */
     await put("stq:"+sym, async()=>{
       const q=IQ[sym];
-      if(sym==="^vix"){ try{ return await cboeVixCSV(); }catch(e){} }    /* эшелон 0 (VIX): официальный CBOE */
+      if(q.cboe){ try{ return await cboeVixCSV(q.cboe,sym.toUpperCase()); }catch(e){} }    /* эшелон 0 (VIX, VIX3M): официальный CBOE */
       try{ return await yahooQuoteCSV(q.y,sym,q.lo,q.hi); }              /* эшелон 1–2: Yahoo query1/query2 */
       catch(e){                                                          /* эшелон 3: легаси Stooq (вдруг оживёт) */
         const csv=await getTEXT("https://stooq.com/q/l/?s="+encodeURIComponent(sym)+"&f=sd2t2ohlcv&h&e=csv");

@@ -24,6 +24,7 @@ on:
       - "scripts/episodes-test.mjs"
       - "scripts/owner-test.mjs"
       - "scripts/insider-surge-test.mjs"
+      - "scripts/vixterm-test.mjs"
       - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
@@ -106,6 +107,11 @@ jobs:
         # месяц правило не включает; поправка владельца и рубильник старше правила. Сжатие breadth, valid() и условный запрос по
         # ETag — настоящими функциями сборщика; файл в репозитории — {"on": false}. Без сети.
         run: node scripts/insider-surge-test.mjs
+
+      - name: Проверить внутридневную термструктуру VIX
+        # Ядро ⟦VIXTERM-CORE⟧ из страницы: VIX и VIX3M в отношении — одной даты; без котировки VIX3M той же даты
+        # подмеса нет. Ключ stq:^vix3m — настоящей функцией valid() сборщика. Без сети.
+        run: node scripts/vixterm-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,
