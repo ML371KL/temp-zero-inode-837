@@ -479,6 +479,31 @@ testAsync("контекст модели называет VIX уровнем з�
   assert.deepEqual(ctx, [`${HUMAN.vix.t}: 18,4 (закрытие 26.10)`]);
 });
 
+testAsync("контекст модели: S&P 500 — уровень индекса и положение к 200-дневной средней, а не уровень под именем отклонения", async () => {
+  // 20.11.2026: во входе разбора стояло «S&P 500 относительно 200-дневной средней: 7324» — уровень под именем отклонения.
+  const panel = mute(() => fromPageRaw({ generated_at: "2026-11-20T14:46:00.000Z", detectors: [], revisions: [], verdict: { word: "" },
+    indicators: [{ id: "spx", name: "S&P 500 против 200-дневной", value: "7 324", value_num: 7324, unit: "", delta: "−3,2% к 200д (плоская)", zone: "до −5% ниже", score: -1,
+      observed_at: "2026-11-18", source: "fred.stlouisfed.org", note: "", degraded: false, voting: true, lead: false, series: [] }], closes: {} }));
+  const { seen, impl } = capture(reply("===0===\nтекст"));
+  await hush(() => withFetch(impl, () => llmComments([{ kind: "release", title: "A", before: "", after: "", detail: "", note: "" }], panel)));
+  assert.deepEqual(JSON.parse(seen[0].body.messages[0].content).panel_context.market_now, ["S&P 500: 7324 (к 200-дневной средней: до −5% ниже)"]);
+});
+
+test("строка причины не печатается, если дата наблюдения карточки откатилась назад", () => {
+  // 20.11.2026, 08:46 UTC: термструктура VIX вернулась с 1,05 за 19.11 к 1,01 за 18.11 — VIX ушёл во внебиржевые часы новой
+  // даты, а закрытия 19.11 во FRED ещё не было. Это не движение рынка: в «Что за этим стоит» такой строки быть не должно.
+  const alloc = (pct) => ({ pct, blocks: {}, bands: null, hold: null });
+  const card = (o) => ind({ id: "vixterm", name: "Термструктура VIX (VIX / VIX3M)", ...o });
+  const before = stateOf(panelOf([card({ zone: ">1,05 событие", score: -2, value: "1,05", value_num: 1.05, observed_at: "2026-11-19" })], { allocation: alloc(50) }));
+  const back = mute(() => diff(before, panelOf([card({ zone: "0,97–1,02 паритет", score: 0, value: "1,01", value_num: 1.01, observed_at: "2026-11-18" })], { allocation: alloc(100) })));
+  assert.equal(back.length, 1);
+  assert.equal(back[0].kind, "allocation");
+  assert.ok(!back[0].causes.some((c) => /Срочная структура VIX/.test(c)), back[0].causes.join(" | "));
+  const fwd = diff(before, panelOf([card({ zone: "0,97–1,02 паритет", score: 0, value: "1,01", value_num: 1.01, observed_at: "2026-11-20" })], { allocation: alloc(100) }));
+  assert.equal(fwd.length, 1);
+  assert.ok(fwd[0].causes.includes("Срочная структура VIX: 1,05 → 1,01"), "дата вперёд — строка на месте: " + fwd[0].causes.join(" | "));
+});
+
 test("иена и нефть выходят по фиксингу ЕЦБ и цене EIA, а не по ночной котировке Yahoo", () => {
   // Неделя 21–28.10.2026: «Курсы валют (фиксинг ЕЦБ) · иена» уходили в 00:06 UTC и в воскресенье 19:26, «Цены на нефть
   // (EIA)» — в 00:26 UTC и в воскресенье 22:26: дата карточки сдвигалась с котировкой Yahoo поверх официального ряда.

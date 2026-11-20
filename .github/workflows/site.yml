@@ -109,8 +109,9 @@ jobs:
         run: node scripts/insider-surge-test.mjs
 
       - name: Проверить внутридневную термструктуру VIX
-        # Ядро ⟦VIXTERM-CORE⟧ из страницы: VIX и VIX3M в отношении — одной даты; без котировки VIX3M той же даты
-        # подмеса нет. Ключ stq:^vix3m — настоящей функцией valid() сборщика. Без сети.
+        # Ядро ⟦VIXTERM-CORE⟧ из страницы: VIX и VIX3M в отношении — одной даты; без котировки VIX3M той же даты —
+        # пара одной даты из снимка (v5.6.2), без неё подмеса нет. Ключи stq:^vix3m и cboe:vixpair — настоящими
+        # функциями сборщика valid() и vixPair(). Без сети.
         run: node scripts/vixterm-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome

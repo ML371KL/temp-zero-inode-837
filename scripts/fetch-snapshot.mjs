@@ -206,7 +206,25 @@ function valid(key,j){
     &&Array.isArray(j.history)&&j.history.length>=24&&j.history.every((r,i,a)=>r&&/^\d{4}-(0[1-9]|1[0-2])$/.test(r.m||"")&&(r.z===null||Number.isFinite(r.z))&&(i===0||a[i-1].m<r.m))
     &&j.history.some(r=>r.m===j.asOf&&!r.p); /* v5.6: ≥2 лет, месяцы по возрастанию без повторов, asOf — полный месяц истории */
   if(key==="cftc:es")           return Array.isArray(j)&&j.length>=52&&j.every(r=>r&&r.report_date_as_yyyy_mm_dd&&+r.open_interest_all>0); /* v4.15: ≥1 год недельных отчётов */
+  if(key==="cboe:vixpair")      return /^\d{4}-\d{2}-\d{2}$/.test(j.day||"")&&j.vix>5&&j.vix<150&&j.vix3m>5&&j.vix3m<150; /* v5.6.2: пара VIX/VIX3M одной даты */
   return true;
+}
+/* v5.6.2: последняя пара котировок VIX и VIX3M ОДНОЙ даты — {day,vix,vix3m} (ключ cboe:vixpair). Кладётся, когда свежие
+   котировки stq:^vix и stq:^vix3m этого прогона одной даты; после закрытия сессии это закрытия. Когда даты разошлись
+   (с ~08:30 UTC VIX идёт внебиржевыми часами новой даты, а у VIX3M их нет), пара переходит из прошлого снимка как есть:
+   это штатное утро, а не сбой источника, поэтому ни в failed, ни в stale_keys она не попадает — иначе страница каждое утро
+   печатала бы «сбои серверной сборки». Пара старше 7 суток и пара старше прошлой не кладутся. Страница берёт её в termLive
+   (⟦VIXTERM-CORE⟧), пока FRED не выложил закрытие этой даты: 20.11.2026 с 08:46 до 14:46 UTC карточка без неё откатывалась
+   с 1,05 (19.11) к 1,01 (18.11). Исполняет и scripts/vixterm-test.mjs. */
+function vixPair(vixCsv,vix3mCsv,prev,nowMs){
+  const row=c=>{ if(typeof c!=="string") return null;
+    const p=c.trim().split(/\r?\n/).pop().split(","), day=p[1], v=+p[6];
+    return /^\d{4}-\d{2}-\d{2}$/.test(day||"")&&v>5&&v<150?{day,v}:null; };
+  const ok=!!prev&&typeof prev==="object"&&/^\d{4}-\d{2}-\d{2}$/.test(prev.day||"")&&prev.vix>5&&prev.vix<150&&prev.vix3m>5&&prev.vix3m<150
+    &&nowMs-Date.parse(prev.day+"T00:00:00Z")<=7*86400e3;
+  const a=row(vixCsv), b=row(vix3mCsv);
+  if(a&&b&&a.day===b.day&&!(ok&&prev.day>a.day)) return {day:a.day,vix:a.v,vix3m:b.v};
+  return ok?{day:prev.day,vix:+prev.vix,vix3m:+prev.vix3m}:null;
 }
 /* условный запрос к stats.json панели 840: prev — прошлая копия из снимка, etag — ETag её ответа. Условие шлётся только при годной
    прошлой копии; 304 → копия как есть. Повторы — на сетевой сбой и HTTP-ошибку; «поля ещё нет» повтором не лечится. */
@@ -525,6 +543,9 @@ async function main(){
       }
     });
   }
+  /* v5.6.2: пара VIX/VIX3M одной даты — из СВЕЖИХ котировок этого прогона (до слияния с прошлым снимком), иначе прежняя */
+  { const vp=vixPair(R["stq:^vix"],R["stq:^vix3m"],prevSnap&&prevSnap.responses&&prevSnap.responses["cboe:vixpair"],Date.now());
+    if(vp&&valid("cboe:vixpair",vp)) R["cboe:vixpair"]=vp; }
 
   /* ── слияние с последним удачным снимком: сбой источника ≠ дырка на сайте ──
      v4.9: критерий здоровья fredOk считается ДО подкладок (раньше протухший ключ FRED
