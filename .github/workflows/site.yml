@@ -25,6 +25,7 @@ on:
       - "scripts/owner-test.mjs"
       - "scripts/insider-surge-test.mjs"
       - "scripts/vixterm-test.mjs"
+      - "scripts/panic-test.mjs"
       - "scripts/fixtures/**"
       - "scripts/fetch-snapshot.mjs"
       - ".github/workflows/site.yml"
@@ -113,6 +114,12 @@ jobs:
         # пара одной даты из снимка (v5.6.2), без неё подмеса нет. Ключи stq:^vix3m и cboe:vixpair — настоящими
         # функциями сборщика valid() и vixPair(). Без сети.
         run: node scripts/vixterm-test.mjs
+
+      - name: Проверить детектор «Паника при здоровой экономике»
+        # Ядро ⟦PANIC-CORE⟧ из страницы (v5.7.0): медленный балл — та же семейная агрегация, только кредит, экономика и
+        # ликвидность; пороги паники VIX 30 и VIX/VIX3M 1,05, порог здоровья +10, минимум 10 из 15 карточек. Контроль —
+        # живой снимок 21.11.2026: медленный балл +21,8, поправка +15. Без сети.
+        run: node scripts/panic-test.mjs
 
       - name: Проверить движок панели в настоящем Chrome
         # Движок живёт в браузере: страница поднимается целиком на текущем снимке и проверяется то,
