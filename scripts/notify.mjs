@@ -1574,7 +1574,12 @@ function diff(prevState, panel) {
     const changed = valueChanged(was, i);
 
     // Сдвиг оценки показателя — не сообщение, а материал для объяснения смены доли капитала.
-    if (zoneChanged) {
+    // Дата наблюдения откатилась назад — страница вернулась к более старой точке ряда (у термструктуры VIX 20.11.2026
+    // в 08:46 UTC: 1,05 за 19.11 → 1,01 за 18.11, пока FRED не выложил закрытие). Это не движение рынка, и строка
+    // «1,05 → 1,01» в «Что за этим стоит» читалась бы как ослабление стресса; факт — в логе.
+    const backdated = !!(i.observed_at && was.observed_at && i.observed_at < was.observed_at);
+    if (zoneChanged && backdated) console.log(`дата карточки откатилась (в причины смены доли не идёт): ${humanTitle(i.id, i.name)} ${was.observed_at} → ${i.observed_at}`);
+    if (zoneChanged && !backdated) {
       why.push({
         id: i.id,
         name: humanTitle(i.id, i.name),
@@ -2096,9 +2101,14 @@ function llmContext(panel) {
   const named = (panel.indicators || [])
     .filter((i) => HUMAN[i.id] && i.value)
     .slice(0, 20)
-    .map((i) => `${humanTitle(i.id, i.name)}: ${closeText(i) || fmtValue(i)}`);
+    .map((i) => contextLine(i));
   return { market_now: named };
 }
+// Значение карточки S&P 500 — уровень индекса, а положение к 200-дневной средней — её зона. Под словарным именем
+// «S&P 500 относительно 200-дневной средней» модель получала «7324» и могла пересказать уровень как отклонение.
+const contextLine = (i) => (i.id === "spx"
+  ? `S&P 500: ${fmtValue(i)}${i.zone ? ` (к 200-дневной средней: ${typo(i.zone)})` : ""}`
+  : `${humanTitle(i.id, i.name)}: ${closeText(i) || fmtValue(i)}`);
 // У карточек с официальным закрытием значение карточки — производная (у VIX — изменение за 30 дней), а имя в
 // словаре — сам индекс; модели уходит то же закрытие, что и читателю в строке «вышли новые данные».
 const closeText = (i) => (i.close ? typo(`${i.close.v.toFixed(i.close.digits ?? 2).replace(".", ",")}${i.close.unit ? ` ${i.close.unit}` : ""} (${i.close.word || "закрытие"} ${ruDay(Date.parse(i.close.d))})`) : "");
