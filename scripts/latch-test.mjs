@@ -1,9 +1,11 @@
-// Тест удержания детектора капекса до развязки (v5.8.0). Без сети и без браузера.
+// Тест удержания детектора капекса до развязки (v5.8.0, v5.8.1). Без сети и без браузера.
 //
-// Проверяется ОРИГИНАЛ: ядро ⟦LATCH-CORE⟧ (basketRelSince, sessionsAfter, capexLatchStep) исполняется прямо из
+// Проверяется ОРИГИНАЛ: ядро ⟦LATCH-CORE⟧ (basketRelSince, spxSince, sessionsAfter, capexLatchStep) исполняется прямо из
 // docs/index.html. Правило: СРАБОТАЛ капекса держится и после 14-дневного окна новостей, пока корзина капекса с закрытия
-// дня срабатывания отстаёт от S&P (медиана доходностей тикеров минус SPY, не меньше 3 тикеров), и не дольше 63 сессий
-// после последнего дня, когда СРАБОТАЛ давали сами новости. Память эпизода — cx памяти ступени {since, last}.
+// дня срабатывания отстаёт от S&P (медиана доходностей тикеров минус SPY, не меньше 3 тикеров) и пока S&P не закрылся
+// выше закрытия дня срабатывания, и не дольше 63 сессий после последнего дня, когда СРАБОТАЛ давали сами новости.
+// v5.8.1: концы отрезков — закрытия завершённых сессий (сессия данных), не живая свеча незакрытой сессии: снятие
+// удержания безвозвратно. Память эпизода — cx памяти ступени {since, last}.
 // Контроль — эпизод 6.10.2026: к 20.11 корзина отстала от S&P (MSFT −8,3%, GOOGL −23,7%, AMZN −3,7%, META −24,1%,
 // ORCL −29,8%, CRWV −56,9% против SPY −11,5%; медиана −23,9% → −12,4 п.п.).
 // Запуск: node scripts/latch-test.mjs
@@ -17,15 +19,16 @@ const test = (name, fn) => {
 };
 
 const page = readFileSync("docs/index.html", "utf-8").replace(/\r\n/g, "\n");
-const { LATCH, basketRelSince, sessionsAfter, capexLatchStep } = (() => {
+const { LATCH, basketRelSince, spxSince, sessionsAfter, capexLatchStep } = (() => {
   const m = page.match(/\/\* ⟦LATCH-CORE⟧ \*\/\n([\s\S]*?)\n\/\* ⟦\/LATCH-CORE⟧ \*\//);
   if (!m) throw new Error("в docs/index.html нет блока ⟦LATCH-CORE⟧");
-  return new Function(m[1] + "\nreturn {LATCH,basketRelSince,sessionsAfter,capexLatchStep};")();
+  return new Function(m[1] + "\nreturn {LATCH,basketRelSince,spxSince,sessionsAfter,capexLatchStep};")();
 })();
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 // ряд как у ypx(): {d: Date, c, a} по сессиям; days — даты ISO
 const ser = (days, vals) => days.map((d, k) => ({ d: new Date(d + "T14:30:00Z"), c: vals[k], a: vals[k] }));
 const D = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-11-19", "2026-11-20"];
+const TODAY = "2026-11-20";
 
 test("правило: 63 сессии после последнего факта, не меньше 3 тикеров", () => {
   assert.deepEqual(LATCH, { maxSessions: 63, minTickers: 3 });
@@ -35,8 +38,8 @@ test("отставание корзины: медиана тикеров с за
   const spy = ser(D, [101, 100, 99, 90, 88.5]);                           // SPY с 6.10: −11,5%
   const r = { MSFT: -8.3, GOOGL: -23.7, AMZN: -3.7, META: -24.1, ORCL: -29.8, CRWV: -56.9 };
   const baskets = Object.entries(r).map(([t, x]) => [t, ser(D, [100, 100, 100, 100, 100 * (1 + x / 100)])]);
-  const rel = basketRelSince(baskets, spy, "2026-10-06");
-  assert.ok(near(rel, ((-23.7 - 24.1) / 2 / 100 + 0.115) * 100, 1e-9), String(rel));
+  const rel = basketRelSince(baskets, spy, "2026-10-06", TODAY);
+  assert.ok(near(rel, ((-23.7 - 24.1) / 2 / 100 + 0.115) * 100), String(rel));
   assert.equal(Math.round(rel * 10) / 10, -12.4);
 });
 
@@ -44,17 +47,35 @@ test("один тикер не решает: медиана, а не средн�
   const spy = ser(D, [100, 100, 100, 100, 100]);
   const flat = [1, 2, 3, 4].map(k => ["T" + k, ser(D, [100, 100, 100, 100, 100])]);
   const crash = ["X", ser(D, [100, 100, 100, 100, 20])];                   // −80% у одного
-  assert.ok(near(basketRelSince([...flat, crash], spy, "2026-10-06"), 0));
+  assert.ok(near(basketRelSince([...flat, crash], spy, "2026-10-06", TODAY), 0));
+});
+
+test("v5.8.1: свеча незакрытой сессии после сессии данных в счёт не идёт", () => {
+  const days = [...D, "2026-11-23"];                                      // 23.11 — живая цена, сессия данных 20.11
+  const spy = ser(days, [100, 100, 100, 100, 100, 100]);
+  const b = [1, 2, 3].map(k => ["T" + k, ser(days, [100, 100, 100, 90, 90, 130])]);
+  assert.ok(near(basketRelSince(b, spy, "2026-10-06", TODAY), -10), "по закрытию 20.11 — −10 п.п.");
+  assert.ok(near(basketRelSince(b, spy, "2026-10-06", "2026-11-23"), 30), "закрытие 23.11 уже считается");
+  const spyUp = ser(days, [100, 100, 100, 99, 99, 105]);
+  assert.ok(near(spxSince(spyUp, "2026-10-06", TODAY), -1), "S&P по закрытию 20.11 — −1%");
+  assert.equal(sessionsAfter(spy, "2026-10-06", TODAY), 3, "живая свеча не считается сессией");
 });
 
 test("день между сессиями — закрытие последней сессии до него; ряда до дня нет — тикер не считается", () => {
   const spy = ser(D, [100, 100, 110, 110, 110]);
   const b = [1, 2, 3].map(k => ["T" + k, ser(D, [100, 100, 100, 100, 99])]);
-  assert.ok(near(basketRelSince(b, spy, "2026-10-08"), -1));            // от закрытия 7.10: корзина −1%, SPY 0%
+  assert.ok(near(basketRelSince(b, spy, "2026-10-08", TODAY), -1));      // от закрытия 7.10: корзина −1%, SPY 0%
   const late = [1, 2, 3].map(k => ["T" + k, ser(D.slice(2), [100, 100, 99])]);   // ряды начинаются после дня
-  assert.equal(basketRelSince(late, spy, "2026-10-06"), null);
-  assert.equal(basketRelSince([["A", ser(D, [1, 1, 1, 1, 1])]], spy, "2026-10-06"), null, "меньше 3 тикеров");
-  assert.equal(basketRelSince(b, null, "2026-10-06"), null, "нет SPY");
+  assert.equal(basketRelSince(late, spy, "2026-10-06", TODAY), null);
+  assert.equal(basketRelSince([["A", ser(D, [1, 1, 1, 1, 1])]], spy, "2026-10-06", TODAY), null, "меньше 3 тикеров");
+  assert.equal(basketRelSince(b, null, "2026-10-06", TODAY), null, "нет SPY");
+});
+
+test("S&P с дня срабатывания — по закрытию SPY без дивидендов; нет данных — null", () => {
+  const spy = D.map((d, k) => ({ d: new Date(d + "T14:30:00Z"), c: [100, 100, 98, 99, 101][k], a: [100, 100, 98, 99, 103][k] }));
+  assert.ok(near(spxSince(spy, "2026-10-06", TODAY), 1), "по close, а не по adjclose");
+  assert.equal(spxSince(spy, "2026-10-01", TODAY), null, "дня в ряду нет");
+  assert.equal(spxSince(null, "2026-10-06", TODAY), null);
 });
 
 test("сессии после последнего факта — по ряду SPY, строго после даты и не позже сегодняшней", () => {
@@ -66,42 +87,46 @@ test("сессии после последнего факта — по ряду 
 });
 
 test("шаг: новости дали СРАБОТАЛ — эпизод начинается или продолжается, last = сегодня", () => {
-  assert.deepEqual(capexLatchStep(null, true, "2026-10-06", null, null), { cx: { since: "2026-10-06", last: "2026-10-06" }, hold: false, off: null });
-  assert.deepEqual(capexLatchStep({ since: "2026-10-06", last: "2026-10-13" }, true, "2026-11-02", -9, 14),
-    { cx: { since: "2026-10-06", last: "2026-11-02" }, hold: false, off: null }, "начало эпизода не сдвигается");
+  assert.deepEqual(capexLatchStep(null, true, "2026-10-06", null, null, null), { cx: { since: "2026-10-06", last: "2026-10-06" }, hold: false, off: null });
+  assert.deepEqual(capexLatchStep({ since: "2026-10-06", last: "2026-10-13" }, true, "2026-11-02", -9, 14, 5),
+    { cx: { since: "2026-10-06", last: "2026-11-02" }, hold: false, off: null }, "начало эпизода не сдвигается, рост S&P при новостях не снимает");
 });
 
-test("шаг: новостей нет — держит, пока корзина отстаёт и срок не вышел", () => {
+test("шаг: новостей нет — держит, пока корзина отстаёт, S&P не выше дня срабатывания и срок не вышел", () => {
   const cx = { since: "2026-10-06", last: "2026-10-13" };
-  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", -12.4, 28), { cx, hold: true, off: null });
-  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", null, 28), { cx, hold: true, off: null }, "нет данных по корзине — держит");
-  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", -0.01, 63), { cx, hold: true, off: null }, "63-я сессия ещё держит");
+  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", -12.4, 28, -11.5), { cx, hold: true, off: null });
+  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", null, 28, null), { cx, hold: true, off: null }, "нет данных — держит");
+  assert.deepEqual(capexLatchStep(cx, false, "2026-11-20", -0.01, 63, 0), { cx, hold: true, off: null }, "63-я сессия и S&P вровень — ещё держит");
 });
 
-test("шаг: развязка — корзина отыграла отставание (≥ 0), срок — больше 63 сессий", () => {
+test("шаг: развязка — корзина отыграла (≥ 0) или S&P выше закрытия дня срабатывания (> 0); срок — больше 63 сессий", () => {
   const cx = { since: "2026-10-06", last: "2026-10-13" };
-  assert.deepEqual(capexLatchStep(cx, false, "2026-12-01", 0, 30), { cx: null, hold: false, off: "resolved" });
-  assert.deepEqual(capexLatchStep(cx, false, "2026-12-01", 3.2, 30), { cx: null, hold: false, off: "resolved" });
-  assert.deepEqual(capexLatchStep(cx, false, "2027-01-20", -20, 64), { cx: null, hold: false, off: "term" });
-  assert.deepEqual(capexLatchStep(cx, false, "2027-01-20", null, 64), { cx: null, hold: false, off: "term" });
+  assert.deepEqual(capexLatchStep(cx, false, "2026-12-01", 0, 30, -3), { cx: null, hold: false, off: "resolved" });
+  assert.deepEqual(capexLatchStep(cx, false, "2026-12-01", 3.2, 30, 2), { cx: null, hold: false, off: "resolved" });
+  assert.deepEqual(capexLatchStep(cx, false, "2026-12-01", -8, 30, 0.2), { cx: null, hold: false, off: "market" });
+  assert.deepEqual(capexLatchStep(cx, false, "2027-01-20", -20, 64, -5), { cx: null, hold: false, off: "term" });
+  assert.deepEqual(capexLatchStep(cx, false, "2027-01-20", null, 64, null), { cx: null, hold: false, off: "term" });
 });
 
 test("шаг: эпизода нет или память битая — удержания нет", () => {
   for (const bad of [null, undefined, {}, { since: "2026-10-06" }, { since: "06.10.2026", last: "2026-10-13" }, "x", 5])
-    assert.deepEqual(capexLatchStep(bad, false, "2026-11-20", -10, 5), { cx: null, hold: false, off: null }, JSON.stringify(bad));
+    assert.deepEqual(capexLatchStep(bad, false, "2026-11-20", -10, 5, -2), { cx: null, hold: false, off: null }, JSON.stringify(bad));
 });
 
-test("страница: капекс держит по ядру, память эпизода — в памяти ступени, источник памяти — как у машины", () => {
-  assert.match(page, /const L=capexLatchStep\(pcx,D\.st==="fired",day,rel,sess\);\n {4}state\.capexLatch=L\.cx;/);
+test("страница: капекс держит по ядру на сессии данных, память эпизода — в памяти ступени, источник памяти — как у машины", () => {
+  assert.match(page, /const L=capexLatchStep\(pcx,D\.st==="fired",day,rel,sess,spx\);\n {4}state\.capexLatch=L\.cx;/);
   assert.match(page, /if\(L\.hold\) return \{st:"fired",pts:-15,co:\[\],latched:true,/);
-  assert.match(page, /rel=basketRelSince\(CONFIG\.CYCLE\.capexTickers\.map\(t=>\[t,ypx\(t\)\]\),spy,pcx\.since\);/);
+  assert.match(page, /rel=basketRelSince\(CONFIG\.CYCLE\.capexTickers\.map\(t=>\[t,ypx\(t\)\]\),spy,pcx\.since,day\);\n {6}spx=spxSince\(spy,pcx\.since,day\);/);
+  assert.match(page, /const pcx=\(prevRungMemory\(\)\|\|\{\}\)\.cx\|\|null, day=dataAsOfNow\(\), spy=ypx\("SPY"\);/);
   assert.match(page, /const memory=\{v:2,rung:cur,since,pend,pendSession,lastMove,cx:state\.capexLatch\?\?null\};/);
   assert.match(page, /const dataAsOf=dataAsOfNow\(\);/);
+  assert.ok(!/spy\[spy\.length-1\]|rows\[rows\.length-1\]/.test(page.match(/\/\* ⟦LATCH-CORE⟧ \*\/[\s\S]*?⟦\/LATCH-CORE⟧/)[0]), "в ядре нет последней свечи ряда");
   // источник памяти до шага — тот же порядок, что в compute(): писатель → журнал сервера → браузер
   const fn = page.match(/function prevRungMemory\(\)\{[\s\S]*?\n\}/)[0];
   assert.ok(fn.indexOf("W.memory") < fn.indexOf("state.ledger") && fn.indexOf("state.ledger") < fn.indexOf("razlom26.rung.v2"));
   assert.match(page, /if\(W\)\{ mem=validMem\(W\.memory\); source="writer"; \}\n {2}else if\(state\.ledger&&validMem\(state\.ledger\.memory\)\)/);
   assert.match(page, /Удержание \(v5\.8\): СРАБОТАЛ держится и после окна новостей/);
+  assert.match(page, /или S&P закроется выше закрытия дня срабатывания, либо через 63 сессии после последнего факта/);
 });
 
 console.log(`\n${passed} ok, ${failures} fail`);
