@@ -158,15 +158,17 @@ try {
     const r = await page.evaluate(() => {
       const last = id => (DETECTORS.find(d => d.id === id) || {}).last || {};
       const cap = last("d_capex"), Tc = newsTally(state.news.capex || []);
-      return { st: cap.st, pts: cap.pts, inputs: cap.inputs || "", want: newsDet(Tc, "capex"), retreat: Tc.fN + Tc.uN,
+      return { st: cap.st, pts: cap.pts, inputs: cap.inputs || "", want: newsDet(Tc, "capex"), retreat: Tc.fN + Tc.uN, latched: !!cap.latched,
         fric: Tc.fric, fired: state.detFired || {}, freezeBy: state.decision.freezeBy || [], newsAt: !!state.newsAt };
     });
     assert.ok(r.newsAt, "сканер новостей не отработал");
-    assert.deepEqual([r.st, r.pts], [r.want.st, r.want.pts], "капекс считает не по правилу v5.4");
-    if (!r.retreat) assert.deepEqual([r.st, r.pts], ["calm", 0], "без отступлений капекс СПОКОЙНО, 0");
+    /* v5.8.0: без новостей СРАБОТАЛ может держаться до развязки — тогда это −15 и строка удержания */
+    if (r.latched) assert.deepEqual([r.st, r.pts], ["fired", -15], "удержание капекса — СРАБОТАЛ, −15");
+    else assert.deepEqual([r.st, r.pts], [r.want.st, r.want.pts], "капекс считает не по правилу v5.4");
+    if (!r.retreat && !r.latched) assert.deepEqual([r.st, r.pts], ["calm", 0], "без отступлений капекс СПОКОЙНО, 0");
     if (!r.fired.capex) assert.ok(!r.freezeBy.includes("Капекс"), "заморозка капексом без срабатывания");
     if (!r.fired.bdc) assert.ok(!r.freezeBy.includes("Стресс BDC"), "заморозка BDC без срабатывания");
-    assert.match(r.inputs, /^отступление: фактов \d+/, "строка детектора начинается с отступлений");
+    assert.match(r.inputs, r.latched ? /^удержание до развязки: / : /^отступление: фактов \d+/, "строка детектора начинается с отступлений или удержания");
     console.log("      капекс:", r.st, r.pts, "·", r.inputs.replace(/\s+/g, " ").slice(0, 160));
   });
   await test("v5.5: поправка владельца — выключенная не меняет вывода, включённая: min(модель, cap), модель прежняя", async () => {
@@ -406,6 +408,46 @@ try {
     assert.equal(await S(() => localStorage.getItem("razlom26.rung.v2")), null);
   });
   await test("сценарии без ошибок JS", async () => assert.deepEqual(w.errors, []));
+
+  /* v5.8.0: удержание СРАБОТАЛ капекса до развязки. Писатель получает эпизод в памяти ступени (cx); ряды корзины и SPY
+     подменяются в снимке страницы: корзина отстаёт — СРАБОТАЛ держится, отыграла — снят, срок вышел — снят. */
+  const L = await open({ v: 2, rung: 2, since: "2026-01-02", pend: null, pendSession: null });
+  const LS = (fn, ...a) => L.page.evaluate(fn, ...a);
+  await test("v5.8.0: капекс держит СРАБОТАЛ до развязки, снимает по корзине и по сроку; эпизод — в памяти ступени", async () => {
+    const r = await LS(() => {
+      const newsFired = newsDet(newsTally(state.news.capex || []), "capex").st === "fired";
+      const day = state.decision.dataAsOf, t1 = Date.parse(day + "T14:30:00Z") / 1000;
+      const back = n => new Date((t1 - n * 86400) * 1000).toISOString().slice(0, 10);
+      const put = (sym, f) => { const rows = []; for (let k = 119; k >= 0; k--) { const v = f(k); rows.push([t1 - k * 86400, v, v]); } SNAP.responses["ypx:" + sym] = rows; };
+      const runWith = (cx, basket) => {
+        put("SPY", () => 100);
+        for (const t of CONFIG.CYCLE.capexTickers) put(t, basket);
+        window.__RUNG_WRITER.memory = { v: 2, rung: 2, since: "2026-01-02", pend: null, pendSession: null, cx };
+        compute();
+        const cap = DETECTORS.find(d => d.id === "d_capex").last;
+        return { st: cap.st, pts: cap.pts, latched: !!cap.latched, inputs: cap.inputs, fired: !!(state.detFired || {}).capex,
+          freeze: state.decision.freezeBy || [], cx: state.decision.memory.cx };
+      };
+      const cx = { since: back(30), last: back(10) };
+      return { newsFired, cx,
+        hold: runWith(cx, k => k >= 30 ? 100 : 80),                                     // корзина с since −20%, SPY плоский
+        resolved: runWith(cx, k => k >= 30 ? 100 : 101),                                // корзина выше дня срабатывания
+        term: runWith({ since: back(100), last: back(80) }, k => k >= 100 ? 100 : 80),   // 80 сессий без новых фактов
+        none: runWith(null, () => 80) };
+    });
+    if (r.newsFired) { console.log("      (в снимке капекс срабатывает по новостям — сценарий удержания пропущен)"); return; }
+    assert.deepEqual([r.hold.st, r.hold.pts, r.hold.latched, r.hold.fired], ["fired", -15, true, true], "корзина отстаёт — СРАБОТАЛ держится");
+    assert.ok(r.hold.freeze.includes("Капекс"), "удержанный капекс замораживает повышения");
+    assert.deepEqual(r.hold.cx, r.cx, "эпизод остаётся в памяти ступени");
+    assert.match(r.hold.inputs, /^удержание до развязки: СРАБОТАЛ с \d{2}\.\d{2}\.\d{4}, последний факт \d{2}\.\d{2}\.\d{4} · корзина с \d{2}\.\d{2}\.\d{4} к S&P [−-]20,0 п\.п\. · сессий после факта 10 из 63 · /);
+    assert.deepEqual([r.resolved.latched, r.resolved.cx], [false, null], "корзина отыграла — удержание снято");
+    assert.notEqual(r.resolved.st, "fired");
+    assert.match(r.resolved.inputs, /удержание снято: корзина отыграла отставание от S&P \(\+1,0 п\.п\. с /);
+    assert.deepEqual([r.term.latched, r.term.cx], [false, null], "срок вышел — удержание снято");
+    assert.match(r.term.inputs, /удержание снято по сроку: 63 сессий без новых фактов/);
+    assert.deepEqual([r.none.latched, r.none.cx], [false, null], "без эпизода удержания нет");
+  });
+  await test("v5.8.0: сценарии удержания без ошибок JS", async () => assert.deepEqual(L.errors, []));
 
   /* v5.5.1: ставка ФРС на дату раньше окна её ряда — неизвестна. 17.09.2026 ФРС подняла ставку (IORB 3,65 → 3,90,
      верх коридора 3,75 → 4,00); когда окно ряда ставки ушло за 17.09, страница подставляла в 14–16.09 самую позднюю
