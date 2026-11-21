@@ -1,9 +1,9 @@
 {
  "v": 1,
- "updated_at": "2026-11-21T04:27:11.690Z",
- "snapshot_at": "2026-11-21T04:26:35.436Z",
+ "updated_at": "2026-11-21T04:47:02.564Z",
+ "snapshot_at": "2026-11-21T04:46:34.766Z",
  "dataAsOf": "2026-11-19",
- "memory": {"v":2,"rung":2,"since":"2026-10-28","pend":null,"pendSession":null,"lastMove":{"d":"2026-10-28","from":1,"to":2}},
+ "memory": {"v":2,"rung":2,"since":"2026-10-28","pend":null,"pendSession":null,"lastMove":{"d":"2026-10-28","from":1,"to":2},"cx":null},
  "decision": {"regime":"moderate","regimeWord":"РИСК УМЕРЕННЫЙ","rung":2,"pct":100,"raw":2,"composite":10.67,"lead":-13.33,"coin":10,"tail":{"p":0.1169,"base":0.17},"override":false,"frozen":false},
  "transitions": [
   {"d":"2026-10-16","from":2,"to":1,"composite":-14},
